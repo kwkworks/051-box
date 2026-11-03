@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+/* 크로스핏051 박스 색: 흰 벽, 검은 매트, 버건디/노랑 띠 */
+:root {
+  --bg: #f3f0ea;
+  --surface: #ffffff;
+  --ink: #2a2320;
+  --muted: #6b6560;
+  --line: #2a2320;
+  --soft-line: #ddd6cb;
+  --burgundy: #7a2e3a;
+  --yellow: #e8b923;
+  --mat: #26262a;
+  --danger: #c2453a;
+  --ok: #2f8a52;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-burgundy: var(--burgundy);
+  --color-yellow: var(--yellow);
+  --color-mat: var(--mat);
+  --font-sans: system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+.card {
+  background: var(--surface);
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 3px 0 var(--line);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: 0 2px 0 var(--line);
+  cursor: pointer;
+  transition: transform 60ms;
+}
+.btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 var(--line);
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--yellow);
+}
+.btn-dark {
+  background: var(--burgundy);
+  color: #fff;
+}
+.btn-danger {
+  background: #fff;
+  color: var(--danger);
+  border-color: var(--danger);
+  box-shadow: 0 2px 0 var(--danger);
+}
+.btn-sm {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.input {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 2px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 15px;
+}
+.input:focus {
+  outline: 3px solid var(--yellow);
+  outline-offset: 1px;
+}
+textarea.input {
+  min-height: 110px;
+  resize: vertical;
+}
+
+.label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #fff;
+}
