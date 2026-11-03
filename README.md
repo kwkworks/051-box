@@ -3,7 +3,8 @@
 실제 크로스핏051 박스를 옮겨놓은 **2D 픽셀 공간**에서 내 캐릭터로 돌아다니며 WOD, 공지, 대회 신청, 모임, 1RM 기록을 확인하는 박스 전용 커뮤니티 웹앱입니다.
 네이버 카페에 흩어져 있던 공지와, 회원들이 오프라인에서 따로 모여 하던 대회 신청을 한 곳으로 모았습니다.
 
-- **배포 주소:** _배포 후 기입_
+- **배포 주소:** https://051-box.vercel.app (백엔드 API: https://zero51-box.onrender.com/health)
+- 회원 전용 서비스라 로그인 후 관리자 승인이 필요합니다. 무료 서버라 오래 쉬었다면 첫 접속에 최대 1분 걸릴 수 있습니다.
 - **기획 문서:** [docs/PRD.md](docs/PRD.md) · 설계: [docs/design.md](docs/design.md) · 결정 기록: [docs/decisions.md](docs/decisions.md)
 
 ## 주요 기능
@@ -56,9 +57,12 @@
 
 | 도구 | 어디에 썼나 |
 |---|---|
-| _Supabase MCP_ | _DB 스키마 적용, RLS 정책 검증 (진행 후 기입)_ |
+| 서브 에이전트 | 수업 자료 PDF 7개를 3개 에이전트가 나눠 읽고, 수업에서 다룬 프론트/백엔드/DB/배포 기술을 비교해 스택 결정 ([decisions.md D12](docs/decisions.md)) |
+| 웹 검색 | 2026년 기준 무료 플랜 한도(Supabase, Render, Vercel, Cloudflare), 카카오 KOE205 원인 확인 |
+| Supabase MCP | 프로젝트 전용으로 연결 설정 ([.mcp.json](.mcp.json), 이 프로젝트에만 접근 가능). 이번 작업에서 스키마는 SQL Editor로 적용했고, 이후 DB 점검에 사용 |
+| 내장 브라우저 미리보기 | 2D 공간 길찾기 버그(데스크 모서리에 걸림), 로그인·개인정보처리방침 화면을 직접 띄워 확인 |
+| gh CLI | GitHub 저장소 생성과 업로드 |
 | Next.js 공식 문서 (`node_modules/next/dist/docs`) | Next.js 16 변경점 확인 후 코드 작성 |
-| 서브 에이전트 | 수업 자료 PDF 7개를 나눠 읽고 수업에서 다룬 기술 스택 비교 |
 
 ## 보안
 
