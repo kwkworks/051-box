@@ -85,3 +85,6 @@ cp .env.example .env.local  # 값 채우기
 npm install
 npm run dev                 # http://localhost:3000
 ```
+<img width="1468" height="891" alt="image" src="https://github.com/user-attachments/assets/c45d14f4-1537-477d-b3aa-460ac1bcd9c5" />
+<img width="1420" height="895" alt="image" src="https://github.com/user-attachments/assets/4f5799b5-9fb4-46b2-9aec-2489ab0cf09e" />
+
