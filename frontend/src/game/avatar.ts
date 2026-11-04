@@ -4,6 +4,8 @@ import { COLORS, type Avatar } from '@/lib/constants';
 // 한 번 그린 모습은 캐시에 저장해두고 다시 쓴다.
 export type Dir = 'down' | 'up' | 'left' | 'right';
 export type Pose = 'stand' | 'sit' | 'dance';
+// 그릴 때만 쓰는 자세 (점프 중 공중 동작). 네트워크로 주고받지 않는다
+export type DrawPose = Pose | 'air';
 
 type Rect = [x: number, y: number, w: number, h: number, color: string];
 
@@ -24,7 +26,7 @@ function shade(hex: string, amount: number): string {
 }
 
 // 오른쪽(right) / 정면(down) / 뒷모습(up)만 그린다. 왼쪽은 오른쪽을 좌우 반전한다.
-function buildRects(a: Avatar, dir: 'down' | 'up' | 'right', frame: number, pose: Pose): Rect[] {
+function buildRects(a: Avatar, dir: 'down' | 'up' | 'right', frame: number, pose: DrawPose): Rect[] {
   const skin = COLORS.skin[a.skin];
   const skinDark = shade(skin, -28);
   const hair = COLORS.hair[a.hairColor];
@@ -109,13 +111,17 @@ function buildRects(a: Avatar, dir: 'down' | 'up' | 'right', frame: number, pose
   const raisedArm = (ax: number, w: number) => {
     add([ax, 13, w, 3, sleeveLen ? top : skin], [ax, 10, w, 3, skin], [ax, 8, w, 2, skin]);
   };
-  if (pose === 'dance' && !side) {
+  if (pose === 'air' && !side) {
+    // 공중: 두 팔을 번쩍
+    raisedArm(3, 3);
+    raisedArm(18, 3);
+  } else if (pose === 'dance' && !side) {
     if (frame !== 2) raisedArm(3, 3);
     else armRects(3, 16, 3);
     if (frame !== 1) raisedArm(18, 3);
     else armRects(18, 16, 3);
   } else if (side) {
-    if (pose === 'dance') raisedArm(11, 3);
+    if (pose === 'dance' || pose === 'air') raisedArm(11, 3);
     else armRects(11 + step, 16, 3);
   } else {
     armRects(3, 16 + Math.max(0, step), 3);
@@ -290,7 +296,7 @@ function buildRects(a: Avatar, dir: 'down' | 'up' | 'right', frame: number, pose
 const cache = new Map<string, HTMLCanvasElement>();
 const PAD = 1;
 
-function renderSprite(a: Avatar, dir: Dir, frame: number, pose: Pose): HTMLCanvasElement {
+function renderSprite(a: Avatar, dir: Dir, frame: number, pose: DrawPose): HTMLCanvasElement {
   const key = `${JSON.stringify(a)}|${dir}|${frame}|${pose}`;
   const hit = cache.get(key);
   if (hit) return hit;
@@ -340,12 +346,15 @@ export function drawAvatar(
   dir: Dir,
   frame: number,
   scale: number,
-  pose: Pose = 'stand',
+  pose: DrawPose = 'stand',
   lift = 0, // 점프 높이 (그림자는 바닥에 남는다)
+  squash = 1, // 세로 비율: 1보다 작으면 웅크림(가로는 그만큼 넓게), 크면 늘어남
 ) {
-  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  // 높이 뜰수록 그림자가 작고 옅어진다
+  const far = Math.min(1, lift / 30);
+  ctx.fillStyle = `rgba(0,0,0,${0.28 - far * 0.12})`;
   ctx.beginPath();
-  ctx.ellipse(x, y - scale, 7 * scale, 2 * scale, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y - scale, 7 * scale * (1 - far * 0.35), 2 * scale * (1 - far * 0.35), 0, 0, Math.PI * 2);
   ctx.fill();
 
   const sprite = renderSprite(avatar, dir, frame, pose);
@@ -353,10 +362,10 @@ export function drawAvatar(
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(
     sprite,
-    Math.round(x - (sprite.width / 2) * scale),
-    Math.round(y - lift - (SPRITE_H + PAD) * scale),
-    sprite.width * scale,
-    sprite.height * scale,
+    Math.round(x - (sprite.width / 2) * scale * (2 - squash)),
+    Math.round(y - lift - (SPRITE_H + PAD) * scale * squash),
+    sprite.width * scale * (2 - squash),
+    sprite.height * scale * squash,
   );
   ctx.imageSmoothingEnabled = prev;
 }

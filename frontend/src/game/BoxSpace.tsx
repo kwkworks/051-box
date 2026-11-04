@@ -39,7 +39,23 @@ export type Action = 'jump' | 'sit' | 'dance' | 'run';
 
 const SPEED = 150; // 초당 이동 픽셀
 const RUN_SPEED = 260;
-const JUMP_MS = 480;
+const JUMP_MS = 560;
+// 점프 동작: 웅크림(준비) → 공중(팔 번쩍, 포물선) → 착지(살짝 눌림)
+const JUMP_PREP = 90;
+const JUMP_LAND = 100;
+const JUMP_HEIGHT = 26;
+function jumpState(t: number): { lift: number; squash: number; air: boolean } {
+  if (t < 0 || t >= JUMP_MS) return { lift: 0, squash: 1, air: false };
+  if (t < JUMP_PREP) return { lift: 0, squash: 1 - 0.18 * Math.sin((Math.PI / 2) * (t / JUMP_PREP)), air: false };
+  const airMs = JUMP_MS - JUMP_PREP - JUMP_LAND;
+  if (t < JUMP_PREP + airMs) {
+    const u = (t - JUMP_PREP) / airMs;
+    // 이륙/낙하 순간엔 몸이 길게, 꼭대기에선 원래대로
+    return { lift: 4 * JUMP_HEIGHT * u * (1 - u), squash: 1 + 0.1 * Math.abs(1 - 2 * u), air: true };
+  }
+  const v = (t - JUMP_PREP - airMs) / JUMP_LAND;
+  return { lift: 0, squash: 1 - 0.15 * Math.sin(Math.PI * v), air: false };
+}
 const POSES: Pose[] = ['stand', 'sit', 'dance'];
 const SPRITE_SCALE = 1.4;
 const BUBBLE_MAX = 60;
@@ -457,21 +473,24 @@ export function BoxSpace({
           : p.moving
             ? (Math.floor(now / (p.running ? 100 : 160)) % 2) + 1
             : 0;
-      const lift = (p: Player) => {
-        const t = p.jumpStart ? now - p.jumpStart : JUMP_MS;
-        const jump = t < JUMP_MS ? Math.sin((Math.PI * t) / JUMP_MS) * 22 : 0;
-        const bounce = p.pose === 'dance' ? Math.abs(Math.sin(now / 130)) * 3 : 0;
-        return jump + bounce;
-      };
+      // 사람마다 이번 프레임의 점프 높이를 계산해 두고, 이름표·말풍선도 같은 높이만큼 올린다
+      const lifts = new Map<string, number>();
       for (const p of everyone) {
-        drawAvatar(ctx, p.avatar, p.x, p.y, p.pose === 'dance' ? 'down' : p.dir, frame(p), SPRITE_SCALE, p.pose, lift(p));
+        const j = jumpState(p.jumpStart ? now - p.jumpStart : JUMP_MS);
+        const bounce = p.pose === 'dance' && !j.air ? Math.abs(Math.sin(now / 130)) * 3 : 0;
+        const lift = j.lift + bounce;
+        lifts.set(p.id, lift);
+        drawAvatar(
+          ctx, p.avatar, p.x, p.y, p.pose === 'dance' ? 'down' : p.dir,
+          j.air ? 0 : frame(p), SPRITE_SCALE, j.air ? 'air' : p.pose, lift, j.squash,
+        );
       }
 
       // 이름표와 말풍선
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       for (const p of everyone) {
-        const headY = p.y - SPRITE_H * SPRITE_SCALE - 6;
+        const headY = p.y - (lifts.get(p.id) ?? 0) - SPRITE_H * SPRITE_SCALE - 6;
         ctx.font = 'bold 10px system-ui, "Malgun Gothic", sans-serif';
         const w = ctx.measureText(p.nickname).width + 10;
         ctx.fillStyle = p.id === me.id ? 'rgba(122,46,58,0.92)' : 'rgba(20,20,22,0.75)';
