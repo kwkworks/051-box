@@ -42,6 +42,9 @@ function Space({ me }: { me: Me }) {
 
   // 채팅 접속 기록: 박스에 들어오면 시작하고 30초마다 갱신한다.
   // 오래 끊겼다가 돌아오면 새 접속으로 시작해서, 없던 동안의 대화는 보이지 않는다 (DB가 강제).
+  // 채팅 다시 불러오기: 휴대폰은 화면이 꺼지거나 다른 앱으로 가면 실시간 연결이 멈춰서
+  // 그 사이 메시지를 놓친다. 연결이 돌아올 때, 화면이 다시 보일 때, 30초마다 서버에서 다시 받아 맞춘다.
+  const refreshChat = useRef<() => void>(() => {});
   useEffect(() => {
     let alive = true;
     let sid: string | null = null;
@@ -54,7 +57,10 @@ function Space({ me }: { me: Me }) {
         setSessions(res.sessions);
         setChatLocked(res.locked);
         setMutedUntil(res.mutedUntil);
-      });
+      }, () => {});
+    refreshChat.current = () => {
+      if (sid && document.visibilityState === 'visible') load(sid);
+    };
     const start = () =>
       api.post<{ id: string }>('/chat/session').then(
         (res) => {
@@ -67,6 +73,7 @@ function Space({ me }: { me: Me }) {
       api.post<{ alive: boolean }>(`/chat/session/${sid}/ping`).then(
         (res) => {
           if (!res.alive) start();
+          else if (sid) load(sid);
         },
         () => {},
       );
@@ -76,6 +83,7 @@ function Space({ me }: { me: Me }) {
     document.addEventListener('visibilitychange', ping);
     return () => {
       alive = false;
+      refreshChat.current = () => {};
       clearInterval(timer);
       document.removeEventListener('visibilitychange', ping);
     };
@@ -156,6 +164,7 @@ function Space({ me }: { me: Me }) {
           onOpen={open}
           onActionState={setAction}
           onChat={addMessage}
+          onRealtimeReady={() => refreshChat.current()}
           onRequestChat={() => chatInputRef.current?.focus()}
           handleRef={spaceRef}
         />

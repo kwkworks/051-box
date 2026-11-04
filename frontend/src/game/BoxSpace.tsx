@@ -102,6 +102,7 @@ export function BoxSpace({
   onNearbyChange,
   onActionState,
   onChat,
+  onRealtimeReady,
   onRequestChat,
   handleRef,
 }: {
@@ -110,6 +111,8 @@ export function BoxSpace({
   onNearbyChange?: (target: ObjectKey | null) => void;
   onActionState?: (state: ActionState) => void;
   onChat?: (message: ChatMessage) => void;
+  // 실시간 연결이 (다시) 이어졌을 때: 끊긴 사이 놓친 채팅을 다시 불러오게 한다
+  onRealtimeReady?: () => void;
   onRequestChat?: () => void;
   handleRef?: React.RefObject<BoxSpaceHandle | null>;
 }) {
@@ -120,9 +123,9 @@ export function BoxSpace({
   const [connection, setConnection] = useState<'connecting' | 'online' | 'offline'>('connecting');
   const [connError, setConnError] = useState<string | null>(null);
   const avatarKey = JSON.stringify(normalizeAvatar(profile.avatar));
-  const callbacks = useRef({ onOpen, onNearbyChange, onActionState, onChat, onRequestChat });
+  const callbacks = useRef({ onOpen, onNearbyChange, onActionState, onChat, onRequestChat, onRealtimeReady });
   useEffect(() => {
-    callbacks.current = { onOpen, onNearbyChange, onActionState, onChat, onRequestChat };
+    callbacks.current = { onOpen, onNearbyChange, onActionState, onChat, onRequestChat, onRealtimeReady };
   });
 
   useEffect(() => {
@@ -428,6 +431,7 @@ export function BoxSpace({
             retryDelay = 2000;
             setConnection('online');
             setConnError(null);
+            callbacks.current.onRealtimeReady?.();
             await ch.track(presencePayload());
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             subscribed = false;
