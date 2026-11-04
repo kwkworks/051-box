@@ -188,7 +188,8 @@ export function rowsToWods(rows, { from, to }) {
   if (col.date < 0 || (col.title < 0 && !hasBody)) {
     throw new HttpError(400, '첫 줄에 "날짜" 열과 "제목" 또는 "스트렝스/본 와드" 열이 있어야 해요');
   }
-  const cell = (r, c) => (c >= 0 ? (r[c] ?? '').trim() : '');
+  // 칸 안의 줄바꿈은 \r\n(붙여넣기)일 수 있어 \n으로 맞춘다 (빈 줄이 사라지지 않게)
+  const cell = (r, c) => (c >= 0 ? (r[c] ?? '').replace(/\r\n?/g, '\n').trim() : '');
   const wods = [];
   const skipped = [];
   for (const [i, r] of rows.slice(1, MAX_ROWS + 1).entries()) {

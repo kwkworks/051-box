@@ -13,8 +13,8 @@ export function Guard({ need, children }: { need: Need; children: (me: Me) => Re
   const router = useRouter();
 
   const role = me?.profile.role;
-  const allowed =
-    !!me && (need === 'login' || (need === 'member' && role !== 'pending') || (need === 'admin' && role === 'admin'));
+  const active = role === 'member' || role === 'admin'; // 승인 대기·거절은 회원 화면에 못 들어간다
+  const allowed = !!me && (need === 'login' || (need === 'member' && active) || (need === 'admin' && role === 'admin'));
 
   useEffect(() => {
     if (!ready) return;
@@ -23,9 +23,9 @@ export function Guard({ need, children }: { need: Need; children: (me: Me) => Re
       return;
     }
     if (!me) return;
-    if (need !== 'login' && role === 'pending') router.replace('/pending');
+    if (need !== 'login' && !active) router.replace('/pending');
     else if (need === 'admin' && role !== 'admin') router.replace('/');
-  }, [ready, session, me, role, need, router]);
+  }, [ready, session, me, role, active, need, router]);
 
   if (meError) {
     return (

@@ -197,6 +197,30 @@ begin
   delete from public.one_rm_records where user_id = a and ((movement = 'fran' and unit = 'time') or (movement = 'front_squat' and weight_lb = 185))
     and created_at > now() - interval '1 minute';
 
+  -- ---- 0008: 승인 취소 회원 기록 숨김 + 관리자 전체 삭제
+  -- 임시 계정 c를 회원으로 올려 "다른 회원" 시점으로 보고, 회원 a를 잠시 승인 취소한다
+  update public.profiles set role = 'member' where id = c;
+  update public.profiles set role = 'pending' where id = a;
+  insert into rls_results values
+  (58, '승인 취소 회원의 1RM 기록을 다른 회원이 조회', 'ok:0', pg_temp.run_as(c, format('select 1 from public.one_rm_records where user_id = %L', a))),
+  (59, '관리자는 승인 취소 회원 기록 조회 가능', 'ok:1', pg_temp.run_as(d, format('select 1 from public.one_rm_records where user_id = %L limit 1', a)));
+  update public.profiles set role = 'member' where id = a;
+  insert into rls_results values
+  (60, '다시 승인하면 기록이 다시 보임', 'ok:1', pg_temp.run_as(c, format('select 1 from public.one_rm_records where user_id = %L limit 1', a))),
+  (61, '회원이 기록 전체 삭제 함수 실행', 'err', pg_temp.run_as(c, format('select public.admin_purge_member_records(%L)', a))),
+  (62, '관리자 계정의 기록 전체 삭제 시도', 'err', pg_temp.run_as(d, format('select public.admin_purge_member_records(%L)', d)));
+  update public.profiles set role = 'pending' where id = c;
+
+  -- 가입 거절 → 본인이 다시 신청 (거절 상태에서만, 승인 대기로만)
+  update public.profiles set role = 'rejected' where id = c;
+  insert into rls_results values
+  (63, '거절된 사람이 스스로 회원으로 바꾸기', 'err', pg_temp.run_as(c, format('update public.profiles set role = ''member'' where id = %L', c))),
+  (64, '거절된 사람이 다시 신청', 'ok:1', pg_temp.run_as(c, 'select public.reapply_membership()')),
+  (66, '거절되지 않은 회원이 다시 신청 함수 실행', 'err', pg_temp.run_as(a, 'select public.reapply_membership()'));
+  -- 한 문장 안에서는 바뀌기 전 값을 읽으므로, 다시 신청한 결과는 다음 문장에서 확인한다
+  insert into rls_results values
+  (65, '다시 신청하면 승인 대기 상태', 'ok:pending', 'ok:' || (select role from public.profiles where id = c));
+
   -- 도배 방지: 10초 안에 5개를 이미 보냈으면 6번째는 거부
   -- 앞 테스트에서 관리자가 보낸 메시지를 지우고, 정확히 5개를 채운 뒤 6번째를 시도한다
   delete from public.chat_messages where user_id = d and body like 'rls-test%';

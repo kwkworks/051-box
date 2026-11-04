@@ -16,7 +16,7 @@ export default function AdminPage() {
   return <Guard need="admin">{(me) => <Admin me={me} />}</Guard>;
 }
 
-const ROLE_LABEL: Record<Role, string> = { pending: '승인 대기', member: '회원', admin: '관리자' };
+const ROLE_LABEL: Record<Role, string> = { pending: '승인 대기', member: '회원', admin: '관리자', rejected: '거절됨' };
 
 function Admin({ me }: { me: Me }) {
   const [tab, setTab] = useState<'members' | 'holidays' | 'sheet'>('members');
@@ -60,8 +60,10 @@ function Members({ myId }: { myId: string }) {
   const [recordsOf, setRecordsOf] = useState<string | null>(null);
 
   const setRole = async (m: Profile, role: Role) => {
+    if (role === 'rejected' && !confirm(`${m.nickname}님의 가입 신청을 거절할까요?\n승인 대기 목록에서 빠지고, 본인이 원하면 다시 신청할 수 있어요.`)) return;
     if (role === 'admin' && !confirm(`${m.nickname}님을 관리자로 지정할까요? 관리자는 모든 게시판과 회원을 관리할 수 있어요.`)) return;
-    if (role === 'pending' && !confirm(`${m.nickname}님의 승인을 취소할까요?`)) return;
+    if (role === 'pending' && !confirm(`${m.nickname}님의 승인을 취소할까요?
+이 회원의 기록(1RM, PR 글, 채팅, 모임, 참가 명단)은 다른 회원에게 보이지 않게 돼요. 다시 승인하면 돌아와요.`)) return;
     setBusyId(m.id);
     try {
       await api.patch(`/admin/members/${m.id}`, { role });
@@ -90,7 +92,8 @@ function Members({ myId }: { myId: string }) {
   if (error) return <ErrorBox message={error} onRetry={reload} />;
   const members = data?.members ?? [];
   const pending = members.filter((m) => m.role === 'pending');
-  const others = members.filter((m) => m.role !== 'pending');
+  const rejected = members.filter((m) => m.role === 'rejected');
+  const others = members.filter((m) => m.role === 'member' || m.role === 'admin');
   const now = data ? Date.parse(new Date().toISOString()) : 0;
   const mutedLabel = (m: Profile) =>
     m.chat_muted_until && Date.parse(m.chat_muted_until) > now
@@ -121,9 +124,14 @@ function Members({ myId }: { myId: string }) {
       )}
       {m.id !== myId && (
         <div className="flex shrink-0 flex-wrap justify-end gap-1">
-          {m.role === 'pending' && (
+          {(m.role === 'pending' || m.role === 'rejected') && (
             <button type="button" className="btn btn-sm btn-primary" disabled={busyId === m.id} onClick={() => setRole(m, 'member')}>
               승인
+            </button>
+          )}
+          {m.role === 'pending' && (
+            <button type="button" className="btn btn-sm btn-danger" disabled={busyId === m.id} onClick={() => setRole(m, 'rejected')}>
+              거절
             </button>
           )}
           {m.role === 'member' && (
@@ -135,16 +143,15 @@ function Members({ myId }: { myId: string }) {
           {m.role === 'admin' && (
             <button type="button" className="btn btn-sm" disabled={busyId === m.id} onClick={() => setRole(m, 'member')}>회원으로</button>
           )}
-          {m.role !== 'pending' && (
-            <button
-              type="button"
-              className="btn btn-sm"
-              aria-expanded={recordsOf === m.id}
-              onClick={() => setRecordsOf((v) => (v === m.id ? null : m.id))}
-            >
-              📋 기록 관리
-            </button>
-          )}
+          {/* 승인 대기(승인 취소) 회원도 남은 기록을 확인·삭제할 수 있게 */}
+          <button
+            type="button"
+            className="btn btn-sm"
+            aria-expanded={recordsOf === m.id}
+            onClick={() => setRecordsOf((v) => (v === m.id ? null : m.id))}
+          >
+            📋 기록 관리
+          </button>
         </div>
       )}
       {recordsOf === m.id && <MemberRecords member={m} />}
@@ -162,6 +169,12 @@ function Members({ myId }: { myId: string }) {
       )}
       <h2 className="mb-2 font-black">회원 {others.length}명</h2>
       <ul className="card divide-y-2 divide-dashed divide-ink/15">{others.map(row)}</ul>
+      {rejected.length > 0 && (
+        <details className="mt-6">
+          <summary className="cursor-pointer font-black text-muted">거절한 신청 {rejected.length}명 (다시 신청하면 승인 대기로 돌아와요)</summary>
+          <ul className="card mt-2 divide-y-2 divide-dashed divide-ink/15">{rejected.map(row)}</ul>
+        </details>
+      )}
     </>
   );
 }
@@ -169,9 +182,9 @@ function Members({ myId }: { myId: string }) {
 // 관리자가 할 수 있는 일을 한눈에
 function AdminPowers() {
   const items = [
-    ['✅', '가입 승인 / 승인 취소', '아래 회원 목록의 "승인", "승인 취소" 버튼. 승인을 취소하면 다시 승인 대기 상태가 되어 게시판을 볼 수 없어요.'],
+    ['✅', '가입 승인 / 승인 취소', '아래 회원 목록의 "승인", "승인 취소" 버튼. 승인을 취소하면 게시판을 볼 수 없고, 그 회원의 기록도 다른 회원에게 숨겨져요(다시 승인하면 돌아옴).'],
     ['🔑', '관리자 지정 / 해제', '"관리자로", "회원으로" 버튼 (내 권한은 바꿀 수 없어요)'],
-    ['📋', '회원 기록 삭제', '"기록 관리"에서 회원이 올린 1RM 기록(PR 축하 글 포함)과 모임 글을 지울 수 있어요.'],
+    ['📋', '회원 기록 삭제', '"기록 관리"에서 1RM 기록(PR 글 포함)과 모임 글을 하나씩 지우거나, "기록 전체 삭제"로 한 번에 지울 수 있어요(되돌릴 수 없음).'],
     ['🚫', '채팅 제한 / 전체 잠금', '회원별 1시간·오늘 제한, 아래 "채팅 전체 잠금". 박스 채팅창에서 메시지를 직접 지울 수도 있어요.'],
     ['📝', 'WOD · 공지 · 대회', '각 게시판에서 바로 작성·수정·삭제해요.'],
   ];
@@ -206,6 +219,31 @@ function MemberRecords({ member }: { member: Profile }) {
   );
   const [busy, setBusy] = useState<string | null>(null);
 
+  // 기록 전체 삭제 (되돌릴 수 없음): 닉네임을 직접 입력해야 진행
+  const purge = async () => {
+    const typed = prompt(
+      `${member.nickname}님의 기록을 모두 지워요.
+(1RM·네임드 WOD 기록, 명예의 벽 글, 채팅, 만든 모임, 참가 신청, 출석)
+되돌릴 수 없어요. 진행하려면 닉네임을 입력하세요.`,
+    );
+    if (typed === null) return;
+    if (typed.trim() !== member.nickname) {
+      alert('닉네임이 달라서 삭제하지 않았어요');
+      return;
+    }
+    setBusy('purge');
+    try {
+      const { removed } = await api.del<{ removed: Record<string, number> }>(`/admin/members/${member.id}/records`);
+      const total = Object.values(removed ?? {}).reduce((a, b) => a + b, 0);
+      alert(`기록 ${total}개를 삭제했어요`);
+      await reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '삭제하지 못했어요');
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const remove = async (what: string, path: string, id: string) => {
     if (!confirm(`${member.nickname}님의 ${what}을(를) 삭제할까요? 되돌릴 수 없어요.`)) return;
     setBusy(id);
@@ -221,6 +259,11 @@ function MemberRecords({ member }: { member: Profile }) {
 
   return (
     <div className="w-full rounded-md border-2 border-dashed border-ink/20 bg-[var(--bg)] p-3 text-sm">
+      {member.role === 'pending' && (
+        <p className="mb-2 rounded bg-yellow/30 px-2 py-1 text-xs font-bold">
+          승인 대기(승인 취소) 회원이라 이 기록은 다른 회원에게 보이지 않아요. 다시 승인하면 그대로 보여요.
+        </p>
+      )}
       {loading && !data && <Loading />}
       {error && <ErrorBox message={error} onRetry={reload} />}
       {data && (
@@ -269,6 +312,11 @@ function MemberRecords({ member }: { member: Profile }) {
                 </Fragment>
               ))}
             </ul>
+          )}
+          {member.role !== 'admin' && (
+            <button type="button" className="btn btn-sm btn-danger mt-3 w-full" disabled={busy === 'purge'} onClick={purge}>
+              🗑 이 회원의 기록 전체 삭제
+            </button>
           )}
         </>
       )}

@@ -1,6 +1,6 @@
 import type { Avatar } from './constants';
 
-export type Role = 'pending' | 'member' | 'admin';
+export type Role = 'pending' | 'member' | 'admin' | 'rejected';
 
 export type Profile = {
   id: string;

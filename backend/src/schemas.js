@@ -109,7 +109,7 @@ export const oneRmSchema = z
   })
   .refine((v) => !v.is_custom || /^[0-9A-Za-z가-힣 ()_.-]+$/.test(v.movement), { message: '종목 이름에 쓸 수 없는 문자가 있어요', path: ['movement'] });
 
-export const roleSchema = z.strictObject({ role: z.enum(['pending', 'member', 'admin']) });
+export const roleSchema = z.strictObject({ role: z.enum(['pending', 'member', 'admin', 'rejected']) });
 
 export const chatSchema = z.strictObject({
   body: z.string().trim().min(1).max(200).regex(/^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F]*$/),

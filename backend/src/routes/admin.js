@@ -50,6 +50,14 @@ adminRouter.get('/members/:id/records', async (req, res) => {
   res.json({ oneRm: unwrap(oneRm), gatherings: unwrap(gatherings) });
 });
 
+// 회원이 올린 기록 전체 삭제 (1RM·PR 글·채팅·만든 모임·참가 신청·출석). 되돌릴 수 없다
+adminRouter.delete('/members/:id/records', async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  if (id === req.userId) throw new HttpError(400, '내 기록은 여기서 지울 수 없어요');
+  const removed = unwrap(await req.sb.rpc('admin_purge_member_records', { target: id }));
+  res.json({ removed });
+});
+
 // 회원의 1RM 기록 삭제 (PR 축하 글도 DB에서 함께 삭제)
 adminRouter.delete('/one-rm/:id', async (req, res) => {
   const id = uuid.parse(req.params.id);

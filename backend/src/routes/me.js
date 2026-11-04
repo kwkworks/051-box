@@ -45,6 +45,12 @@ meRouter.patch('/', async (req, res) => {
   res.json({ profile });
 });
 
+// 가입이 거절된 사람이 다시 신청 (거절 → 승인 대기). DB 함수가 거절 상태일 때만 허용한다
+meRouter.post('/reapply', async (req, res) => {
+  const role = unwrap(await req.sb.rpc('reapply_membership'));
+  res.json({ role });
+});
+
 // 오늘 출석 체크. 날짜는 DB가 한국 시간 기준으로 정한다(클라이언트 값 사용 안 함).
 meRouter.post('/attendance', requireMember, async (req, res) => {
   const { error } = await req.sb.from('attendance').insert({});

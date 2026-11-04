@@ -102,7 +102,7 @@ const SECTION_LINE = /^\s*\[[^\]\n]{1,30}\]\s*$/;
 function WodContent({ text }: { text: string }) {
   return (
     <div className="whitespace-pre-wrap break-words px-4 py-4 text-[15px] leading-relaxed">
-      {text.split('\n').map((line, i) =>
+      {text.split(/\r\n|\r|\n/).map((line, i) =>
         SECTION_LINE.test(line) ? (
           <p key={i} className={`font-black text-[var(--burgundy)] ${i ? 'mt-1' : ''}`}>
             {line.trim()}
