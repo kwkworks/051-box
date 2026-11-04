@@ -30,7 +30,7 @@ export async function requireAuth(req, res, next) {
 
   const { data: profile, error: profileError } = await sb
     .from('profiles')
-    .select('id, nickname, role, avatar, created_at, chat_muted_until')
+    .select('id, nickname, role, avatar, gender, created_at, chat_muted_until')
     .eq('id', userId)
     .maybeSingle();
   if (profileError) throw fromDbError(profileError);

@@ -46,8 +46,12 @@ export const isoDate = z.iso.date();
 export const uuid = z.uuid();
 
 export const meUpdateSchema = z
-  .strictObject({ nickname: nickname.optional(), avatar: avatarSchema.optional() })
-  .refine((v) => v.nickname !== undefined || v.avatar !== undefined, '변경할 내용이 없습니다');
+  .strictObject({
+    nickname: nickname.optional(),
+    avatar: avatarSchema.optional(),
+    gender: z.enum(['M', 'F']).nullable().optional(), // 박스 순위 남/여 구분 (선택 안 함 = null)
+  })
+  .refine((v) => v.nickname !== undefined || v.avatar !== undefined || v.gender !== undefined, '변경할 내용이 없습니다');
 
 export const wodSchema = z.strictObject({
   title: requiredText(80),

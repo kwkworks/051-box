@@ -7,8 +7,9 @@ import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { api } from '@/lib/api';
 import { MOVEMENTS, NAMED_WODS, movementLabel, type MovementKey, type NamedWodKey } from '@/lib/constants';
 import { RecordValue } from '@/components/RecordValue';
-import { kstToday } from '@/lib/format';
-import type { Me, OneRmRecord, RankRow, RecordUnit } from '@/lib/types';
+import { formatDateLabel, kstToday } from '@/lib/format';
+import Link from 'next/link';
+import type { Gender, Me, OneRmRecord, RankGroups, RecordUnit } from '@/lib/types';
 import { useLoad } from '@/lib/useLoad';
 
 export default function OneRmPage() {
@@ -20,7 +21,7 @@ const CUSTOM = '__custom__';
 function OneRm({ me }: { me: Me }) {
   const { refreshMe } = useAuth();
   const { data, error, loading, reload } = useLoad(
-    () => api.get<{ records: OneRmRecord[]; rankings: Record<string, RankRow[]> }>('/one-rm'),
+    () => api.get<{ records: OneRmRecord[]; rankings: Record<string, RankGroups> }>('/one-rm'),
     'one-rm',
   );
   const [unit, setUnit] = useState<RecordUnit>('lb');
@@ -32,7 +33,6 @@ function OneRm({ me }: { me: Me }) {
   const [date, setDate] = useState(kstToday());
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-  const [rankKey, setRankKey] = useState<string>('lb:back_squat');
 
   const isCustom = movement === CUSTOM;
   const weightNum = Number(weight);
@@ -49,19 +49,6 @@ function OneRm({ me }: { me: Me }) {
     setMovement(next === 'lb' ? 'back_squat' : 'fran');
     setMessage(null);
   };
-
-  // 종목별 내 최고 기록 (무게는 무거운 것, 시간은 빠른 것)
-  const myBest = useMemo(() => {
-    const map = new Map<string, { label: string; unit: RecordUnit; best: number; count: number }>();
-    for (const r of data?.records ?? []) {
-      const key = `${r.unit}:${r.is_custom ? 'custom:' : ''}${r.movement}`;
-      const cur = map.get(key);
-      const value = r.unit === 'time' ? Number(r.time_sec) : Number(r.weight_lb);
-      const best = !cur ? value : r.unit === 'time' ? Math.min(cur.best, value) : Math.max(cur.best, value);
-      map.set(key, { label: movementLabel(r.movement, r.is_custom), unit: r.unit, best, count: (cur?.count ?? 0) + 1 });
-    }
-    return [...map.entries()];
-  }, [data]);
 
   const save = async () => {
     setSaving(true);
@@ -96,8 +83,6 @@ function OneRm({ me }: { me: Me }) {
     }
   };
 
-  const rankingKeys = Object.keys(data?.rankings ?? {});
-  const ranking = data?.rankings[rankKey] ?? [];
 
   return (
     <BoardShell title="🏋️ 1RM 기록" subtitle="내 최고 기록(lb)과 네임드 WOD 기록, 박스 순위">
@@ -177,77 +162,220 @@ function OneRm({ me }: { me: Me }) {
 
       {data && (
         <>
-          <section className="mb-6">
-            <h2 className="mb-2 text-lg font-black">🏋️ {me.profile.nickname}님의 최고 기록</h2>
-            {myBest.length === 0 ? (
-              <p className="card p-4 text-sm text-muted">첫 기록을 남겨보세요. 다음에 더 무겁게(시간은 더 빠르게) 하면 PR로 축하해드려요!</p>
-            ) : (
-              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {myBest.map(([key, v]) => (
-                  <li key={key} className="card p-3">
-                    <p className="truncate text-xs font-bold text-muted">{v.label}</p>
-                    <p className="text-xl">
-                      <RecordValue unit={v.unit} weightLb={v.best} timeSec={v.best} size="lg" />
-                    </p>
-                    <p className="text-xs text-muted">기록 {v.count}개</p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <section className="mb-6">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h2 className="text-lg font-black">🏆 박스 순위</h2>
-              <select className="input w-auto" value={rankKey} onChange={(e) => setRankKey(e.target.value)} aria-label="순위 종목">
-                {[...new Set(['lb:back_squat', ...rankingKeys])].map((k) => {
-                  const [u, ...rest] = k.split(':');
-                  const name = rest.join(':');
-                  const label = name.startsWith('custom:') ? name.slice(7) : movementLabel(name);
-                  return (
-                    <option key={k} value={k}>
-                      {u === 'time' ? `⏱ ${label}` : label}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-            {ranking.length === 0 ? (
-              <p className="card p-4 text-sm text-muted">아직 이 종목 기록이 없어요</p>
-            ) : (
-              <ol className="card divide-y-2 divide-dashed divide-ink/15">
-                {ranking.map((r, i) => (
-                  <li key={r.user_id} className={`flex items-center gap-3 px-4 py-2.5 ${r.user_id === me.profile.id ? 'bg-yellow/25' : ''}`}>
-                    <span className="w-7 text-center font-black">{['🥇', '🥈', '🥉'][i] ?? i + 1}</span>
-                    <span className="flex-1 truncate font-bold">{r.nickname}</span>
-                    <RecordValue unit={r.unit} weightLb={r.weight_lb} timeSec={r.time_sec} />
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
-
-          <section>
-            <h2 className="mb-2 text-lg font-black">📜 내 기록 이력</h2>
-            {data.records.length === 0 ? (
-              <p className="card p-4 text-sm text-muted">기록이 없어요</p>
-            ) : (
-              <ul className="card divide-y-2 divide-dashed divide-ink/15">
-                {data.records.map((r) => (
-                  <li key={r.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                    <span className="w-24 shrink-0 text-muted">{r.achieved_on}</span>
-                    <span className="flex-1 truncate font-bold">{movementLabel(r.movement, r.is_custom)}</span>
-                    <RecordValue unit={r.unit} weightLb={r.weight_lb} timeSec={r.time_sec} />
-                    <button type="button" className="btn btn-sm btn-danger" onClick={() => remove(r.id)} aria-label="기록 삭제">
-                      ✕
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <MyRecords me={me} records={data.records} onRemove={remove} />
+          <Rankings me={me} rankings={data.rankings} />
         </>
       )}
     </BoardShell>
+  );
+}
+
+// ---------------------------------------------------------------------
+// 내 최고 기록: 검색 · 종류 필터 · 정렬, 종목을 누르면 그 종목 기록 변화와 삭제
+// ---------------------------------------------------------------------
+type Group = {
+  key: string;
+  label: string;
+  unit: RecordUnit;
+  isCustom: boolean;
+  best: number;
+  bestOn: string;
+  lastOn: string;
+  records: OneRmRecord[];
+};
+
+const valueOf = (r: OneRmRecord) => (r.unit === 'time' ? Number(r.time_sec) : Number(r.weight_lb));
+const better = (unit: RecordUnit, a: number, b: number) => (unit === 'time' ? a < b : a > b);
+
+function MyRecords({ me, records, onRemove }: { me: Me; records: OneRmRecord[]; onRemove: (id: string) => void }) {
+  const [query, setQuery] = useState('');
+  const [kind, setKind] = useState<'all' | 'lift' | 'wod' | 'custom'>('all');
+  const [sort, setSort] = useState<'recent' | 'name' | 'count'>('recent');
+  const [open, setOpen] = useState<string | null>(null);
+
+  const groups = useMemo(() => {
+    const map = new Map<string, Group>();
+    for (const r of records) {
+      const key = `${r.unit}:${r.is_custom ? 'custom:' : ''}${r.movement}`;
+      const v = valueOf(r);
+      const g = map.get(key);
+      if (!g) {
+        map.set(key, { key, label: movementLabel(r.movement, r.is_custom), unit: r.unit, isCustom: r.is_custom, best: v, bestOn: r.achieved_on, lastOn: r.achieved_on, records: [r] });
+        continue;
+      }
+      g.records.push(r);
+      if (better(r.unit, v, g.best)) {
+        g.best = v;
+        g.bestOn = r.achieved_on;
+      }
+      if (r.achieved_on > g.lastOn) g.lastOn = r.achieved_on;
+    }
+    return [...map.values()];
+  }, [records]);
+
+  const q = query.trim().toLowerCase();
+  const shown = groups
+    .filter((g) => (kind === 'all' ? true : kind === 'lift' ? g.unit === 'lb' && !g.isCustom : kind === 'wod' ? g.unit === 'time' && !g.isCustom : g.isCustom))
+    .filter((g) => !q || g.label.toLowerCase().includes(q) || g.key.toLowerCase().includes(q))
+    .sort((a, b) =>
+      sort === 'name' ? a.label.localeCompare(b.label, 'ko') : sort === 'count' ? b.records.length - a.records.length : b.lastOn.localeCompare(a.lastOn),
+    );
+
+  return (
+    <section className="mb-6">
+      <h2 className="mb-2 text-lg font-black">🏋️ {me.profile.nickname}님의 최고 기록</h2>
+      {groups.length === 0 ? (
+        <p className="card p-4 text-sm text-muted">첫 기록을 남겨보세요. 다음에 더 무겁게(시간은 더 빠르게) 하면 PR로 축하해드려요!</p>
+      ) : (
+        <>
+          <div className="card mb-2 flex flex-col gap-2 p-3">
+            <input
+              type="search"
+              className="input"
+              placeholder="🔍 종목 찾기 (예: 스쿼트, Fran)"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="종목 찾기"
+            />
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(
+                [
+                  ['all', '전체'],
+                  ['lift', '🏋️ 리프트'],
+                  ['wod', '⏱ 네임드 WOD'],
+                  ['custom', '✏️ 직접 입력'],
+                ] as const
+              ).map(([k, label]) => (
+                <button key={k} type="button" className={`chip ${kind === k ? 'bg-yellow' : ''}`} aria-pressed={kind === k} onClick={() => setKind(k)}>
+                  {label}
+                </button>
+              ))}
+              <select className="input ml-auto w-auto py-1 text-sm" value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="정렬">
+                <option value="recent">최근 기록순</option>
+                <option value="name">이름순</option>
+                <option value="count">기록 많은 순</option>
+              </select>
+            </div>
+          </div>
+          {shown.length === 0 ? (
+            <p className="card p-4 text-sm text-muted">조건에 맞는 기록이 없어요</p>
+          ) : (
+            <ul className="card divide-y-2 divide-dashed divide-ink/15">
+              {shown.map((g) => {
+                const expanded = open === g.key;
+                const history = [...g.records].sort((a, b) => b.achieved_on.localeCompare(a.achieved_on) || b.created_at.localeCompare(a.created_at));
+                return (
+                  <li key={g.key}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left"
+                      aria-expanded={expanded}
+                      onClick={() => setOpen(expanded ? null : g.key)}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-bold">{g.label}</span>
+                        <span className="block text-xs text-muted">
+                          최고 {formatDateLabel(g.bestOn)} · 기록 {g.records.length}개
+                        </span>
+                      </span>
+                      <span className="text-right text-lg">
+                        <RecordValue unit={g.unit} weightLb={g.best} timeSec={g.best} />
+                      </span>
+                      <span className="text-muted" aria-hidden>{expanded ? '▴' : '▾'}</span>
+                    </button>
+                    {expanded && (
+                      <ul className="mx-3 mb-3 rounded-md bg-[var(--bg)] px-3 py-1 text-sm">
+                        {history.map((r) => {
+                          const isBest = valueOf(r) === g.best;
+                          return (
+                            <li key={r.id} className="flex items-center gap-2 py-1.5">
+                              <span className="w-24 shrink-0 text-muted">{r.achieved_on}</span>
+                              <span className="flex-1">
+                                <RecordValue unit={r.unit} weightLb={r.weight_lb} timeSec={r.time_sec} />
+                                {isBest && <span className="ml-1 rounded bg-yellow px-1 text-[10px] font-black">최고</span>}
+                              </span>
+                              <button type="button" className="btn btn-sm btn-danger" onClick={() => onRemove(r.id)} aria-label="기록 삭제">
+                                ✕
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------
+// 박스 순위: 남자 / 여자 / 전체
+// ---------------------------------------------------------------------
+function Rankings({ me, rankings }: { me: Me; rankings: Record<string, RankGroups> }) {
+  const myGender = me.profile.gender ?? null;
+  const [rankKey, setRankKey] = useState<string>('lb:back_squat');
+  const [tab, setTab] = useState<'all' | Gender>(myGender ?? 'all');
+  const keys = [...new Set(['lb:back_squat', ...Object.keys(rankings)])];
+  const ranking = rankings[rankKey]?.[tab] ?? [];
+
+  const labelOf = (k: string) => {
+    const [u, ...rest] = k.split(':');
+    const name = rest.join(':');
+    const label = name.startsWith('custom:') ? name.slice(7) : movementLabel(name);
+    return u === 'time' ? `⏱ ${label}` : label;
+  };
+
+  return (
+    <section className="mb-6">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="text-lg font-black">🏆 박스 순위</h2>
+        <select className="input w-auto" value={rankKey} onChange={(e) => setRankKey(e.target.value)} aria-label="순위 종목">
+          {keys.map((k) => (
+            <option key={k} value={k}>
+              {labelOf(k)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="mb-2 grid grid-cols-3 gap-2" role="tablist" aria-label="순위 구분">
+        {(
+          [
+            ['M', '남자'],
+            ['F', '여자'],
+            ['all', '전체'],
+          ] as const
+        ).map(([k, label]) => (
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className={`btn btn-sm ${tab === k ? 'btn-primary' : ''}`} onClick={() => setTab(k)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {!myGender && (
+        <p className="mb-2 rounded-md bg-yellow/30 px-3 py-2 text-xs font-bold">
+          성별을 고르면 남/여 순위에 내 기록이 나와요 ·{' '}
+          <Link href="/avatar" className="underline">
+            프로필에서 고르기
+          </Link>
+        </p>
+      )}
+      {ranking.length === 0 ? (
+        <p className="card p-4 text-sm text-muted">아직 이 종목 기록이 없어요</p>
+      ) : (
+        <ol className="card divide-y-2 divide-dashed divide-ink/15">
+          {ranking.map((r, i) => (
+            <li key={r.user_id} className={`flex items-center gap-3 px-4 py-2.5 ${r.user_id === me.profile.id ? 'bg-yellow/25' : ''}`}>
+              <span className="w-7 text-center font-black">{['🥇', '🥈', '🥉'][i] ?? i + 1}</span>
+              <span className="flex-1 truncate font-bold">{r.nickname}</span>
+              <RecordValue unit={r.unit} weightLb={r.weight_lb} timeSec={r.time_sec} />
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }

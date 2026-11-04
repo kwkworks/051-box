@@ -49,6 +49,7 @@ declare
   w_future uuid;
   anon_id uuid := gen_random_uuid();
   t_first uuid;
+  a_gender text;
   lock_before text;
   r text;
 begin
@@ -220,6 +221,14 @@ begin
   -- 한 문장 안에서는 바뀌기 전 값을 읽으므로, 다시 신청한 결과는 다음 문장에서 확인한다
   insert into rls_results values
   (65, '다시 신청하면 승인 대기 상태', 'ok:pending', 'ok:' || (select role from public.profiles where id = c));
+
+  -- ---- 0009: 성별 (본인만, 정해진 값만)
+  select gender into a_gender from public.profiles where id = a;
+  insert into rls_results values
+  (67, '회원이 자기 성별 저장', 'ok:1', pg_temp.run_as(a, format('update public.profiles set gender = ''F'' where id = %L', a))),
+  (68, '회원이 다른 사람 성별 변경', 'ok:0', pg_temp.run_as(a, format('update public.profiles set gender = ''M'' where id = %L', d))),
+  (69, '정해지지 않은 성별 값 저장', 'err', pg_temp.run_as(a, format('update public.profiles set gender = ''X'' where id = %L', a)));
+  update public.profiles set gender = a_gender where id = a;  -- 원래 값으로 되돌림
 
   -- 도배 방지: 10초 안에 5개를 이미 보냈으면 6번째는 거부
   -- 앞 테스트에서 관리자가 보낸 메시지를 지우고, 정확히 5개를 채운 뒤 6번째를 시도한다

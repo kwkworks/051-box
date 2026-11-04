@@ -17,7 +17,7 @@ oneRmRouter.get('/', async (req, res) => {
       .order('achieved_on', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(300),
-    req.sb.from('one_rm_best').select('user_id, movement, is_custom, unit, weight_lb, time_sec, achieved_on, nickname').limit(2000),
+    req.sb.from('one_rm_best').select('user_id, movement, is_custom, unit, weight_lb, time_sec, achieved_on, nickname, gender').limit(2000),
   ]);
 
   // 순위: 무게는 무거운 순, 시간은 빠른 순
@@ -26,9 +26,15 @@ oneRmRouter.get('/', async (req, res) => {
     const key = `${row.unit === 'time' ? 'time' : 'lb'}:${row.is_custom ? 'custom:' : ''}${row.movement}`;
     (rankings[key] ??= []).push(clean(row));
   }
+  // 종목마다 전체 / 남자 / 여자 상위 10명
   for (const key of Object.keys(rankings)) {
     const time = key.startsWith('time:');
-    rankings[key] = rankings[key].sort((a, b) => (time ? a.time_sec - b.time_sec : b.weight_lb - a.weight_lb)).slice(0, 10);
+    const sorted = rankings[key].sort((a, b) => (time ? a.time_sec - b.time_sec : b.weight_lb - a.weight_lb));
+    rankings[key] = {
+      all: sorted.slice(0, 10),
+      M: sorted.filter((r) => r.gender === 'M').slice(0, 10),
+      F: sorted.filter((r) => r.gender === 'F').slice(0, 10),
+    };
   }
 
   res.json({

@@ -9,7 +9,10 @@ export type Profile = {
   avatar: Partial<Avatar>;
   created_at?: string;
   chat_muted_until?: string | null;
+  gender?: Gender | null; // 박스 순위 남/여 구분 (선택 안 함 = null)
 };
+
+export type Gender = 'M' | 'F';
 
 export type Me = {
   profile: Profile;
@@ -87,6 +90,7 @@ export type RankRow = {
   time_sec: number | null;
   achieved_on: string;
   nickname: string;
+  gender: Gender | null;
 };
 
 export type FeedItem = {
@@ -122,3 +126,6 @@ export type ChatState = {
   locked: boolean;
   mutedUntil: string | null;
 };
+
+// 종목마다 전체 / 남자 / 여자 상위 10명
+export type RankGroups = { all: RankRow[]; M: RankRow[]; F: RankRow[] };

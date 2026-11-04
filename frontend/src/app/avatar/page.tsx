@@ -11,7 +11,7 @@ import { api } from '@/lib/api';
 import {
   AVATAR_GROUPS, AVATAR_LABELS, AVATAR_OPTIONS, COLORS, OPTION_LABELS, normalizeAvatar, type Avatar,
 } from '@/lib/constants';
-import type { Me, Profile } from '@/lib/types';
+import type { Gender, Me, Profile } from '@/lib/types';
 
 export default function AvatarPage() {
   return <Guard need="login">{(me) => <Editor me={me} />}</Guard>;
@@ -30,6 +30,7 @@ function Editor({ me }: { me: Me }) {
   const { setMe } = useAuth();
   const [avatar, setAvatar] = useState<Avatar>(normalizeAvatar(me.profile.avatar));
   const [nickname, setNickname] = useState(me.profile.nickname);
+  const [gender, setGender] = useState<Gender | null>(me.profile.gender ?? null);
   const [dir, setDir] = useState<Dir>('down');
   const [group, setGroup] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -53,7 +54,7 @@ function Editor({ me }: { me: Me }) {
     setSaving(true);
     setError(null);
     try {
-      const { profile } = await api.patch<{ profile: Profile }>('/me', { nickname: nickname.trim(), avatar });
+      const { profile } = await api.patch<{ profile: Profile }>('/me', { nickname: nickname.trim(), avatar, gender });
       setMe((prev) => (prev ? { ...prev, profile: { ...prev.profile, ...profile } } : prev));
       router.push(me.profile.role === 'pending' ? '/pending' : '/');
     } catch (e) {
@@ -91,6 +92,27 @@ function Editor({ me }: { me: Me }) {
               닉네임 (2~16자)
             </label>
             <input id="nickname" className="input" value={nickname} maxLength={16} onChange={(e) => setNickname(e.target.value)} />
+            <p className="label mt-3">성별 <span className="font-normal text-muted">(박스 순위를 남/여로 나눠 보여줘요)</span></p>
+            <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="성별">
+              {(
+                [
+                  ['M', '남자'],
+                  ['F', '여자'],
+                  [null, '선택 안 함'],
+                ] as const
+              ).map(([g, label]) => (
+                <button
+                  key={label}
+                  type="button"
+                  role="radio"
+                  aria-checked={gender === g}
+                  className={`btn btn-sm ${gender === g ? 'btn-primary' : ''}`}
+                  onClick={() => setGender(g)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             {!nickValid && <p className="mt-1 text-xs font-bold text-[var(--danger)]">한글, 영문, 숫자 2~16자로 입력해주세요</p>}
           </div>
           {error && <p className="text-sm font-bold text-[var(--danger)]">{error}</p>}
