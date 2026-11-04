@@ -17,15 +17,26 @@ export function ActionPad({
   pose,
   running,
   hold = null,
+  ride = null,
+  hang = null,
   onAct,
 }: {
   pose: Pose;
   running: boolean;
   hold?: GearKey | null;
+  ride?: number | null;
+  hang?: number | null;
   onAct: (action: Action) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const items = ACTIONS.map((a) => (a.key === 'jump' && hold ? { ...a, icon: '🏋️', label: '들어올리기' } : a));
+  const items = ride !== null
+    ? [{ key: 'ride' as Action, icon: '⬇️', label: '머신에서 내리기', keyHint: 'E' }]
+    : hang !== null
+      ? [
+          { key: 'jump' as Action, icon: '💪', label: '풀업', keyHint: 'Space' },
+          { key: 'hang' as Action, icon: '⬇️', label: '내려오기', keyHint: 'E' },
+        ]
+      : ACTIONS.map((a) => (a.key === 'jump' && hold ? { ...a, icon: '🏋️', label: '들어올리기' } : a));
   if (hold) items.push({ key: 'grab', icon: GEAR[hold].icon, label: `${GEAR[hold].label} 내려놓기`, keyHint: 'E' });
   const active = (a: Action) => (a === 'run' ? running : a === 'grab' ? false : a === pose);
 

@@ -43,22 +43,74 @@ const DECOR: Box[] = [
 // 장애물 (상호작용 없음)
 const RIG_POSTS: [number, number][] = [];
 for (const row of [8, 14]) for (let x = 5; x <= 21; x += 4) RIG_POSTS.push([x, row]);
-// 유산소 구역 (오른쪽): 에어바이크, 바이크에르그, 로잉머신, 스키에르그
-const BIKES: Box[] = [30, 32, 34, 36].map((x) => ({ x, y: 5, w: 1, h: 2 }));
-const BIKE_ERGS: Box[] = [30, 32, 34, 36].map((x) => ({ x, y: 9, w: 1, h: 2 }));
-const ROWERS: Box[] = [
-  { x: 29, y: 13, w: 3, h: 1 },
-  { x: 33, y: 13, w: 3, h: 1 },
-  { x: 29, y: 15, w: 3, h: 1 },
-  { x: 33, y: 15, w: 3, h: 1 },
+// 유산소 머신: 오른쪽 벽을 따라 위에서부터 한 줄 (가로 3칸, 회원은 왼쪽을 보고 탄다)
+export type MachineKind = 'rower' | 'ski' | 'bikeErg' | 'assault' | 'treadmill';
+export const MACHINE_INFO: Record<MachineKind, { label: string; icon: string }> = {
+  rower: { label: '로잉머신', icon: '🚣' },
+  ski: { label: '스키에르그', icon: '⛷' },
+  bikeErg: { label: '바이크에르그', icon: '🚴' },
+  assault: { label: '어썰트바이크', icon: '🚲' },
+  treadmill: { label: '트레드밀', icon: '🏃' },
+};
+const MACHINE_ORDER: MachineKind[] = [
+  'rower', 'rower', 'rower', 'rower', 'rower',
+  'ski', 'ski',
+  'bikeErg', 'bikeErg',
+  'assault', 'assault',
+  'treadmill', 'treadmill',
 ];
-const SKI_ERGS: Box[] = [5, 7, 9, 11].map((y) => ({ x: 38, y, w: 1, h: 1 }));
+export const MACHINES: (Box & { kind: MachineKind })[] = MACHINE_ORDER.map((kind, i) => ({ kind, x: 36, y: 3 + i, w: 3, h: 1 }));
+
+// 머신을 탈 때 캐릭터 발 위치
+export function seatOf(i: number): { x: number; y: number } {
+  const m = MACHINES[i];
+  const offset = m.kind === 'rower' ? 1.75 : m.kind === 'ski' ? 1.9 : m.kind === 'treadmill' ? 1.55 : 1.6;
+  return { x: (m.x + offset) * TILE, y: (m.y + 1) * TILE - 3 };
+}
+
+export function nearbyMachine(x: number, y: number): number | null {
+  let best: number | null = null;
+  let bestDist = 1.1;
+  MACHINES.forEach((m, i) => {
+    const d = boxDist(m, x, y);
+    if (d < bestDist) {
+      best = i;
+      bestDist = d;
+    }
+  });
+  return best;
+}
+
+export function machineAt(wx: number, wy: number): number | null {
+  const i = MACHINES.findIndex((m) => wx >= m.x * TILE && wx <= (m.x + m.w) * TILE && wy >= m.y * TILE && wy <= (m.y + m.h) * TILE);
+  return i < 0 ? null : i;
+}
+
 const PILLARS: Box[] = [
   { x: 26, y: 10, w: 2, h: 2 },
   { x: 26, y: 16, w: 2, h: 2 },
 ];
 const BOXES: Box[] = [{ x: 19, y: 23, w: 2, h: 1 }]; // 플라이오 박스 (아래 벽 쪽 기구 줄)
-const COOLER: Box = { x: 38, y: 15, w: 1, h: 2 }; // 정수기 (오른쪽 벽)
+const COOLER: Box = { x: 38, y: 17, w: 1, h: 2 }; // 정수기 (오른쪽 벽, 머신 줄 아래)
+
+// ---- 철봉 (풀업 리그): 두 줄. 매달리면 손은 봉에, 몸은 바로 아래 칸
+export const BAR_ROWS = [8, 14] as const;
+export const BAR_MIN_X = 5.6 * TILE;
+export const BAR_MAX_X = 21.4 * TILE;
+export function hangY(row: number) {
+  return (row + 1) * TILE + 18;
+}
+// 철봉 바로 위나 아래에 서 있으면 매달릴 수 있다
+export function nearbyBar(x: number, y: number): number | null {
+  if (x < BAR_MIN_X || x > BAR_MAX_X) return null;
+  for (const row of BAR_ROWS) if (y > (row - 1) * TILE + 8 && y < (row + 2) * TILE) return row;
+  return null;
+}
+export function barAt(wx: number, wy: number): number | null {
+  if (wx < BAR_MIN_X || wx > BAR_MAX_X) return null;
+  for (const row of BAR_ROWS) if (Math.abs(wy - (row * TILE + 7)) < 14) return row;
+  return null;
+}
 
 // ---- 들고 다닐 수 있는 운동기구: 기구 자리(스테이션)에서 집고, 아무 데서나 내려놓으면 제자리로 돌아간다
 export type GearKey = 'barbell' | 'kettlebell' | 'dumbbell' | 'medball';
@@ -83,11 +135,9 @@ const NAMED: (Box & { name: string })[] = [
   { x: 19, y: 3, w: 7, h: 2, name: '📝 RECORD 화이트보드' },
   { x: 29, y: 0, w: 5, h: 3, name: '🏆 대회 포스터' },
   { x: 29, y: 19, w: 7, h: 3, name: '🛎 데스크' },
-  ...BIKES.map((b) => ({ ...b, name: '🚲 에어바이크' })),
-  ...BIKE_ERGS.map((b) => ({ ...b, name: '🚴 바이크에르그' })),
-  ...ROWERS.map((b) => ({ ...b, name: '🚣 로잉머신' })),
-  ...SKI_ERGS.map((b) => ({ ...b, name: '⛷ 스키에르그' })),
   ...PILLARS.map((b) => ({ ...b, name: '노란 기둥' })),
+  { x: 5, y: 8, w: 17, h: 1, name: '🤸 철봉 (풀업 리그)' },
+  { x: 5, y: 14, w: 17, h: 1, name: '🤸 철봉 (풀업 리그)' },
   ...BOXES.map((b) => ({ ...b, name: '📦 플라이오 박스' })),
   { ...COOLER, name: '💧 정수기' },
 ];
@@ -108,7 +158,7 @@ OBJECTS.forEach(block);
 DECOR.forEach(block);
 RIG_POSTS.forEach(([x, y]) => block({ x, y, w: 1, h: 1 }));
 STATIONS.forEach(block);
-[...BIKES, ...BIKE_ERGS, ...ROWERS, ...SKI_ERGS, ...PILLARS, ...BOXES, COOLER].forEach(block);
+[...MACHINES, ...PILLARS, ...BOXES, COOLER].forEach(block);
 
 export function isSolidAt(px: number, py: number): boolean {
   const tx = Math.floor(px / TILE);
@@ -390,57 +440,8 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
     }
   }
 
-  // 에어바이크
-  for (const b of BIKES) {
-    rect(ctx, b.x * T + 4, b.y * T + 6, T - 8, 2 * T - 12, '#1B1B1E');
-    ctx.strokeStyle = '#5F5E5A';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(b.x * T + T / 2, b.y * T + T - 2, 9, 0, Math.PI * 2);
-    ctx.stroke();
-    rect(ctx, b.x * T + 6, b.y * T + 4, T - 12, 4, '#D9443E');
-  }
-
-  // 바이크에르그 (앉아서 타는 자전거, 작은 플라이휠)
-  for (const b of BIKE_ERGS) {
-    rect(ctx, b.x * T + 10, b.y * T + 4, 12, 2 * T - 8, '#1B1B1E');
-    rect(ctx, b.x * T + 6, b.y * T + 6, T - 12, 10, '#2F2F35');
-    rect(ctx, b.x * T + 11, b.y * T + 8, 10, 5, '#5BB0E8');
-    rect(ctx, b.x * T + 8, b.y * T + 2 * T - 18, T - 16, 8, '#3A3A40');
-    ctx.fillStyle = '#5F5E5A';
-    ctx.beginPath();
-    ctx.arc(b.x * T + T / 2, b.y * T + T + 4, 6, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // 로잉머신 (긴 레일 + 앞쪽 플라이휠 + 발판 + 시트)
-  for (const r of ROWERS) {
-    const x0 = r.x * T;
-    const y0 = r.y * T;
-    rect(ctx, x0 + 26, y0 + 13, r.w * T - 30, 6, '#9C9C9C');
-    rect(ctx, x0 + 26, y0 + 14, r.w * T - 30, 2, '#C9C9C9');
-    rect(ctx, x0 + 4, y0 + 6, 22, 20, '#1B1B1E');
-    ctx.fillStyle = '#3A3A40';
-    ctx.beginPath();
-    ctx.arc(x0 + 15, y0 + 16, 8, 0, Math.PI * 2);
-    ctx.fill();
-    rect(ctx, x0 + 12, y0 + 4, 6, 4, '#5BB0E8');
-    rect(ctx, x0 + 28, y0 + 7, 6, 18, '#2B2B30');
-    rect(ctx, x0 + 54, y0 + 9, 14, 14, '#1F1F22');
-    rect(ctx, x0 + 56, y0 + 11, 10, 10, '#3A3A40');
-  }
-
-  // 스키에르그 (벽에 붙은 기둥 + 손잡이 두 개)
-  for (const k of SKI_ERGS) {
-    const x0 = k.x * T;
-    const y0 = k.y * T;
-    rect(ctx, x0 + 18, y0 + 2, 12, T - 4, '#1B1B1E');
-    rect(ctx, x0 + 20, y0 + 6, 8, 6, '#5BB0E8');
-    rect(ctx, x0 + 6, y0 + 8, 12, 2, '#5F5E5A');
-    rect(ctx, x0 + 6, y0 + 22, 12, 2, '#5F5E5A');
-    rect(ctx, x0 + 4, y0 + 6, 4, 6, '#D9443E');
-    rect(ctx, x0 + 4, y0 + 20, 4, 6, '#D9443E');
-  }
+  // 유산소 머신 줄 (오른쪽 벽)
+  for (const m of MACHINES) drawMachine(ctx, m);
 
   // 노란 기둥
   for (const p of PILLARS) {
@@ -631,5 +632,62 @@ export function drawGear(ctx: CanvasRenderingContext2D, gear: GearKey, cx: numbe
     ctx.arc(cx, cy, 6.5, 0, Math.PI * 2);
     ctx.fill();
     r(-7, -1, 14, 2, '#17171A');
+  }
+}
+
+// 머신 하나 그리기 (가로 3칸, 오른쪽이 벽)
+function drawMachine(ctx: CanvasRenderingContext2D, m: Box & { kind: MachineKind }) {
+  const T = TILE;
+  const x0 = m.x * T;
+  const y0 = m.y * T;
+  const r = (x: number, y: number, w: number, h: number, c: string) => rect(ctx, x0 + x, y0 + y, w, h, c);
+  const wheel = (cx: number, cy: number, rad: number, c: string) => {
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.arc(x0 + cx, y0 + cy, rad, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  // 바닥 고무판
+  r(2, 3, 3 * T - 4, T - 6, '#2E2E33');
+  if (m.kind === 'rower') {
+    r(8, 13, 62, 5, '#A8A8A8'); // 레일
+    r(8, 14, 62, 2, '#D0D0D0');
+    r(68, 5, 24, 22, '#1B1B1E'); // 플라이휠 통 (벽쪽)
+    wheel(80, 16, 8, '#3A3A40');
+    r(76, 3, 8, 4, '#5BB0E8');
+    r(62, 8, 5, 16, '#2B2B30'); // 발판
+    r(50, 10, 10, 11, '#1F1F22'); // 시트
+  } else if (m.kind === 'ski') {
+    r(78, 2, 14, 28, '#1B1B1E'); // 벽에 붙은 기둥
+    r(81, 5, 8, 6, '#5BB0E8');
+    r(64, 9, 14, 2, '#6B6B70');
+    r(64, 21, 14, 2, '#6B6B70');
+    r(60, 7, 5, 6, '#D9443E');
+    r(60, 19, 5, 6, '#D9443E');
+    r(40, 6, 22, 20, '#3A3A40'); // 발판
+  } else if (m.kind === 'bikeErg') {
+    r(70, 6, 20, 20, '#1B1B1E');
+    wheel(80, 16, 7, '#4A4A50');
+    r(66, 6, 6, 4, '#5BB0E8');
+    r(34, 14, 38, 4, '#2B2B30'); // 몸체
+    r(40, 10, 10, 12, '#1F1F22'); // 안장
+    r(62, 8, 4, 16, '#6B6B70'); // 핸들
+  } else if (m.kind === 'assault') {
+    ctx.strokeStyle = '#6B6B70';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x0 + 78, y0 + 16, 11, 0, Math.PI * 2);
+    ctx.stroke();
+    wheel(78, 16, 4, '#D9443E');
+    r(34, 14, 40, 4, '#1B1B1E');
+    r(40, 10, 10, 12, '#1F1F22');
+    r(58, 4, 3, 24, '#D9443E'); // 팔 손잡이
+    r(64, 4, 3, 24, '#D9443E');
+  } else {
+    r(8, 6, 80, 20, '#1B1B1E'); // 벨트 틀
+    r(12, 9, 66, 14, '#3A3A40'); // 벨트
+    for (let i = 0; i < 6; i++) r(14 + i * 11, 9, 1, 14, '#4A4A50');
+    r(80, 4, 10, 24, '#2B2B30'); // 콘솔
+    r(82, 8, 6, 8, '#5BB0E8');
   }
 }

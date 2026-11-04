@@ -56,8 +56,9 @@ export const ChatPanel = forwardRef<
     blockedReason: string | null;
     onSend: (text: string) => Promise<boolean>;
     onDelete: (id: string) => void;
+    onMinimizedChange?: (minimized: boolean) => void;
   }
->(function ChatPanel({ messages, sessions, currentSessionId, myId, canModerate, blockedReason, onSend, onDelete }, ref) {
+>(function ChatPanel({ messages, sessions, currentSessionId, myId, canModerate, blockedReason, onSend, onDelete, onMinimizedChange }, ref) {
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
@@ -70,6 +71,11 @@ export const ChatPanel = forwardRef<
   const drag = useRef<{ px: number; py: number; x: number; y: number; moved: boolean; last?: Pos } | null>(null);
 
   const unread = minimized ? Math.max(0, messages.length - seen) : 0;
+
+  // 펼쳐져 있는지 바깥(박스 화면)에 알려서 휴대폰에서는 겹치는 버튼을 숨기게 한다
+  useEffect(() => {
+    onMinimizedChange?.(minimized);
+  }, [minimized, onMinimizedChange]);
 
   const setMin = (v: boolean) => {
     setMinimized(v);
@@ -216,7 +222,7 @@ export const ChatPanel = forwardRef<
   return (
     <section
       ref={boxRef}
-      className="absolute z-20 flex w-[min(24rem,calc(100%-1.5rem))] flex-col overflow-hidden rounded-lg border-2 border-black/70 bg-black/70 text-white"
+      className="absolute z-30 flex w-[min(24rem,calc(100%-1.5rem))] flex-col overflow-hidden rounded-lg border-2 border-black/70 bg-black/70 text-white"
       style={placement}
       aria-label="박스 채팅"
     >

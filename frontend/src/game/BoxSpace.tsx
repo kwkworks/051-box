@@ -7,8 +7,9 @@ import { supabase } from '@/lib/supabase';
 import type { ChatMessage, Profile } from '@/lib/types';
 import { SPRITE_H, drawAvatar, type Dir, type Pose } from './avatar';
 import {
-  GEAR, GEAR_KEYS, OBJECT_LABELS, SPAWN, WORLD_H, WORLD_W, collides, drawGear, drawObjectHint, drawStaticMap,
-  drawStationHint, findPath, isNear, isNearStation, nameAt, nearbyBoard, nearbyStation, objectAt, stationAt,
+  BAR_MAX_X, BAR_MIN_X, BAR_ROWS, GEAR, GEAR_KEYS, MACHINES, MACHINE_INFO, OBJECT_LABELS, SPAWN, WORLD_H, WORLD_W, collides, drawGear, drawObjectHint, drawStaticMap,
+  drawStationHint, findPath, isNear, isNearStation, machineAt, nameAt, nearbyBoard, nearbyMachine, nearbyStation,
+  objectAt, seatOf, stationAt, barAt, hangY, nearbyBar,
   type GearKey, type ObjectKey,
 } from './map';
 
@@ -27,6 +28,9 @@ type Player = {
   jumpStart?: number;
   hold: GearKey | null; // 들고 있는 운동기구
   liftStart?: number; // 기구 들어올리기 시작 시각
+  ride: number | null; // 타고 있는 머신 번호
+  hang: number | null; // 매달린 철봉 줄 (8 또는 14)
+  pullStart?: number; // 풀업 시작 시각
   chat?: string;
   chatUntil?: number;
 };
@@ -40,8 +44,13 @@ export type BoxSpaceHandle = {
   zoomBy: (dir: 1 | -1) => number;
 };
 
-export type Action = 'jump' | 'sit' | 'dance' | 'run' | 'grab';
-export type ActionState = { pose: Pose; running: boolean; hold: GearKey | null };
+export type Action = 'jump' | 'sit' | 'dance' | 'run' | 'grab' | 'ride' | 'hang';
+export type ActionState = { pose: Pose; running: boolean; hold: GearKey | null; ride: number | null; hang: number | null };
+
+const HANG_SPEED = 70;
+const PULL_MS = 650;
+
+const JOY_R = 48; // 조이스틱 반경 (CSS px)
 
 const LIFT_MS = 700;
 
@@ -85,7 +94,35 @@ function readPeer(raw: Record<string, unknown>) {
   const dir = DIRS.includes(raw.dir as Dir) ? (raw.dir as Dir) : 'down';
   const pose = POSES.includes(raw.pose as Pose) ? (raw.pose as Pose) : 'stand';
   const hold = GEAR_KEYS.includes(raw.hold as GearKey) ? (raw.hold as GearKey) : null;
-  return { x, y, dir, moving: raw.moving === true, pose, running: raw.running === true, hold };
+  const ride = Number.isInteger(raw.ride) && (raw.ride as number) >= 0 && (raw.ride as number) < MACHINES.length ? (raw.ride as number) : null;
+  const hang = BAR_ROWS.includes(raw.hang as (typeof BAR_ROWS)[number]) ? (raw.hang as number) : null;
+  return { x, y, dir, moving: raw.moving === true, pose, running: raw.running === true, hold, ride, hang };
+}
+
+// 머신 위 동작: 종류마다 다르게 움직인다 (모두 왼쪽을 본다)
+function drawRider(ctx: CanvasRenderingContext2D, p: Player, now: number) {
+  const kind = MACHINES[p.ride!].kind;
+  const S = SPRITE_SCALE;
+  if (kind === 'rower') {
+    // 시트가 앞뒤로 미끄러지며 당기기
+    const phase = Math.sin(now / 380);
+    drawAvatar(ctx, p.avatar, p.x + phase * 8, p.y, 'left', phase > 0 ? 1 : 2, S, 'sit');
+  } else if (kind === 'ski') {
+    // 팔을 머리 위로 올렸다가 몸을 숙이며 끌어내리기
+    const t = (now % 1100) / 1100;
+    const top = t < 0.45;
+    drawAvatar(ctx, p.avatar, p.x, p.y, 'left', 0, S, top ? 'air' : 'stand', 0, top ? 1.04 : 0.88);
+  } else if (kind === 'bikeErg') {
+    const bob = Math.abs(Math.sin(now / 220)) * 1.5;
+    drawAvatar(ctx, p.avatar, p.x, p.y, 'left', Math.floor(now / 220) % 2 ? 1 : 2, S, 'sit', bob);
+  } else if (kind === 'assault') {
+    const bob = Math.abs(Math.sin(now / 150)) * 2;
+    drawAvatar(ctx, p.avatar, p.x, p.y, 'left', Math.floor(now / 150) % 2 ? 1 : 2, S, 'sit', bob);
+  } else {
+    // 트레드밀: 제자리 달리기
+    const bob = Math.abs(Math.sin(now / 100)) * 2;
+    drawAvatar(ctx, p.avatar, p.x, p.y, 'left', (Math.floor(now / 100) % 2) + 1, S, 'stand', bob);
+  }
 }
 
 function cleanText(v: unknown, max: number) {
@@ -120,7 +157,11 @@ export function BoxSpace({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [nearby, setNearby] = useState<ObjectKey | null>(null);
-  const [gearUi, setGearUi] = useState<{ station: GearKey | null; hold: GearKey | null }>({ station: null, hold: null });
+  const [gearUi, setGearUi] = useState<{
+    station: GearKey | null; hold: GearKey | null; machine: number | null; ride: number | null; bar: number | null; hang: number | null;
+  }>({ station: null, hold: null, machine: null, ride: null, bar: null, hang: null });
+  const hangRef = useRef<() => void>(() => {});
+  const rideRef = useRef<() => void>(() => {});
   const grabRef = useRef<() => void>(() => {});
   const [online, setOnline] = useState(1);
   const [connection, setConnection] = useState<'connecting' | 'online' | 'offline'>('connecting');
@@ -146,7 +187,7 @@ export function BoxSpace({
     const me: Player = {
       id: profile.id, nickname: profile.nickname, avatar: JSON.parse(avatarKey) as Avatar,
       x: start.x, y: start.y, tx: start.x, ty: start.y, dir: 'up', moving: false, pose: 'stand', running: false,
-      hold: null,
+      hold: null, ride: null, hang: null,
     };
     const peers = new Map<string, Player>();
     const keys = new Set<string>();
@@ -167,6 +208,12 @@ export function BoxSpace({
     let currentNearby: ObjectKey | null = null;
     let currentStation: GearKey | null = null;
     let pendingGear: GearKey | null = null; // 기구 자리를 누르면 걸어가서 집는다
+    let currentMachine: number | null = null;
+    let currentBar: number | null = null;
+    let pendingBar: number | null = null;
+    let pendingMachine: number | null = null;
+    // 플로팅 조이스틱 (휴대폰): 누른 자리에 생기고, 밀면 이동. 조금만 누르고 떼면 기존처럼 그 자리로 이동
+    let joy: { id: number; sx: number; sy: number; cx: number; cy: number; active: boolean } | null = null;
     let flash: { text: string; x: number; y: number; until: number } | null = null; // 누른 구조물 이름
     let runToggle = false; // 모바일: 달리기 켜기/끄기
     let channel: RealtimeChannel | null = null;
@@ -177,13 +224,63 @@ export function BoxSpace({
       p.chat = cleanText(text, BUBBLE_MAX);
       p.chatUntil = performance.now() + 6000;
     };
-    const sendAct = (type: 'jump' | 'lift') => {
+    const sendAct = (type: 'jump' | 'lift' | 'pull') => {
       if (subscribed) channel?.send({ type: 'broadcast', event: 'act', payload: { id: me.id, type } });
     };
     const notify = () => {
-      callbacks.current.onActionState?.({ pose: me.pose, running: runToggle, hold: me.hold });
-      setGearUi({ station: currentStation, hold: me.hold });
+      callbacks.current.onActionState?.({ pose: me.pose, running: runToggle, hold: me.hold, ride: me.ride, hang: me.hang });
+      setGearUi({ station: currentStation, hold: me.hold, machine: currentMachine, ride: me.ride, bar: currentBar, hang: me.hang });
     };
+    // 철봉 매달리기/내려오기
+    const grabBar = (row: number) => {
+      me.hang = row;
+      me.hold = null;
+      me.pose = 'stand';
+      me.x = me.tx = Math.max(BAR_MIN_X, Math.min(BAR_MAX_X, me.x));
+      me.y = me.ty = hangY(row);
+      me.dir = 'down';
+      path = [];
+      lastSentKey = '';
+      notify();
+    };
+    const dropBar = () => {
+      if (me.hang === null) return;
+      me.hang = null;
+      lastSentKey = '';
+      notify();
+    };
+    const toggleHang = () => {
+      if (me.hang !== null) dropBar();
+      else if (currentBar !== null) grabBar(currentBar);
+    };
+    hangRef.current = toggleHang;
+    // 머신 타기/내리기
+    const mount = (i: number) => {
+      const seat = seatOf(i);
+      me.ride = i;
+      me.hold = null;
+      me.pose = 'stand';
+      me.x = me.tx = seat.x;
+      me.y = me.ty = seat.y;
+      me.dir = 'left';
+      path = [];
+      lastSentKey = '';
+      notify();
+    };
+    const dismount = () => {
+      if (me.ride === null) return;
+      const seat = seatOf(me.ride);
+      me.ride = null;
+      me.x = me.tx = 35.5 * 32;
+      me.y = me.ty = seat.y;
+      lastSentKey = '';
+      notify();
+    };
+    const toggleRide = () => {
+      if (me.ride !== null) dismount();
+      else if (currentMachine !== null) mount(currentMachine);
+    };
+    rideRef.current = toggleRide;
     // 기구 집기/내려놓기: 들고 있으면 내려놓고(제자리로), 기구 자리 옆이면 집는다
     const grab = (gear: GearKey | null = currentStation) => {
       if (me.hold && (!gear || gear === me.hold)) me.hold = null;
@@ -196,6 +293,24 @@ export function BoxSpace({
     grabRef.current = () => grab();
     const act = (action: Action) => {
       const now = performance.now();
+      if (action === 'ride') {
+        toggleRide();
+        return;
+      }
+      if (me.ride !== null) return; // 머신 위에서는 다른 동작 없음
+      if (action === 'hang') {
+        toggleHang();
+        return;
+      }
+      if (me.hang !== null) {
+        // 철봉 위: Space(점프)는 풀업, 나머지는 내려오기
+        if (action === 'jump') {
+          if (me.pullStart && now - me.pullStart < PULL_MS) return;
+          me.pullStart = now;
+          sendAct('pull');
+        } else if (action !== 'run') dropBar();
+        return;
+      }
       if (action === 'grab') {
         grab(me.hold ?? currentStation); // 메뉴의 "내려놓기"는 항상 내려놓는다
         return;
@@ -259,7 +374,13 @@ export function BoxSpace({
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTyping() || e.isComposing) return;
       const move = MOVE_CODES[e.code];
+      if (move && me.hang !== null && (move === 'up' || move === 'down')) {
+        e.preventDefault();
+        dropBar();
+        return;
+      }
       if (move) {
+        dismount(); // 움직이면 머신에서 내린다
         keys.add(move);
         path = [];
         pendingOpen = null;
@@ -276,12 +397,24 @@ export function BoxSpace({
         act('sit');
       } else if (e.code === 'KeyQ' && !e.repeat) {
         act('dance');
+      } else if (e.code === 'KeyE' && !e.repeat && me.ride !== null) {
+        e.preventDefault();
+        dismount();
+      } else if (e.code === 'KeyE' && !e.repeat && me.hang !== null) {
+        e.preventDefault();
+        dropBar();
       } else if (e.code === 'KeyE' && currentNearby) {
         e.preventDefault();
         callbacks.current.onOpen(currentNearby);
+      } else if (e.code === 'KeyE' && !e.repeat && currentMachine !== null && !currentStation && !me.hold) {
+        e.preventDefault();
+        mount(currentMachine);
       } else if ((e.code === 'KeyE' || e.code === 'KeyF') && !e.repeat && (currentStation || me.hold)) {
         e.preventDefault();
         grab();
+      } else if (e.code === 'KeyE' && !e.repeat && currentBar !== null) {
+        e.preventDefault();
+        grabBar(currentBar);
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
@@ -300,8 +433,13 @@ export function BoxSpace({
       const dpr = canvas.width / r.width;
       return { wx: ((e.clientX - r.left) * dpr) / zoom + cam.x, wy: ((e.clientY - r.top) * dpr) / zoom + cam.y };
     };
-    const onPointer = (e: PointerEvent) => {
+    const tapAt = (e: PointerEvent) => {
       const { wx, wy } = toWorld(e);
+      if (me.ride !== null) {
+        const m = machineAt(wx, wy);
+        if (m === me.ride) return;
+        dismount();
+      }
       const target = objectAt(wx, wy);
       if (target && isNear(target, me.x, me.y)) {
         callbacks.current.onOpen(target);
@@ -312,13 +450,59 @@ export function BoxSpace({
         grab(gear);
         return;
       }
-      if (!target && !gear) {
+      if (me.hang !== null) {
+        const bx = barAt(wx, wy);
+        if (bx === me.hang) return;
+        dropBar();
+      }
+      const bar = target || gear ? null : barAt(wx, wy);
+      if (bar !== null && nearbyBar(me.x, me.y) === bar && Math.abs(wx - me.x) < 48) {
+        grabBar(bar);
+        return;
+      }
+      const machine = target || gear ? null : machineAt(wx, wy);
+      if (machine !== null && nearbyMachine(me.x, me.y) === machine) {
+        mount(machine);
+        return;
+      }
+      if (!target && !gear && machine === null) {
         const named = nameAt(wx, wy);
         if (named) flash = { text: named.name, x: named.x, y: named.y, until: performance.now() + 1800 };
       }
       pendingOpen = target;
       pendingGear = gear;
-      path = findPath(me.x, me.y, wx, wy);
+      pendingMachine = machine;
+      pendingBar = bar;
+      path = findPath(me.x, me.y, wx, bar !== null ? (bar + 1) * 32 + 16 : wy);
+    };
+    const onPointer = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse') {
+        tapAt(e);
+        return;
+      }
+      if (joy) return; // 두 번째 손가락은 무시
+      canvas.setPointerCapture(e.pointerId);
+      joy = { id: e.pointerId, sx: e.clientX, sy: e.clientY, cx: e.clientX, cy: e.clientY, active: false };
+    };
+    const onJoyMove = (e: PointerEvent) => {
+      if (!joy || e.pointerId !== joy.id) return;
+      joy.cx = e.clientX;
+      joy.cy = e.clientY;
+      if (!joy.active && Math.hypot(joy.cx - joy.sx, joy.cy - joy.sy) > 12) {
+        joy.active = true;
+        path = [];
+        pendingOpen = null;
+        pendingGear = null;
+        pendingMachine = null;
+        pendingBar = null;
+        dismount();
+      }
+    };
+    const onJoyEnd = (e: PointerEvent) => {
+      if (!joy || e.pointerId !== joy.id) return;
+      const wasTap = !joy.active && e.type === 'pointerup';
+      joy = null;
+      if (wasTap) tapAt(e);
     };
     const onHover = (e: PointerEvent) => {
       const { wx, wy } = toWorld(e);
@@ -326,11 +510,14 @@ export function BoxSpace({
     };
     canvas.addEventListener('pointerdown', onPointer);
     canvas.addEventListener('pointermove', onHover);
+    canvas.addEventListener('pointermove', onJoyMove);
+    canvas.addEventListener('pointerup', onJoyEnd);
+    canvas.addEventListener('pointercancel', onJoyEnd);
 
     // ---- 실시간 (비공개 채널: 승인된 회원만 접속 가능)
     const presencePayload = () => ({
       nickname: me.nickname, avatar: me.avatar, x: Math.round(me.x), y: Math.round(me.y), dir: me.dir, pose: me.pose,
-      hold: me.hold,
+      hold: me.hold, ride: me.ride, hang: me.hang,
     });
 
     const syncPresence = () => {
@@ -351,10 +538,12 @@ export function BoxSpace({
           existing.nickname = nickname;
           existing.avatar = avatar;
           existing.hold = pos.hold;
+          existing.ride = pos.ride;
+          existing.hang = pos.hang;
         } else {
           peers.set(id, {
             id, nickname, avatar, x: pos.x, y: pos.y, tx: pos.x, ty: pos.y, dir: pos.dir,
-            moving: false, pose: pos.pose, running: false, hold: pos.hold,
+            moving: false, pose: pos.pose, running: false, hold: pos.hold, ride: pos.ride, hang: pos.hang,
           });
         }
       }
@@ -412,11 +601,14 @@ export function BoxSpace({
           p.pose = pos.pose;
           p.running = pos.running;
           p.hold = pos.hold;
+          p.ride = pos.ride;
+          p.hang = pos.hang;
         })
         .on('broadcast', { event: 'act' }, ({ payload }) => {
           const p = peers.get(String(payload?.id));
           if (p && payload?.type === 'jump') p.jumpStart = performance.now();
           if (p && payload?.type === 'lift' && p.hold) p.liftStart = performance.now();
+          if (p && payload?.type === 'pull' && p.hang !== null) p.pullStart = performance.now();
         })
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) =>
           onChatInsert(payload.new as Record<string, unknown>),
@@ -459,6 +651,38 @@ export function BoxSpace({
       if (keys.has('right')) vx += 1;
       if (keys.has('up')) vy -= 1;
       if (keys.has('down')) vy += 1;
+      let joyRun = false;
+      if (joy?.active && !vx && !vy) {
+        const dx = joy.cx - joy.sx;
+        const dy = joy.cy - joy.sy;
+        const d = Math.hypot(dx, dy);
+        if (d > 8) {
+          vx = dx / d;
+          vy = dy / d;
+          joyRun = d > JOY_R * 0.85; // 끝까지 밀면 달리기
+        }
+      }
+      if (me.ride !== null) {
+        vx = 0;
+        vy = 0;
+        path = [];
+      }
+      // 철봉: 좌우로만 손을 옮기며 이동
+      if (me.hang !== null) {
+        path = [];
+        if (joy?.active && Math.abs(joy.cy - joy.sy) > JOY_R * 0.9 && Math.abs(joy.cy - joy.sy) > Math.abs(joy.cx - joy.sx) * 1.5) {
+          dropBar();
+        } else {
+          const hx = Math.sign(vx);
+          me.moving = hx !== 0;
+          if (hx) {
+            me.x = Math.max(BAR_MIN_X, Math.min(BAR_MAX_X, me.x + hx * HANG_SPEED * dt));
+            me.dir = hx > 0 ? 'right' : 'left';
+          }
+          vx = 0;
+          vy = 0;
+        }
+      }
       if (!vx && !vy && path.length) {
         const target = path[0];
         const dx = target.x - me.x;
@@ -471,8 +695,8 @@ export function BoxSpace({
         }
       }
       const len = Math.hypot(vx, vy);
-      me.moving = len > 0;
-      me.running = me.moving && (keys.has('run') || runToggle);
+      if (me.hang === null) me.moving = len > 0;
+      me.running = me.moving && (keys.has('run') || runToggle || joyRun);
       if (me.moving && me.pose !== 'stand') {
         me.pose = 'stand'; // 움직이면 일어난다
         notify();
@@ -494,7 +718,7 @@ export function BoxSpace({
       }
 
       // 위치 전송 (초당 최대 10회, 바뀌었을 때만)
-      const sendKey = `${Math.round(me.x)},${Math.round(me.y)},${me.dir},${me.moving},${me.pose},${me.running},${me.hold}`;
+      const sendKey = `${Math.round(me.x)},${Math.round(me.y)},${me.dir},${me.moving},${me.pose},${me.running},${me.hold},${me.ride},${me.hang}`;
       if (channel && subscribed && now - lastSent > 100 && sendKey !== lastSentKey) {
         lastSent = now;
         lastSentKey = sendKey;
@@ -502,13 +726,19 @@ export function BoxSpace({
           type: 'broadcast', event: 'move',
           payload: {
             id: me.id, x: Math.round(me.x), y: Math.round(me.y), dir: me.dir,
-            moving: me.moving, pose: me.pose, running: me.running, hold: me.hold,
+            moving: me.moving, pose: me.pose, running: me.running, hold: me.hold, ride: me.ride, hang: me.hang,
           },
         });
       }
 
       // 다른 회원은 부드럽게 따라가게
       for (const p of peers.values()) {
+        if (p.ride !== null) {
+          const seat = seatOf(p.ride);
+          p.x = p.tx = seat.x;
+          p.y = p.ty = seat.y;
+          continue;
+        }
         p.x += (p.tx - p.x) * Math.min(1, dt * 10);
         p.y += (p.ty - p.y) * Math.min(1, dt * 10);
       }
@@ -519,10 +749,22 @@ export function BoxSpace({
         setNearby(near);
         callbacks.current.onNearbyChange?.(near);
       }
-      const station = nearbyStation(me.x, me.y);
-      if (station !== currentStation) {
+      const station = me.ride === null ? nearbyStation(me.x, me.y) : null;
+      const machineNear = me.ride === null ? nearbyMachine(me.x, me.y) : null;
+      const barNear = me.ride === null && me.hang === null ? nearbyBar(me.x, me.y) : null;
+      if (station !== currentStation || machineNear !== currentMachine || barNear !== currentBar) {
         currentStation = station;
-        setGearUi({ station, hold: me.hold });
+        currentMachine = machineNear;
+        currentBar = barNear;
+        setGearUi({ station, hold: me.hold, machine: machineNear, ride: me.ride, bar: barNear, hang: me.hang });
+      }
+      if (pendingBar !== null && !path.length) {
+        if (nearbyBar(me.x, me.y) === pendingBar) grabBar(pendingBar);
+        pendingBar = null;
+      }
+      if (pendingMachine !== null && !path.length) {
+        if (nearbyMachine(me.x, me.y) === pendingMachine) mount(pendingMachine);
+        pendingMachine = null;
       }
       if (pendingGear && !path.length) {
         if (isNearStation(pendingGear, me.x, me.y)) grab(pendingGear);
@@ -573,6 +815,19 @@ export function BoxSpace({
         const handY = p.y - lift - 14 * SPRITE_SCALE - up * 22 * SPRITE_SCALE;
         const handX = p.x + (side ? (dir === 'right' ? 9 : -9) : 0);
         if (lifting) lifts.set(p.id, lift + up * 16); // 머리 위 기구가 이름표를 가리지 않게
+        if (p.ride !== null) {
+          drawRider(ctx, p, now);
+          continue;
+        }
+        if (p.hang !== null) {
+          const pt = p.pullStart ? now - p.pullStart : PULL_MS;
+          const pull = pt < PULL_MS ? Math.sin((Math.PI * pt) / PULL_MS) : 0;
+          const sway = p.moving ? Math.sin(now / 120) * 2 : Math.sin(now / 600) * 0.8;
+          const hangLift = 10 + pull * 14;
+          lifts.set(p.id, hangLift);
+          drawAvatar(ctx, p.avatar, p.x + sway, p.y, 'down', 0, SPRITE_SCALE, 'air', hangLift, 1 + pull * 0.04);
+          continue;
+        }
         if (p.hold && dir === 'up') drawGear(ctx, p.hold, handX, handY, side);
         drawAvatar(
           ctx, p.avatar, p.x, p.y, dir,
@@ -607,6 +862,32 @@ export function BoxSpace({
           ctx.fillStyle = '#1F1F22';
           ctx.fillText(p.chat, p.x, by, 180);
         }
+      }
+
+      // 플로팅 조이스틱 (화면 좌표로 그린다)
+      if (joy?.active) {
+        const r = canvas.getBoundingClientRect();
+        const k = canvas.width / r.width;
+        const bx = (joy.sx - r.left) * k;
+        const by = (joy.sy - r.top) * k;
+        const dx = joy.cx - joy.sx;
+        const dy = joy.cy - joy.sy;
+        const d = Math.hypot(dx, dy);
+        const m = Math.min(1, JOY_R / Math.max(d, 1));
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+        ctx.lineWidth = 2 * k;
+        ctx.beginPath();
+        ctx.arc(bx, by, JOY_R * k, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = d > JOY_R * 0.85 ? 'rgba(232,185,35,0.9)' : 'rgba(255,255,255,0.8)';
+        ctx.beginPath();
+        ctx.arc(bx + dx * m * k, by + dy * m * k, 20 * k, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       }
 
       // 누른 구조물 이름 잠깐 보여주기
@@ -650,6 +931,9 @@ export function BoxSpace({
       window.removeEventListener('blur', onBlur);
       canvas.removeEventListener('pointerdown', onPointer);
       canvas.removeEventListener('pointermove', onHover);
+      canvas.removeEventListener('pointermove', onJoyMove);
+      canvas.removeEventListener('pointerup', onJoyEnd);
+      canvas.removeEventListener('pointercancel', onJoyEnd);
       if (handleRef) handleRef.current = null;
       clearTimeout(retryTimer);
       document.removeEventListener('visibilitychange', onVisible);
@@ -672,7 +956,28 @@ export function BoxSpace({
             ? '실시간 연결 중…'
             : `실시간 연결 끊김${connError ? ` (${connError})` : ''}`}
       </div>
-      {!nearby && (gearUi.station || gearUi.hold) && (
+      {!nearby && (gearUi.ride !== null || (gearUi.machine !== null && !gearUi.station && !gearUi.hold)) && (
+        <button
+          type="button"
+          onClick={() => rideRef.current()}
+          className="absolute bottom-24 left-1/2 -translate-x-1/2 rounded-lg border-2 border-[#2A2320] bg-white px-4 py-2 text-sm font-bold text-[#2A2320] shadow-[0_3px_0_#2A2320] active:translate-y-0.5"
+        >
+          {gearUi.ride !== null
+            ? `${MACHINE_INFO[MACHINES[gearUi.ride].kind].icon} 내리기`
+            : `${MACHINE_INFO[MACHINES[gearUi.machine!].kind].icon} ${MACHINE_INFO[MACHINES[gearUi.machine!].kind].label} 타기`}{' '}
+          <span className="hidden sm:inline">(E)</span>
+        </button>
+      )}
+      {!nearby && gearUi.ride === null && !gearUi.station && !gearUi.hold && gearUi.machine === null && (gearUi.hang !== null || gearUi.bar !== null) && (
+        <button
+          type="button"
+          onClick={() => hangRef.current()}
+          className="absolute bottom-24 left-1/2 -translate-x-1/2 rounded-lg border-2 border-[#2A2320] bg-white px-4 py-2 text-sm font-bold text-[#2A2320] shadow-[0_3px_0_#2A2320] active:translate-y-0.5"
+        >
+          {gearUi.hang !== null ? '🤸 철봉에서 내려오기' : '🤸 철봉 매달리기'} <span className="hidden sm:inline">(E)</span>
+        </button>
+      )}
+      {!nearby && gearUi.ride === null && (gearUi.station || gearUi.hold) && (
         <button
           type="button"
           onClick={() => grabRef.current()}

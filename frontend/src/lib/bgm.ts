@@ -55,8 +55,9 @@ export class Bgm {
 
   // 사용자 입력(클릭/키) 안에서 호출해야 소리가 난다
   start() {
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
     if (this.timer) {
-      this.ctx?.resume();
+      if (this.ctx?.state !== 'running') this.ctx?.resume();
       return;
     }
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -71,9 +72,21 @@ export class Bgm {
     const data = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
 
+    // 모바일(특히 아이폰)은 사용자 동작 안에서 실제로 소리를 한 번 내야 오디오가 열린다: 무음 한 조각 재생
+    const unlock = this.ctx.createBufferSource();
+    unlock.buffer = this.ctx.createBuffer(1, 1, this.ctx.sampleRate);
+    unlock.connect(this.ctx.destination);
+    unlock.start(0);
+    this.ctx.resume();
+
     this.nextTime = this.ctx.currentTime + 0.1;
     // 앞으로 0.2초 분량의 음을 미리 예약해서 끊김 없이 재생
     this.timer = setInterval(() => this.schedule(), 50);
+  }
+
+  // 실제로 소리가 나고 있는지 (모바일에서 잠금 해제가 됐는지)
+  get running() {
+    return this.ctx?.state === 'running';
   }
 
   stop() {
@@ -81,6 +94,16 @@ export class Bgm {
     this.timer = null;
     this.ctx?.close();
     this.ctx = null;
+  }
+
+  // 화면이 안 보일 때는 오디오를 잠시 멈춘다 (설정은 그대로)
+  setHidden(hidden: boolean) {
+    if (!this.ctx) return;
+    if (hidden) this.ctx.suspend();
+    else {
+      this.ctx.resume();
+      this.nextTime = Math.max(this.nextTime, this.ctx.currentTime + 0.05);
+    }
   }
 
   setSettings(s: BgmSettings) {
@@ -161,8 +184,18 @@ export class Bgm {
 // 컴포넌트가 사라져도 멈추지 않고, 로그아웃할 때만 멈춘다.
 let shared: Bgm | null = null;
 
+let watching = false;
+
 export function getBgm(): Bgm {
   shared ??= new Bgm(loadBgmSettings());
+  // 휴대폰에서 다른 앱으로 가거나 화면을 끄면(탭이 안 보이면) 멈추고, 돌아오면 이어서 재생
+  if (!watching && typeof document !== 'undefined') {
+    watching = true;
+    const sync = () => shared?.setHidden(document.visibilityState !== 'visible');
+    document.addEventListener('visibilitychange', sync);
+    window.addEventListener('pagehide', () => shared?.setHidden(true));
+    window.addEventListener('pageshow', sync);
+  }
   return shared;
 }
 

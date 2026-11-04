@@ -30,8 +30,10 @@ function Space({ me }: { me: Me }) {
   const [mutedUntil, setMutedUntil] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [action, setAction] = useState<ActionState>({ pose: 'stand', running: false, hold: null });
+  const [action, setAction] = useState<ActionState>({ pose: 'stand', running: false, hold: null, ride: null, hang: null });
   const [help, setHelp] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const onChatMinimized = useCallback((min: boolean) => setChatOpen(!min), []);
 
   const showToast = (text: string) => {
     setToast(text);
@@ -174,9 +176,11 @@ function Space({ me }: { me: Me }) {
             blockedReason={chatBlocked}
             onSend={sendChat}
             onDelete={deleteChat}
+            onMinimizedChange={onChatMinimized}
           />
-        <div className="absolute bottom-3 right-3 z-20 flex items-end gap-2">
-          <ActionPad pose={action.pose} running={action.running} hold={action.hold} onAct={(a) => spaceRef.current?.act(a)} />
+        {/* 휴대폰에서 채팅창을 펼치면 겹치지 않게 숨긴다 (채팅창을 접으면 다시 보임) */}
+        <div className={`absolute bottom-3 right-3 z-20 items-end gap-2 ${chatOpen ? 'hidden sm:flex' : 'flex'}`}>
+          <ActionPad pose={action.pose} running={action.running} hold={action.hold} ride={action.ride} hang={action.hang} onAct={(a) => spaceRef.current?.act(a)} />
           <QuickMenu />
         </div>
         <div className="absolute right-3 top-3 z-10 flex flex-col overflow-hidden rounded-md bg-black/60 text-white lg:top-12" role="group" aria-label="화면 확대·축소">
@@ -195,8 +199,9 @@ function Space({ me }: { me: Me }) {
             <ul className="rounded-md bg-black/75 px-3 py-2 text-xs leading-relaxed text-white">
               <li>방향키 / WASD 이동 · Shift 달리기</li>
               <li>Space 점프 · C 앉기 · Q 춤추기</li>
-              <li>E 또는 클릭: 게시판 열기 · 기구 들기/내려놓기</li>
-              <li>기구를 들고 Space: 들어올리기 · Enter 채팅</li>
+              <li>E 또는 클릭: 게시판 열기 · 기구 들기/내려놓기 · 머신 타기/내리기</li>
+              <li>기구를 들고 Space: 들어올리기 · 철봉에서 Space: 풀업, ←→ 이동</li>
+              <li>Enter 채팅</li>
             </ul>
           )}
         </div>

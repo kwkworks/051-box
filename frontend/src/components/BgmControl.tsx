@@ -12,14 +12,17 @@ export function BgmControl() {
 
   // 첫 클릭이나 키 입력 때 음악 시작 (브라우저 자동재생 정책).
   // 화면을 떠나도 멈추지 않는다: 플레이어는 앱 전체에서 하나를 같이 쓴다.
+  // 휴대폰 브라우저는 손가락을 뗄 때(touchend/click)만 소리를 허락하므로 여러 입력에서 시도하고,
+  // 실제로 소리가 나기 시작하면 그만 듣는다.
   useEffect(() => {
-    const kick = () => getBgm().start();
-    window.addEventListener('pointerdown', kick, { once: true });
-    window.addEventListener('keydown', kick, { once: true });
-    return () => {
-      window.removeEventListener('pointerdown', kick);
-      window.removeEventListener('keydown', kick);
+    const events = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'] as const;
+    const kick = () => {
+      const player = getBgm();
+      player.start();
+      if (player.running) events.forEach((ev) => window.removeEventListener(ev, kick, true));
     };
+    events.forEach((ev) => window.addEventListener(ev, kick, true));
+    return () => events.forEach((ev) => window.removeEventListener(ev, kick, true));
   }, []);
 
   const update = (next: BgmSettings) => {
