@@ -102,6 +102,7 @@ export const chatSchema = z.strictObject({
 
 export const sheetUrlSchema = z.strictObject({ url: z.url({ protocol: /^https$/ }).max(500) });
 
+export const chatReadSchema = z.strictObject({ at: z.iso.datetime({ offset: true }) });
 export const chatMuteSchema = z.strictObject({ mute: z.enum(['1h', 'today', 'off']) });
 export const chatLockSchema = z.strictObject({ locked: z.boolean() });
 

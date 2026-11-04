@@ -27,7 +27,15 @@ export function DevPreview() {
   const [opened, setOpened] = useState("");
   const [view, setView] = useState<'space' | 'avatars'>('space');
   const space = useRef<BoxSpaceHandle | null>(null);
-  const [msgs, setMsgs] = useState<ChatMessage[]>([]);
+  // 채팅 미리보기: 다른 회원 메시지 8개, 그중 5개는 이미 읽음
+  const [msgs, setMsgs] = useState<ChatMessage[]>(() =>
+    Array.from({ length: 8 }, (_, i) => ({
+      id: `demo-${i}`, user_id: '11111111-1111-1111-1111-111111111111', nickname: '코치', body: `미리보기 메시지 ${i + 1}`,
+      created_at: new Date(Date.UTC(2026, 10, 4, 1, i)).toISOString(), role: i === 0 ? 'admin' : 'member',
+    })),
+  );
+  const demoMarker = new Date(Date.UTC(2026, 10, 4, 1, 4)).toISOString();
+  const [demoRead, setDemoRead] = useState<string | null>(demoMarker);
   // 실제 박스 화면처럼 브라우저에서만 채팅창을 그린다 (저장된 위치를 읽기 때문)
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   return (
@@ -42,8 +50,9 @@ export function DevPreview() {
           <BoxSpace profile={DEMO} handleRef={space} onOpen={(b) => setOpened(`${b} @ ${new Date().toLocaleTimeString()}`)} />
           {mounted && <ChatPanel
             messages={msgs}
-            sessions={[]}
-            currentSessionId={null}
+            markerAt={demoMarker}
+            readAt={demoRead}
+            onRead={setDemoRead}
             myId={DEMO.id}
             canModerate={false}
             blockedReason={null}

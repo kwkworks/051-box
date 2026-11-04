@@ -1,9 +1,8 @@
 'use client';
 
 import { Fragment, forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
-import type { ChatMessage, ChatSession } from '@/lib/types';
+import type { ChatMessage } from '@/lib/types';
 
-const GRACE_MS = 90_000;
 const POS_KEY = 'box-chat-pos';
 const MIN_KEY = 'box-chat-min';
 
@@ -32,45 +31,42 @@ function time(iso: string) {
   return new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 }
 
-// 메시지가 어느 접속(세션) 중에 오갔는지
-function sessionOf(m: ChatMessage, sessions: ChatSession[], currentId: string | null): string | null {
-  const t = new Date(m.created_at).getTime();
-  for (const s of sessions) {
-    const end = s.id === currentId ? Infinity : new Date(s.last_seen).getTime() + GRACE_MS;
-    if (t >= new Date(s.started_at).getTime() && t <= end) return s.id;
-  }
-  return null;
-}
-
-// 박스 채팅: 오늘, 내가 접속해 있던 동안의 대화만. 이전 접속 대화는 구분선 위에 보여준다.
-// Enter로 입력창 열기, Enter로 보내기, Esc로 닫기.
+// 박스 채팅: 오늘(0시부터) 대화 전체. 다시 들어오면 "여기까지 읽었어요" 구분선으로 읽던 곳을 보여주고,
+// 내가 보내면 가장 최신 대화로 이동한다. Enter로 입력창 열기, Enter로 보내기, Esc로 닫기.
 // 손잡이(⠿)를 끌어서 옮길 수 있고, 접으면 작은 버튼만 남는다. 위치와 접힘 상태는 이 기기에 저장.
 export const ChatPanel = forwardRef<
   ChatPanelHandle,
   {
     messages: ChatMessage[];
-    sessions: ChatSession[];
-    currentSessionId: string | null;
+    markerAt: string | null; // "여기까지 읽었어요" 구분선 위치 (들어올 때 읽었던 곳)
+    readAt: string | null; // 지금까지 읽은 곳 (안 읽은 수 계산)
     myId: string;
     canModerate: boolean;
     blockedReason: string | null;
     onSend: (text: string) => Promise<boolean>;
     onDelete: (id: string) => void;
     onMinimizedChange?: (minimized: boolean) => void;
+    onRead?: (at: string) => void;
   }
->(function ChatPanel({ messages, sessions, currentSessionId, myId, canModerate, blockedReason, onSend, onDelete, onMinimizedChange }, ref) {
+>(function ChatPanel({ messages, markerAt, readAt, myId, canModerate, blockedReason, onSend, onDelete, onMinimizedChange, onRead }, ref) {
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [minimized, setMinimized] = useState(readMinimized);
   const [pos, setPos] = useState<Pos | null>(readPos);
-  const [seen, setSeen] = useState(messages.length);
   const listRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const drag = useRef<{ px: number; py: number; x: number; y: number; moved: boolean; last?: Pos } | null>(null);
+  const markerRef = useRef<HTMLDivElement>(null);
+  const stickBottom = useRef(true); // 맨 아래를 보고 있으면 새 메시지가 와도 계속 맨 아래
+  const scrollTo = useRef<'marker' | 'bottom' | null>('marker');
 
-  const unread = minimized ? Math.max(0, messages.length - seen) : 0;
+  const readTime = readAt ? Date.parse(readAt) : 0;
+  const unread = messages.filter((m) => m.user_id !== myId && Date.parse(m.created_at) > readTime).length;
+  // 구분선: 들어올 때 읽었던 곳 다음의 첫 메시지 앞
+  const markerTime = markerAt ? Date.parse(markerAt) : null;
+  const firstNewIdx = markerTime === null ? -1 : messages.findIndex((m) => Date.parse(m.created_at) > markerTime && m.user_id !== myId);
 
   // 펼쳐져 있는지 바깥(박스 화면)에 알려서 휴대폰에서는 겹치는 버튼을 숨기게 한다
   useEffect(() => {
@@ -79,7 +75,11 @@ export const ChatPanel = forwardRef<
 
   const setMin = (v: boolean) => {
     setMinimized(v);
-    setSeen(messages.length);
+    if (!v) {
+      // 펼칠 때 안 읽은 게 여러 개면 기록을 열고 읽던 곳으로
+      if (unread > 3) setOpen(true);
+      scrollTo.current = unread > 0 ? 'marker' : 'bottom';
+    }
     try {
       localStorage.setItem(MIN_KEY, v ? '1' : '0');
     } catch {}
@@ -160,13 +160,38 @@ export const ChatPanel = forwardRef<
     style: { touchAction: 'none' } as React.CSSProperties,
   };
 
-  // 새 메시지가 오면 맨 아래로
-  useEffect(() => {
+  // 스크롤: 처음/펼칠 때는 읽던 곳, 새 메시지는 맨 아래를 보고 있을 때만 따라 내려간다, 내가 보낸 건 항상 맨 아래
+  const lastMine = messages.length > 0 && messages[messages.length - 1].user_id === myId;
+  useLayoutEffect(() => {
     const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length, open]);
+    if (!el) return;
+    const want = scrollTo.current;
+    scrollTo.current = null;
+    if (want === 'marker' && markerRef.current) {
+      el.scrollTop = markerRef.current.offsetTop - 8;
+    } else if (want === 'bottom' || want === 'marker' || stickBottom.current || lastMine) {
+      el.scrollTop = el.scrollHeight;
+    }
+    stickBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+  }, [messages.length, open, minimized, lastMine]);
 
-  const visible = open ? messages : messages.slice(-3);
+  // 맨 아래까지 보고 있으면 "읽음"으로 저장
+  const latest = messages.length ? messages[messages.length - 1].created_at : null;
+  useEffect(() => {
+    if (minimized || !latest || !stickBottom.current || document.visibilityState !== 'visible') return;
+    if (Date.parse(latest) > readTime) onRead?.(latest);
+  }, [latest, minimized, readTime, onRead, open]);
+
+  const onScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    stickBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+    if (stickBottom.current && latest && Date.parse(latest) > readTime) onRead?.(latest);
+  };
+
+  // 접은 화면에서는 최근 3개 (읽던 곳 구분선이 그 안에 있으면 함께 보여준다)
+  const start = open ? 0 : Math.max(0, messages.length - 3);
+  const visible = messages.slice(start);
 
   const submit = async () => {
     const value = text.trim();
@@ -179,12 +204,11 @@ export const ChatPanel = forwardRef<
     const ok = await onSend(value);
     setSending(false);
     if (ok) {
+      scrollTo.current = 'bottom';
       setText('');
       input?.blur();
     }
   };
-
-  let prevSession: string | null | undefined;
 
   if (minimized) {
     const last = messages[messages.length - 1];
@@ -236,7 +260,7 @@ export const ChatPanel = forwardRef<
           ⠿
         </span>
         <span className="min-w-0 flex-1 truncate font-bold">
-          💬 오늘의 박스 채팅 <span className="hidden font-normal text-white/60 sm:inline">(내가 있던 동안)</span>
+          💬 오늘의 박스 채팅 <span className="hidden font-normal text-white/60 sm:inline">(0시부터)</span>
         </span>
         <button type="button" className="shrink-0 rounded px-2 py-1 font-bold hover:bg-white/10" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
           {open ? '기록 ▾' : '기록 ▴'}
@@ -245,29 +269,22 @@ export const ChatPanel = forwardRef<
           ✕
         </button>
       </div>
-      <div ref={listRef} className={`overflow-y-auto px-3 ${open ? 'max-h-[35vh]' : 'max-h-20 sm:max-h-24'}`} aria-live="polite">
+      <div ref={listRef} onScroll={onScroll} className={`relative overflow-y-auto px-3 ${open ? 'max-h-[35vh]' : 'max-h-20 sm:max-h-24'}`} aria-live="polite">
         {visible.length === 0 && <p className="py-1 text-xs text-white/60">아직 대화가 없어요. 먼저 인사해보세요!</p>}
-        {visible.map((m) => {
-          const sid = sessionOf(m, sessions, currentSessionId);
-          const showDivider = open && sid !== prevSession;
-          prevSession = sid;
-          const s = sessions.find((x) => x.id === sid);
+        {visible.map((m, i) => {
+          const idx = start + i;
+          const showMarker = idx === firstNewIdx && idx > 0;
+          const old = firstNewIdx > 0 && idx < firstNewIdx;
           return (
             <Fragment key={m.id}>
-              {showDivider && (
-                <div className="my-2 flex items-center gap-2 text-[11px] font-bold" role="separator">
-                  <span className={`h-0.5 flex-1 ${sid === currentSessionId ? 'bg-green-400/70' : 'bg-yellow/70'}`} />
-                  <span className={`shrink-0 rounded-full px-2 py-0.5 ${sid === currentSessionId ? 'bg-green-500/30 text-green-200' : 'bg-yellow/25 text-yellow'}`}>
-                    {sid === currentSessionId
-                      ? `지금 접속 ${s ? time(s.started_at) : ''}~`
-                      : s
-                        ? `이전 접속 ${time(s.started_at)} ~ ${time(s.last_seen)} 대화`
-                        : '이전 대화'}
-                  </span>
-                  <span className={`h-0.5 flex-1 ${sid === currentSessionId ? 'bg-green-400/70' : 'bg-yellow/70'}`} />
+              {showMarker && (
+                <div ref={markerRef} className="my-2 flex items-center gap-2 text-[11px] font-bold" role="separator">
+                  <span className="h-0.5 flex-1 bg-yellow/80" />
+                  <span className="shrink-0 rounded-full bg-yellow/25 px-2 py-0.5 text-yellow">여기까지 읽었어요 · 새 메시지</span>
+                  <span className="h-0.5 flex-1 bg-yellow/80" />
                 </div>
               )}
-              <p className={`group break-words py-0.5 text-[13px] leading-snug ${sid !== currentSessionId ? 'opacity-70' : ''}`}>
+              <p className={`group break-words py-0.5 text-[13px] leading-snug ${old ? 'opacity-70' : ''}`}>
                 <span className="mr-1 text-[11px] text-white/50">{time(m.created_at)}</span>
                 {m.role === 'admin' && (
                   <span className="mr-1 rounded bg-yellow px-1 text-[10px] font-black text-ink" title="관리자">

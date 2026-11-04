@@ -12,7 +12,7 @@ import { QuickMenu } from '@/components/QuickMenu';
 import { BoxSpace, type ActionState, type BoxSpaceHandle } from '@/game/BoxSpace';
 import { BOARDS, type ObjectKey } from '@/game/map';
 import { api } from '@/lib/api';
-import type { ChatMessage, ChatSession, ChatState, Me } from '@/lib/types';
+import type { ChatMessage, ChatState, Me } from '@/lib/types';
 
 export default function HomePage() {
   return <Guard need="member">{(me) => <Space me={me} />}</Guard>;
@@ -24,8 +24,8 @@ function Space({ me }: { me: Me }) {
   const spaceRef = useRef<BoxSpaceHandle | null>(null);
   const chatInputRef = useRef<ChatPanelHandle>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [readAt, setReadAt] = useState<string | null>(null); // 지금까지 읽은 곳 (서버에도 저장)
+  const [markerAt, setMarkerAt] = useState<string | null>(null); // 들어올 때 읽었던 곳 ("여기까지 읽었어요")
   const [chatLocked, setChatLocked] = useState(false);
   const [mutedUntil, setMutedUntil] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -40,53 +40,43 @@ function Space({ me }: { me: Me }) {
     setTimeout(() => setToast(null), 2500);
   };
 
-  // 채팅 접속 기록: 박스에 들어오면 시작하고 30초마다 갱신한다.
-  // 오래 끊겼다가 돌아오면 새 접속으로 시작해서, 없던 동안의 대화는 보이지 않는다 (DB가 강제).
-  // 채팅 다시 불러오기: 휴대폰은 화면이 꺼지거나 다른 앱으로 가면 실시간 연결이 멈춰서
-  // 그 사이 메시지를 놓친다. 연결이 돌아올 때, 화면이 다시 보일 때, 30초마다 서버에서 다시 받아 맞춘다.
+  // 채팅: 오늘 0시부터의 대화 전체. 휴대폰은 화면이 꺼지거나 다른 앱으로 가면 실시간 연결이 멈춰서
+  // 그 사이 메시지를 놓치므로, 연결이 돌아올 때 · 화면이 다시 보일 때 · 30초마다 서버에서 다시 받아 맞춘다.
   const refreshChat = useRef<() => void>(() => {});
   useEffect(() => {
     let alive = true;
-    let sid: string | null = null;
-    const load = (id: string) =>
+    let first = true;
+    const load = () =>
       api.get<ChatState>('/chat').then((res) => {
         if (!alive) return;
-        sid = id;
-        setSessionId(id);
         setMessages(res.messages);
-        setSessions(res.sessions);
+        setReadAt((prev) => (prev && res.readAt && prev > res.readAt ? prev : res.readAt));
+        if (first) {
+          first = false;
+          setMarkerAt(res.readAt);
+        }
         setChatLocked(res.locked);
         setMutedUntil(res.mutedUntil);
       }, () => {});
-    refreshChat.current = () => {
-      if (sid && document.visibilityState === 'visible') load(sid);
+    const refresh = () => {
+      if (document.visibilityState === 'visible') load();
     };
-    const start = () =>
-      api.post<{ id: string }>('/chat/session').then(
-        (res) => {
-          if (alive) load(res.id);
-        },
-        () => {},
-      );
-    const ping = () => {
-      if (!sid || document.visibilityState !== 'visible') return;
-      api.post<{ alive: boolean }>(`/chat/session/${sid}/ping`).then(
-        (res) => {
-          if (!res.alive) start();
-          else if (sid) load(sid);
-        },
-        () => {},
-      );
-    };
-    start();
-    const timer = setInterval(ping, 30_000);
-    document.addEventListener('visibilitychange', ping);
+    refreshChat.current = refresh;
+    load();
+    const timer = setInterval(refresh, 30_000);
+    document.addEventListener('visibilitychange', refresh);
     return () => {
       alive = false;
       refreshChat.current = () => {};
       clearInterval(timer);
-      document.removeEventListener('visibilitychange', ping);
+      document.removeEventListener('visibilitychange', refresh);
     };
+  }, []);
+
+  // 맨 아래까지 본 메시지 시각을 "읽음"으로 저장 (휴대폰·PC 같이 기억)
+  const markRead = useCallback((at: string) => {
+    setReadAt((prev) => (prev && prev >= at ? prev : at));
+    api.post('/chat/read', { at }).catch(() => {});
   }, []);
 
   const chatBlocked = chatLocked && me.profile.role !== 'admin'
@@ -110,6 +100,9 @@ function Space({ me }: { me: Me }) {
       const { message } = await api.post<{ message: ChatMessage }>('/chat', { body: text });
       spaceRef.current?.showMyBubble(text);
       addMessage(message);
+      // 내가 보내면 구분선 없이 가장 최신 대화부터
+      setMarkerAt(message.created_at);
+      markRead(message.created_at);
       return true;
     } catch (e) {
       showToast(e instanceof Error ? e.message : '메시지를 보내지 못했어요');
@@ -178,8 +171,9 @@ function Space({ me }: { me: Me }) {
         <ChatPanel
             ref={chatInputRef}
             messages={messages}
-            sessions={sessions}
-            currentSessionId={sessionId}
+            markerAt={markerAt}
+            readAt={readAt}
+            onRead={markRead}
             myId={me.profile.id}
             canModerate={me.profile.role === 'admin'}
             blockedReason={chatBlocked}

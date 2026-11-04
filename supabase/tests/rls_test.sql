@@ -3,7 +3,6 @@
 -- SQL Editor에서 실행한다. 실제 사용자 권한으로 "막혀야 하는 요청"을 보내고 결과를 표로 보여준다.
 -- 필요: 관리자 1명(admin) + 승인된 회원 1명(member). 승인 대기 계정은 테스트 중에 임시로 만들고 지운다.
 -- 테스트로 만든 데이터는 마지막에 모두 삭제한다.
--- 31번 정확도를 위해, 실행하는 동안 테스트 회원 계정으로 앱에 접속해 있지 않아야 한다.
 -- =====================================================================
 
 -- 특정 사용자(또는 비로그인)로 쿼리를 실행하고 결과를 'ok:처리행수' 또는 'err:에러코드'로 돌려준다
@@ -112,7 +111,7 @@ begin
   insert into rls_results values
   (29, '승인 대기자가 채팅 접속 시작', 'err', pg_temp.run_as(c, 'select public.chat_session_start()')),
   (30, '회원이 접속 기록을 직접 만들기 (시간 위조)', 'err', pg_temp.run_as(a, format('insert into public.chat_sessions (user_id, started_at) values (%L, now() - interval ''1 day'')', a))),
-  (31, '회원이 접속 전 대화를 조회', 'ok:0', pg_temp.run_as(a, format('select * from public.chat_messages where id = %L', dm))),
+  (31, '회원이 오늘 대화 전체 조회 (접속 전 대화 포함)', 'ok:1', pg_temp.run_as(a, format('select * from public.chat_messages where id = %L', dm))),
   (32, '회원 접속 시작', 'ok:1', pg_temp.run_as(a, 'select public.chat_session_start()'));
   insert into public.chat_messages (user_id, body) values (d, 'rls-test 접속 후 메시지') returning id into dm2;
   insert into rls_results values
@@ -172,6 +171,16 @@ begin
   insert into rls_results values
   (48, '익명 로그인 계정은 승인 대기 목록에 안 생김', 'ok:0', 'ok:' || (select count(*) from public.profiles where id = anon_id)::text);
   delete from auth.users where id = anon_id;
+
+  -- ---- 0006: 오늘 대화 전체 공개 + 읽은 위치
+  insert into public.chat_messages (user_id, body) values (d, 'rls-test 어제 메시지') returning id into dm2;
+  update public.chat_messages set created_at = public.kst_today_start() - interval '1 hour' where id = dm2;
+  insert into rls_results values
+  (50, '회원이 어제 대화 조회', 'ok:0', pg_temp.run_as(a, format('select * from public.chat_messages where id = %L', dm2))),
+  (51, '회원이 읽은 위치 저장 (함수)', 'ok:1', pg_temp.run_as(a, 'select public.chat_mark_read(now())')),
+  (52, '회원이 다른 회원의 읽은 위치 직접 변경', 'err', pg_temp.run_as(a, format('update public.profiles set chat_read_at = now() where id = %L', d))),
+  (53, '승인 대기자가 읽은 위치 저장', 'err', pg_temp.run_as(c, 'select public.chat_mark_read(now())'));
+  delete from public.chat_messages where id = dm2;
 
   -- 도배 방지: 10초 안에 5개를 이미 보냈으면 6번째는 거부
   -- 앞 테스트에서 관리자가 보낸 메시지를 지우고, 정확히 5개를 채운 뒤 6번째를 시도한다

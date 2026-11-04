@@ -102,11 +102,9 @@ export type ChatMessage = {
   role?: 'pending' | 'member' | 'admin';
 };
 
-export type ChatSession = { id: string; started_at: string; last_seen: string };
-
 export type ChatState = {
   messages: ChatMessage[];
-  sessions: ChatSession[];
+  readAt: string | null; // 어디까지 읽었는지
   locked: boolean;
   mutedUntil: string | null;
 };
