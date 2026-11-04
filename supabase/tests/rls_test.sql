@@ -46,6 +46,8 @@ declare
   rm_pr uuid;  -- 회원의 PR 기록
   dm2 uuid;    -- 회원이 접속한 뒤 관리자가 쓴 채팅
   rm_first uuid;
+  w_past uuid;
+  w_future uuid;
   lock_before text;
   r text;
 begin
@@ -140,6 +142,16 @@ begin
   insert into rls_results values
   (40, '종목 첫 기록도 PR 글 생성', 'ok:1', 'ok:' || (select count(*) from public.activities where one_rm_id = rm_first)::text);
   delete from public.one_rm_records where id = rm_first;
+
+  -- ---- 0004: WOD 공개 시각 (지난 WOD는 보이고, 공개 전 미래 WOD는 관리자만)
+  insert into public.wods (wod_date, title) values (public.kst_today() - 300, 'rls-test 지난 WOD') returning id into w_past;
+  insert into public.wods (wod_date, title) values (public.kst_today() + 300, 'rls-test 미래 WOD') returning id into w_future;
+  insert into rls_results values
+  (41, '회원이 지난 WOD 조회', 'ok:1', pg_temp.run_as(a, format('select * from public.wods where id = %L', w_past))),
+  (42, '회원이 공개 전 미래 WOD 조회', 'ok:0', pg_temp.run_as(a, format('select * from public.wods where id = %L', w_future))),
+  (43, '관리자는 미래 WOD 미리 보기 가능', 'ok:1', pg_temp.run_as(d, format('select * from public.wods where id = %L', w_future))),
+  (44, '공개 시각 규칙: 모레 WOD는 항상 비공개', 'ok:false', 'ok:' || public.wod_visible(public.kst_today() + 2)::text);
+  delete from public.wods where id in (w_past, w_future);
 
   -- 도배 방지: 10초 안에 5개를 이미 보냈으면 6번째는 거부
   -- 앞 테스트에서 관리자가 보낸 메시지를 지우고, 정확히 5개를 채운 뒤 6번째를 시도한다

@@ -18,7 +18,7 @@ function WodBoard({ me }: { me: Me }) {
   const [date, setDate] = useState(today);
   const isAdmin = me.profile.role === 'admin';
   const { data, error, loading, reload } = useLoad(
-    () => api.get<{ wod: Wod | null; photos: WodPhoto[] }>(`/wods?date=${date}`),
+    () => api.get<{ wod: Wod | null; photos: WodPhoto[]; locked?: boolean; opensAt?: string; released?: boolean }>(`/wods?date=${date}`),
     date,
   );
   const [editing, setEditing] = useState(false);
@@ -55,8 +55,21 @@ function WodBoard({ me }: { me: Me }) {
         <>
           {editing && isAdmin ? (
             <WodEditor date={date} wod={data.wod} onDone={() => { setEditing(false); reload(); }} />
+          ) : data.locked ? (
+            <div className="card p-6 text-center">
+              <p className="text-3xl" aria-hidden>🔒</p>
+              <p className="mt-2 font-bold">아직 공개 전이에요</p>
+              <p className="mt-1 text-sm text-muted">{opensLabel(data.opensAt, today)}에 공개돼요</p>
+            </div>
           ) : data.wod ? (
-            <WodView wod={data.wod} bestLifts={me.bestLifts} />
+            <>
+              {isAdmin && data.released === false && (
+                <p className="mb-2 rounded-md bg-yellow/30 px-3 py-2 text-xs font-bold">
+                  🔒 회원에게는 {opensLabel(data.opensAt, today)}에 공개돼요 (관리자만 미리 보는 중)
+                </p>
+              )}
+              <WodView wod={data.wod} bestLifts={me.bestLifts} />
+            </>
           ) : (
             <div className="card p-6 text-center text-muted">
               <p className="font-bold">아직 올라온 WOD가 없어요</p>
@@ -64,7 +77,7 @@ function WodBoard({ me }: { me: Me }) {
             </div>
           )}
 
-          {isAdmin && !editing && (
+          {isAdmin && !editing && !data.locked && (
             <button type="button" className="btn btn-dark mt-3 w-full" onClick={() => setEditing(true)}>
               {data.wod ? 'WOD 수정' : 'WOD 작성'}
             </button>
@@ -75,6 +88,13 @@ function WodBoard({ me }: { me: Me }) {
       )}
     </BoardShell>
   );
+}
+
+// 공개 시각 안내: "오늘 오후 8시 30분" / "11월 6일 (금) 오후 8시 30분"
+function opensLabel(iso: string | undefined, today: string) {
+  if (!iso) return '전날 오후 8시 30분';
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(iso));
+  return `${day === today ? '오늘' : formatDateLabel(day)} 오후 8시 30분`;
 }
 
 function WodView({ wod, bestLifts }: { wod: Wod; bestLifts: Record<string, number> }) {

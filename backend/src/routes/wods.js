@@ -23,13 +23,25 @@ function detectImage(buf) {
   return null;
 }
 
+// WOD 공개 시각: 전날 오후 8시 30분 (한국 시간). 실제 차단은 DB(RLS)가 하고, 여기서는 안내용 시각만 알려준다.
+function releaseAt(date) {
+  const d = new Date(`${date}T20:30:00+09:00`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d;
+}
+
 // 날짜별 WOD + 기록 사진(1시간짜리 서명 URL)
 wodsRouter.get('/', async (req, res) => {
   const date = isoDate.parse(req.query.date);
+  const opensAt = releaseAt(date);
+  const released = Date.now() >= opensAt.getTime();
+  if (!released && req.profile.role !== 'admin') {
+    return res.json({ wod: null, photos: [], locked: true, opensAt: opensAt.toISOString() });
+  }
   const wod = unwrap(
     await req.sb.from('wods').select('id, wod_date, title, content, lifts, updated_at').eq('wod_date', date).maybeSingle(),
   );
-  if (!wod) return res.json({ wod: null, photos: [] });
+  if (!wod) return res.json({ wod: null, photos: [], locked: false, opensAt: opensAt.toISOString(), released });
 
   const rows = unwrap(
     await req.sb.from('wod_photos').select('id, storage_path, created_at').eq('wod_id', wod.id).order('created_at'),
@@ -39,7 +51,7 @@ wodsRouter.get('/', async (req, res) => {
     const signed = unwrap(await req.sb.storage.from(BUCKET).createSignedUrls(rows.map((r) => r.storage_path), 3600));
     photos = rows.map((r, i) => ({ id: r.id, url: signed[i]?.signedUrl ?? null, created_at: r.created_at }));
   }
-  res.json({ wod, photos });
+  res.json({ wod, photos, locked: false, opensAt: opensAt.toISOString(), released });
 });
 
 // 날짜 기준으로 작성/수정 (관리자)
