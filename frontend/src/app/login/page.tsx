@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { SIGNOUT_KEY } from '@/components/AuthProvider';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AvatarView } from '@/components/AvatarView';
@@ -11,11 +12,24 @@ import { supabase } from '@/lib/supabase';
 
 type Provider = 'kakao' | 'google';
 
+const noop = () => () => {};
+function readSignOutNotice(): string | null {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SIGNOUT_KEY) ?? 'null');
+    if (!raw || raw.reason === 'user' || Date.now() - Date.parse(raw.at) > 3600_000) return null;
+    return '로그인 유지 시간이 지나 다시 로그인이 필요해요. 한 번만 다시 로그인해 주세요.';
+  } catch {
+    return null;
+  }
+}
+
 export default function LoginPage() {
   const { ready, session } = useAuth();
   const router = useRouter();
   const [busy, setBusy] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 사용자가 직접 로그아웃한 게 아니면 이유를 알려준다 (최근 1시간 이내 기록만, 브라우저에서만 읽음)
+  const notice = useSyncExternalStore(noop, readSignOutNotice, () => null);
 
   useEffect(() => {
     wakeServer(); // 로그인하는 동안 백엔드 서버를 미리 깨운다
@@ -86,6 +100,11 @@ export default function LoginPage() {
               {busy === 'google' ? '구글로 이동 중…' : 'Google로 시작하기'}
             </button>
           </div>
+          {notice && !error && (
+            <p className="mt-3 rounded-md bg-yellow/30 px-3 py-2 text-sm font-bold" role="status">
+              {notice}
+            </p>
+          )}
           {error && (
             <p className="mt-3 text-sm font-bold text-[var(--danger)]" role="alert">
               {error}

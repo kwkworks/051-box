@@ -19,6 +19,25 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+// 왜 로그아웃됐는지 기록 (로그인 화면에서 안내, 원인 확인용)
+export const SIGNOUT_KEY = 'box-signout-reason';
+function noteSignOut(reason: string) {
+  try {
+    localStorage.setItem(SIGNOUT_KEY, JSON.stringify({ reason, at: new Date().toISOString() }));
+  } catch {}
+}
+
+// API가 401을 줬을 때: 정말 로그인이 끝났는지 Supabase에 직접 확인한다 (네트워크 문제면 로그아웃하지 않음)
+async function sessionReallyEnded(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (!error && data.user) return false;
+    return !!error && typeof error.status === 'number' && error.status >= 400 && error.status < 500;
+  } catch {
+    return false;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
@@ -33,7 +52,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setMeState(next);
       return next;
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) {
+      if (e instanceof ApiError && e.status === 401 && (await sessionReallyEnded())) {
+        noteSignOut('expired');
         await supabase.auth.signOut();
         setMeState(null);
       } else {
@@ -50,7 +70,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(data.session);
       setReady(true);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+      // 사용자가 누르지 않았는데 로그아웃되면 (토큰 갱신 실패 등) 이유를 남긴다
+      if (event === 'SIGNED_OUT') {
+        try {
+          if (!localStorage.getItem(SIGNOUT_KEY)) noteSignOut('refresh-failed');
+        } catch {}
+      } else if (event === 'SIGNED_IN') {
+        // 다시 로그인했으면 안내는 지우고, 원인 확인용으로 마지막 기록만 남겨둔다
+        try {
+          const last = localStorage.getItem(SIGNOUT_KEY);
+          if (last) localStorage.setItem(`${SIGNOUT_KEY}-last`, last);
+          localStorage.removeItem(SIGNOUT_KEY);
+        } catch {}
+      }
       setSession(next);
       if (!next) setMeState(null);
     });
@@ -73,7 +106,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       async (e) => {
         if (!alive) return;
-        if (e instanceof ApiError && e.status === 401) {
+        if (e instanceof ApiError && e.status === 401 && (await sessionReallyEnded())) {
+          noteSignOut('expired');
           await supabase.auth.signOut();
           setMeState(null);
         } else {
@@ -88,6 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     stopBgm();
+    noteSignOut('user');
     await supabase.auth.signOut();
     try {
       sessionStorage.clear();

@@ -19,6 +19,10 @@ export async function requireAuth(req, res, next) {
 
   const sb = createUserClient(token);
   const { data, error } = await sb.auth.getClaims(token);
+  // 인증 서버 키를 못 받아오는 등 네트워크 문제는 "로그인 만료"가 아니다 → 잠시 후 다시 시도하게 한다
+  if (error && (error.name === 'AuthRetryableFetchError' || (typeof error.status === 'number' && error.status >= 500))) {
+    throw new HttpError(503, '로그인 확인이 잠시 지연되고 있어요. 잠시 후 다시 시도해주세요');
+  }
   const userId = data?.claims?.sub;
   if (error || !userId || data.claims.role !== 'authenticated') {
     throw new HttpError(401, '로그인이 만료되었습니다. 다시 로그인해주세요');

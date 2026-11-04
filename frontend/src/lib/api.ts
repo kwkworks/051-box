@@ -32,7 +32,20 @@ async function authHeader(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+// 로그인 토큰 갱신은 동시에 여러 번 하지 않는다
+let refreshing: Promise<boolean> | null = null;
+function refreshLogin(): Promise<boolean> {
+  refreshing ??= supabase.auth
+    .refreshSession()
+    .then(({ data, error }) => !error && !!data.session)
+    .catch(() => false)
+    .finally(() => {
+      refreshing = null;
+    });
+  return refreshing;
+}
+
+async function request<T>(method: string, path: string, body?: unknown, retried = false): Promise<T> {
   pending += 1;
   const slowTimer = setTimeout(() => setWaking(true), 2500);
   try {
@@ -58,6 +71,10 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     }
     if (!res) throw new ApiError(0, '서버에 연결할 수 없어요');
 
+    // 오래 켜둔 화면은 토큰이 막 만료됐을 수 있다 → 갱신해서 한 번만 다시 시도
+    if (res.status === 401 && !retried && (await refreshLogin())) {
+      return request<T>(method, path, body, true);
+    }
     if (res.status === 204) return undefined as T;
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new ApiError(res.status, data.error ?? '요청을 처리하지 못했어요');
