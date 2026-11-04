@@ -18,7 +18,7 @@ const ORDER: BoardKey[] = ['wod', 'notices', 'competition', 'gathering', 'one-rm
 function Hub({ me }: { me: Me }) {
   const extras = [
     { href: '/avatar', icon: '👕', label: '캐릭터 꾸미기', hint: '내 캐릭터 모습과 닉네임' },
-    { href: '/', icon: '🏠', label: '박스 공간', hint: '2D 박스로 돌아가서 회원들과 만나기 · 출석 체크 · 채팅 · 스피커 음악' },
+    { href: '/', icon: '🏠', label: '박스 공간', hint: '2D 박스로 돌아가서 회원들과 만나기 · 출석 체크 · 채팅 · 배경음악' },
     ...(me.profile.role === 'admin'
       ? [{ href: '/admin', icon: '🔑', label: '관리자', hint: '가입 승인, 휴무일, 구글 시트 WOD 가져오기' }]
       : []),

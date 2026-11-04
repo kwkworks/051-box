@@ -97,13 +97,31 @@ function opensLabel(iso: string | undefined, today: string) {
   return `${day === today ? '오늘' : formatDateLabel(day)} 오후 8시 30분`;
 }
 
+// WOD 본문: [Strength], [Conditioning] 같은 구역 제목 줄은 굵게
+const SECTION_LINE = /^\s*\[[^\]\n]{1,30}\]\s*$/;
+function WodContent({ text }: { text: string }) {
+  return (
+    <div className="whitespace-pre-wrap break-words px-4 py-4 text-[15px] leading-relaxed">
+      {text.split('\n').map((line, i) =>
+        SECTION_LINE.test(line) ? (
+          <p key={i} className={`font-black text-[var(--burgundy)] ${i ? 'mt-1' : ''}`}>
+            {line.trim()}
+          </p>
+        ) : (
+          <p key={i}>{line || ' '}</p>
+        ),
+      )}
+    </div>
+  );
+}
+
 function WodView({ wod, bestLifts }: { wod: Wod; bestLifts: Record<string, number> }) {
   return (
     <article className="card overflow-hidden">
       <div className="border-b-2 border-ink bg-white px-4 py-3">
         <h2 className="text-xl font-black text-[#C2453A]">{wod.title}</h2>
       </div>
-      {wod.content && <pre className="whitespace-pre-wrap break-words px-4 py-4 font-sans text-[15px] leading-relaxed">{wod.content}</pre>}
+      {wod.content && <WodContent text={wod.content} />}
       {wod.lifts.length > 0 && (
         <div className="border-t-2 border-dashed border-ink/30 bg-[var(--bg)] px-4 py-4">
           <h3 className="mb-2 text-sm font-black">🏋️ 내 무게 (1RM 기준 정확한 값)</h3>
