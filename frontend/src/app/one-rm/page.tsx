@@ -83,7 +83,7 @@ function OneRm({ me }: { me: Me }) {
   const ranking = data?.rankings[rankKey] ?? [];
 
   return (
-    <BoardShell title="바벨 랙 · 1RM" subtitle="내 최고 기록과 박스 순위">
+    <BoardShell title="🏋️ 1RM 기록" subtitle="내 최고 기록과 박스 순위">
       <section className="card mb-5 flex flex-col gap-3 p-4">
         <h2 className="font-black">새 기록 남기기</h2>
         <div className="grid gap-3 sm:grid-cols-2">

@@ -8,6 +8,7 @@ export type Profile = {
   role: Role;
   avatar: Partial<Avatar>;
   created_at?: string;
+  chat_muted_until?: string | null;
 };
 
 export type Me = {
@@ -85,9 +86,26 @@ export type RankRow = {
 export type FeedItem = {
   id: string;
   kind: 'pr';
-  payload: { movement: string; is_custom: boolean; weight_kg: number; prev_kg: number };
+  payload: { movement: string; is_custom: boolean; weight_kg: number; prev_kg: number | null };
   created_at: string;
   user_id: string;
   nickname: string;
   avatar: Partial<Avatar>;
+};
+
+export type ChatMessage = {
+  id: string;
+  user_id: string;
+  body: string;
+  created_at: string;
+  nickname: string;
+};
+
+export type ChatSession = { id: string; started_at: string; last_seen: string };
+
+export type ChatState = {
+  messages: ChatMessage[];
+  sessions: ChatSession[];
+  locked: boolean;
+  mutedUntil: string | null;
 };

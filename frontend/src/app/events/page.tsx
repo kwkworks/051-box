@@ -44,7 +44,7 @@ function Events({ me }: { me: Me }) {
   const canCreate = isAdmin || kind === 'gathering';
 
   return (
-    <BoardShell title="대회 · 이벤트 · 모임" subtitle="버튼 하나로 참가 신청">
+    <BoardShell title="🏆 대회·이벤트 · 🍻 회원 모임" subtitle="버튼 하나로 참가 신청">
       <div className="mb-4 grid grid-cols-3 gap-2" role="tablist">
         {TABS.map((k) => (
           <button key={k} type="button" role="tab" aria-selected={kind === k} className={`btn ${kind === k ? 'btn-primary' : ''}`} onClick={() => changeKind(k)}>

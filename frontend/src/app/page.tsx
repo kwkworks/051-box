@@ -1,15 +1,19 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import { ChatPanel } from '@/components/ChatPanel';
 import { Guard } from '@/components/Guard';
+import { ActionPad } from '@/components/ActionPad';
+import { BgmControl } from '@/components/BgmControl';
 import { QuickMenu } from '@/components/QuickMenu';
-import { BoxSpace } from '@/game/BoxSpace';
-import { BOARDS, type BoardKey } from '@/game/map';
+import type { Pose } from '@/game/avatar';
+import { BoxSpace, type BoxSpaceHandle } from '@/game/BoxSpace';
+import { BOARDS, type ObjectKey } from '@/game/map';
 import { api } from '@/lib/api';
-import type { Me } from '@/lib/types';
+import type { ChatMessage, ChatSession, ChatState, Me } from '@/lib/types';
 
 export default function HomePage() {
   return <Guard need="member">{(me) => <Space me={me} />}</Guard>;
@@ -18,14 +22,99 @@ export default function HomePage() {
 function Space({ me }: { me: Me }) {
   const router = useRouter();
   const { setMe } = useAuth();
-  const chatRef = useRef<((text: string) => void) | null>(null);
-  const [chat, setChat] = useState('');
+  const spaceRef = useRef<BoxSpaceHandle | null>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [chatLocked, setChatLocked] = useState(false);
+  const [mutedUntil, setMutedUntil] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [action, setAction] = useState<{ pose: Pose; running: boolean }>({ pose: 'stand', running: false });
+  const [help, setHelp] = useState(false);
 
   const showToast = (text: string) => {
     setToast(text);
     setTimeout(() => setToast(null), 2500);
+  };
+
+  // 채팅 접속 기록: 박스에 들어오면 시작하고 30초마다 갱신한다.
+  // 오래 끊겼다가 돌아오면 새 접속으로 시작해서, 없던 동안의 대화는 보이지 않는다 (DB가 강제).
+  useEffect(() => {
+    let alive = true;
+    let sid: string | null = null;
+    const load = (id: string) =>
+      api.get<ChatState>('/chat').then((res) => {
+        if (!alive) return;
+        sid = id;
+        setSessionId(id);
+        setMessages(res.messages);
+        setSessions(res.sessions);
+        setChatLocked(res.locked);
+        setMutedUntil(res.mutedUntil);
+      });
+    const start = () =>
+      api.post<{ id: string }>('/chat/session').then(
+        (res) => {
+          if (alive) load(res.id);
+        },
+        () => {},
+      );
+    const ping = () => {
+      if (!sid || document.visibilityState !== 'visible') return;
+      api.post<{ alive: boolean }>(`/chat/session/${sid}/ping`).then(
+        (res) => {
+          if (!res.alive) start();
+        },
+        () => {},
+      );
+    };
+    start();
+    const timer = setInterval(ping, 30_000);
+    document.addEventListener('visibilitychange', ping);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', ping);
+    };
+  }, []);
+
+  const chatBlocked = chatLocked && me.profile.role !== 'admin'
+    ? '🔒 관리자가 채팅을 잠갔어요'
+    : mutedUntil && new Date(mutedUntil) > new Date()
+      ? `🚫 ${new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(mutedUntil))}까지 채팅이 제한되어 있어요`
+      : null;
+
+  // 실시간으로 받은 메시지 추가 (같은 메시지는 한 번만)
+  const addMessage = useCallback((m: ChatMessage) => {
+    setMessages((prev) => {
+      if (prev.some((p) => p.id === m.id)) return prev;
+      const known = prev.find((p) => p.user_id === m.user_id)?.nickname;
+      const next = [...prev, m.nickname === '회원' && known ? { ...m, nickname: known } : m];
+      return next.slice(-200);
+    });
+  }, []);
+
+  const sendChat = async (text: string) => {
+    try {
+      const { message } = await api.post<{ message: ChatMessage }>('/chat', { body: text });
+      spaceRef.current?.showMyBubble(text);
+      addMessage(message);
+      return true;
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : '메시지를 보내지 못했어요');
+      return false;
+    }
+  };
+
+  const deleteChat = async (id: string) => {
+    try {
+      await api.del(`/chat/${id}`);
+      setMessages((prev) => prev.filter((m) => m.id !== id));
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : '삭제하지 못했어요');
+    }
   };
 
   const checkIn = async () => {
@@ -41,7 +130,7 @@ function Space({ me }: { me: Me }) {
     }
   };
 
-  const open = (board: BoardKey) => router.push(BOARDS[board].href);
+  const open = (target: ObjectKey) => router.push(BOARDS[target].href);
 
   return (
     <div className="flex h-dvh flex-col bg-[#121214]">
@@ -51,47 +140,60 @@ function Space({ me }: { me: Me }) {
         </Link>
         <span className="chip border-yellow bg-transparent text-yellow">🔥 {me.streak}일</span>
         <div className="flex-1" />
+        <BgmControl />
+        <Link href="/board" className="btn btn-sm">
+          🗂<span className="hidden sm:inline"> 게시판</span>
+        </Link>
         <button type="button" className="btn btn-sm btn-primary" disabled={me.checkedInToday || checking} onClick={checkIn}>
           {me.checkedInToday ? '출석 완료' : checking ? '체크 중…' : '출석 체크'}
         </button>
       </header>
 
       <div className="relative min-h-0 flex-1">
-        <BoxSpace profile={me.profile} onOpenBoard={open} chatRef={chatRef} />
+        <BoxSpace
+          profile={me.profile}
+          onOpen={open}
+          onActionState={setAction}
+          onChat={addMessage}
+          onRequestChat={() => chatInputRef.current?.focus()}
+          handleRef={spaceRef}
+        />
 
         {toast && (
-          <div className="card absolute left-1/2 top-12 -translate-x-1/2 px-4 py-2 text-sm font-bold" role="status">
+          <div className="card absolute left-1/2 top-12 z-30 -translate-x-1/2 px-4 py-2 text-sm font-bold" role="status">
             {toast}
           </div>
         )}
 
-        <form
-          className="absolute bottom-4 left-3 right-28 flex gap-2 sm:right-auto sm:w-96"
-          onSubmit={(e) => {
-            e.preventDefault();
-            chatRef.current?.(chat);
-            setChat('');
-            (document.activeElement as HTMLElement | null)?.blur();
-          }}
-        >
-          <input
-            className="input min-h-10 flex-1 bg-white/95"
-            value={chat}
-            maxLength={60}
-            onChange={(e) => setChat(e.target.value)}
-            placeholder="말풍선으로 인사하기"
-            aria-label="말풍선 메시지"
+        <div className="pointer-events-none absolute bottom-3 left-3 right-24 sm:right-auto">
+          <ChatPanel
+            ref={chatInputRef}
+            messages={messages}
+            sessions={sessions}
+            currentSessionId={sessionId}
+            myId={me.profile.id}
+            canModerate={me.profile.role === 'admin'}
+            blockedReason={chatBlocked}
+            onSend={sendChat}
+            onDelete={deleteChat}
           />
-          <button type="submit" className="btn btn-sm h-10">
-            전송
-          </button>
-        </form>
-        <div className="absolute bottom-4 right-3">
+        </div>
+        <div className="absolute bottom-3 right-3 flex items-end gap-2">
+          <ActionPad pose={action.pose} running={action.running} onAct={(a) => spaceRef.current?.act(a)} />
           <QuickMenu />
         </div>
-        <p className="pointer-events-none absolute right-3 top-3 hidden rounded-md bg-black/60 px-2.5 py-1 text-xs text-white sm:block">
-          방향키/WASD 이동 · 클릭으로 이동 · Space 열기
-        </p>
+        <div className="absolute right-3 top-3 hidden flex-col items-end gap-1 lg:flex">
+          <button type="button" className="rounded-md bg-black/60 px-2.5 py-1 text-xs text-white" onClick={() => setHelp((v) => !v)} aria-expanded={help}>
+            ⌨️ 조작법
+          </button>
+          {help && (
+            <ul className="rounded-md bg-black/75 px-3 py-2 text-xs leading-relaxed text-white">
+              <li>방향키 / WASD 이동 · Shift 달리기</li>
+              <li>Space 점프 · C 앉기 · Q 춤추기</li>
+              <li>E 또는 클릭: 게시판 열기 · Enter 채팅</li>
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );

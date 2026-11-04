@@ -19,7 +19,7 @@ function Notices({ me }: { me: Me }) {
   const [editing, setEditing] = useState<Notice | 'new' | null>(null);
 
   return (
-    <BoardShell title="공지사항" subtitle="데스크에서 알려드려요">
+    <BoardShell title="📢 공지사항" subtitle="박스 공지">
       {isAdmin && !editing && (
         <button type="button" className="btn btn-dark mb-4 w-full" onClick={() => setEditing('new')}>
           + 공지 작성

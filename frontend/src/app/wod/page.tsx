@@ -30,7 +30,7 @@ function WodBoard({ me }: { me: Me }) {
   const dayName = date === today ? '오늘' : date === shiftDate(today, 1) ? '내일' : date === shiftDate(today, -1) ? '어제' : '';
 
   return (
-    <BoardShell title="RECORD 화이트보드" subtitle="WOD · 내 무게 · 기록 사진">
+    <BoardShell title="📋 오늘의 WOD" subtitle="WOD · 내 무게 · 기록 사진">
       <div className="mb-4 flex items-center justify-between gap-2">
         <button type="button" className="btn btn-sm" onClick={() => goTo(shiftDate(date, -1))}>
           ← 이전

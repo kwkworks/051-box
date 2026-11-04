@@ -95,7 +95,7 @@ function Detail() {
               <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                 {ev.participants.map((p, i) => (
                   <li key={p.user_id} className="card flex flex-col items-center p-2 text-center">
-                    <AvatarView avatar={p.avatar} scale={2} />
+                    <AvatarView avatar={p.avatar} scale={1.5} />
                     <span className="mt-1 w-full truncate text-xs font-bold">{i + 1}. {p.nickname}</span>
                   </li>
                 ))}

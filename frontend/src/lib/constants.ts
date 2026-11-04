@@ -28,72 +28,118 @@ export const EVENT_KINDS = {
   gathering: '모임',
 } as const;
 
-// 캐릭터 파츠. 값은 백엔드 허용 목록과 같아야 저장된다.
+// 캐릭터 파츠. 값은 백엔드(backend/src/schemas.js) 허용 목록과 같아야 저장된다.
 export const AVATAR_OPTIONS = {
-  skin: ['s1', 's2', 's3', 's4', 's5'],
-  hair: ['short', 'buzz', 'long', 'ponytail', 'bun', 'curly'],
-  hairColor: ['black', 'brown', 'blonde', 'red', 'gray', 'blue', 'pink', 'green'],
-  top: ['tshirt', 'tank', 'hoodie'],
-  topColor: ['burgundy', 'yellow', 'black', 'white', 'blue', 'green', 'red', 'purple', 'gray', 'orange'],
-  bottom: ['shorts', 'pants'],
-  bottomColor: ['black', 'gray', 'navy', 'burgundy', 'khaki', 'white', 'blue', 'green'],
-  shoes: ['black', 'white', 'red', 'blue', 'yellow', 'green'],
-  acc: ['none', 'headband', 'cap', 'glasses', 'wristband'],
+  skin: ['s1', 's2', 's3', 's4', 's5', 's6'],
+  eyes: ['round', 'smile', 'sharp', 'sleepy', 'sparkle'],
+  brows: ['normal', 'thick', 'angry', 'none'],
+  mouth: ['smile', 'grin', 'neutral', 'open'],
+  facial: ['none', 'mustache', 'beard', 'stubble'],
+  hair: ['short', 'buzz', 'long', 'ponytail', 'bun', 'curly', 'mohawk', 'sidepart', 'bob', 'twintail', 'bald'],
+  hairColor: ['black', 'brown', 'blonde', 'red', 'gray', 'blue', 'pink', 'green', 'white', 'purple'],
+  top: ['tshirt', 'tank', 'hoodie', 'crop', 'longsleeve', 'jersey'],
+  topColor: ['burgundy', 'yellow', 'black', 'white', 'blue', 'green', 'red', 'purple', 'gray', 'orange', 'navy', 'pink'],
+  topPrint: ['none', 'stripe', 'logo'],
+  bottom: ['shorts', 'pants', 'leggings', 'joggers'],
+  bottomColor: ['black', 'gray', 'navy', 'burgundy', 'khaki', 'white', 'blue', 'green', 'pink'],
+  shoes: ['black', 'white', 'red', 'blue', 'yellow', 'green', 'pink'],
+  head: ['none', 'headband', 'cap', 'beanie', 'backcap'],
+  face: ['none', 'glasses', 'sunglasses'],
+  gear: ['none', 'wristwraps', 'kneesleeves', 'belt', 'headphones'],
 } as const;
 
 export type Avatar = { [K in keyof typeof AVATAR_OPTIONS]: (typeof AVATAR_OPTIONS)[K][number] };
 
 export const DEFAULT_AVATAR: Avatar = {
   skin: 's2',
+  eyes: 'round',
+  brows: 'normal',
+  mouth: 'smile',
+  facial: 'none',
   hair: 'short',
   hairColor: 'black',
   top: 'tshirt',
   topColor: 'burgundy',
+  topPrint: 'none',
   bottom: 'shorts',
   bottomColor: 'black',
   shoes: 'white',
-  acc: 'none',
+  head: 'none',
+  face: 'none',
+  gear: 'none',
 };
+
+// 꾸미기 화면의 묶음(탭)
+export const AVATAR_GROUPS: { title: string; keys: (keyof Avatar)[] }[] = [
+  { title: '얼굴', keys: ['skin', 'eyes', 'brows', 'mouth', 'facial'] },
+  { title: '헤어', keys: ['hair', 'hairColor'] },
+  { title: '옷', keys: ['top', 'topColor', 'topPrint', 'bottom', 'bottomColor', 'shoes'] },
+  { title: '장비·소품', keys: ['head', 'face', 'gear'] },
+];
 
 export const AVATAR_LABELS: Record<keyof Avatar, string> = {
   skin: '피부',
+  eyes: '눈',
+  brows: '눈썹',
+  mouth: '입',
+  facial: '수염',
   hair: '머리 모양',
   hairColor: '머리 색',
   top: '상의',
   topColor: '상의 색',
+  topPrint: '상의 무늬',
   bottom: '하의',
   bottomColor: '하의 색',
   shoes: '신발',
-  acc: '액세서리',
+  head: '모자·밴드',
+  face: '안경',
+  gear: '운동 장비',
 };
 
 export const OPTION_LABELS: Record<string, string> = {
+  round: '동글', smile: '웃음', sharp: '날카로움', sleepy: '졸림', sparkle: '반짝',
+  normal: '기본', thick: '진한', angry: '화남',
+  grin: '활짝', neutral: '무표정', open: '놀람',
+  mustache: '콧수염', beard: '턱수염', stubble: '거뭇',
   short: '숏컷', buzz: '버즈컷', long: '장발', ponytail: '포니테일', bun: '똥머리', curly: '곱슬',
-  tshirt: '티셔츠', tank: '나시', hoodie: '후드',
-  shorts: '반바지', pants: '긴바지',
-  none: '없음', headband: '헤드밴드', cap: '모자', glasses: '안경', wristband: '손목밴드',
+  mohawk: '모히칸', sidepart: '가르마', bob: '단발', twintail: '양갈래', bald: '민머리',
+  tshirt: '티셔츠', tank: '나시', hoodie: '후드', crop: '크롭', longsleeve: '긴팔', jersey: '저지',
+  stripe: '줄무늬', logo: '051 로고',
+  shorts: '반바지', pants: '긴바지', leggings: '레깅스', joggers: '조거',
+  none: '없음', headband: '헤드밴드', cap: '모자', beanie: '비니', backcap: '뒤로 쓴 모자',
+  glasses: '안경', sunglasses: '선글라스',
+  wristwraps: '손목 랩', kneesleeves: '무릎 슬리브', belt: '리프팅 벨트', headphones: '헤드폰',
 };
 
 // 실제 색상값 (캐릭터 그리기와 색상 선택 버튼에 사용)
 export const COLORS = {
-  skin: { s1: '#FCE3CF', s2: '#F2C9A0', s3: '#D9A273', s4: '#A9714A', s5: '#6E4630' },
+  skin: { s1: '#FCE3CF', s2: '#F2C9A0', s3: '#D9A273', s4: '#A9714A', s5: '#6E4630', s6: '#F7D7C4' },
   hair: {
-    black: '#22201E', brown: '#5A3A24', blonde: '#E0B85A', red: '#B0442C',
-    gray: '#9A9893', blue: '#3B6FD1', pink: '#E58FB5', green: '#3E9E5F',
+    black: '#22201E', brown: '#5A3A24', blonde: '#E0B85A', red: '#B0442C', gray: '#9A9893',
+    blue: '#3B6FD1', pink: '#E58FB5', green: '#3E9E5F', white: '#ECEAE4', purple: '#7A5BC7',
   },
   cloth: {
     burgundy: '#7A2E3A', yellow: '#E8B923', black: '#1F1F22', white: '#F4F2EE', blue: '#3B82C4',
     green: '#3E9E5F', red: '#D9443E', purple: '#7A5BC7', gray: '#8C8B88', orange: '#E8792B',
-    navy: '#25345C', khaki: '#A7966A',
+    navy: '#25345C', khaki: '#A7966A', pink: '#E58FB5',
   },
 } as const;
 
-export function normalizeAvatar(a?: Partial<Avatar> | null): Avatar {
+// 이전 버전 캐릭터(acc 하나)를 새 파츠로 옮긴다
+const LEGACY_ACC: Record<string, Partial<Avatar>> = {
+  headband: { head: 'headband' },
+  cap: { head: 'cap' },
+  glasses: { face: 'glasses' },
+  wristband: { gear: 'wristwraps' },
+};
+
+export function normalizeAvatar(a?: (Partial<Avatar> & { acc?: string }) | null): Avatar {
   const out = { ...DEFAULT_AVATAR };
   if (!a) return out;
+  const src: Record<string, unknown> = { ...(a.acc ? LEGACY_ACC[a.acc] : {}), ...a };
   for (const key of Object.keys(AVATAR_OPTIONS) as (keyof Avatar)[]) {
-    const value = a[key];
-    if (value && (AVATAR_OPTIONS[key] as readonly string[]).includes(value)) {
+    const value = src[key];
+    if (typeof value === 'string' && (AVATAR_OPTIONS[key] as readonly string[]).includes(value)) {
       (out as Record<string, string>)[key] = value;
     }
   }

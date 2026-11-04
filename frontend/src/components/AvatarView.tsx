@@ -20,8 +20,8 @@ export function AvatarView({
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const key = JSON.stringify(normalizeAvatar(avatar));
-  const w = (SPRITE_W + 4) * scale;
-  const h = (SPRITE_H + 4) * scale;
+  const w = Math.round((SPRITE_W + 4) * scale);
+  const h = Math.round((SPRITE_H + 4) * scale);
 
   useEffect(() => {
     const canvas = ref.current;

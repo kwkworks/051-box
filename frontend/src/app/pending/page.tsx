@@ -35,7 +35,7 @@ function Pending({ nickname, role, avatar }: { nickname: string; role: string; a
     <div className="flex min-h-screen items-center justify-center bg-[var(--mat)] px-4">
       <div className="card w-full max-w-sm p-6 text-center">
         <div className="flex justify-center">
-          <AvatarView avatar={avatar} scale={5} animate />
+          <AvatarView avatar={avatar} scale={4} animate />
         </div>
         <h1 className="mt-2 text-xl font-black">{nickname}님, 환영해요!</h1>
         <p className="mt-2 text-sm leading-relaxed text-muted">

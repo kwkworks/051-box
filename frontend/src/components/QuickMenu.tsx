@@ -2,16 +2,17 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { BOARDS } from '@/game/map';
 import { useAuth } from './AuthProvider';
 
 const ITEMS = [
   { href: '/', label: '박스 공간', icon: '🏠' },
-  { href: '/wod', label: 'WOD', icon: '📋' },
-  { href: '/notices', label: '공지사항', icon: '📢' },
-  { href: '/events?kind=competition', label: '대회·이벤트', icon: '🏆' },
-  { href: '/events?kind=gathering', label: '모임', icon: '🍻' },
-  { href: '/one-rm', label: '1RM', icon: '🏋️' },
-  { href: '/wall', label: '명예의 벽', icon: '🎉' },
+  { href: BOARDS.hub.href, label: '게시판 (전체 보기)', icon: BOARDS.hub.icon },
+  ...(['wod', 'notices', 'competition', 'gathering', 'one-rm', 'wall'] as const).map((k) => ({
+    href: BOARDS[k].href,
+    label: BOARDS[k].label,
+    icon: BOARDS[k].icon,
+  })),
   { href: '/avatar', label: '캐릭터 꾸미기', icon: '👕' },
 ];
 

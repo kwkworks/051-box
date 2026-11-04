@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { normalizeAvatar, type Avatar } from '@/lib/constants';
 import { supabase } from '@/lib/supabase';
-import type { Profile } from '@/lib/types';
-import { drawAvatar, type Dir } from './avatar';
+import type { ChatMessage, Profile } from '@/lib/types';
+import { SPRITE_H, drawAvatar, type Dir, type Pose } from './avatar';
 import {
-  BOARDS, SPAWN, WORLD_H, WORLD_W, collides, drawObjectHint, drawStaticMap, findPath, nearbyBoard, type BoardKey,
+  OBJECT_LABELS, SPAWN, WORLD_H, WORLD_W, collides, drawObjectHint, drawStaticMap, findPath, isNear,
+  nearbyBoard, objectAt, type ObjectKey,
 } from './map';
 
 type Player = {
@@ -20,15 +21,31 @@ type Player = {
   ty: number;
   dir: Dir;
   moving: boolean;
+  pose: Pose;
+  running: boolean;
+  jumpStart?: number;
   chat?: string;
   chatUntil?: number;
 };
 
+export type BoxSpaceHandle = {
+  // 내가 보낸 메시지를 실시간 수신보다 먼저 말풍선으로 보여준다
+  showMyBubble: (text: string) => void;
+  // 모바일 액션 버튼에서 호출
+  act: (action: Action) => void;
+};
+
+export type Action = 'jump' | 'sit' | 'dance' | 'run';
+
 const SPEED = 150; // 초당 이동 픽셀
-const SPRITE_SCALE = 2;
-const CHAT_MAX = 60;
+const RUN_SPEED = 260;
+const JUMP_MS = 480;
+const POSES: Pose[] = ['stand', 'sit', 'dance'];
+const SPRITE_SCALE = 1.4;
+const BUBBLE_MAX = 60;
 const POS_KEY = 'box-space-pos';
 const DIRS: Dir[] = ['down', 'up', 'left', 'right'];
+const UUID = /^[0-9a-f-]{36}$/i;
 
 function clampNum(v: unknown, min: number, max: number): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? Math.max(min, Math.min(max, v)) : null;
@@ -40,11 +57,12 @@ function readPeer(raw: Record<string, unknown>) {
   const y = clampNum(raw.y, 0, WORLD_H);
   if (x === null || y === null) return null;
   const dir = DIRS.includes(raw.dir as Dir) ? (raw.dir as Dir) : 'down';
-  return { x, y, dir, moving: raw.moving === true };
+  const pose = POSES.includes(raw.pose as Pose) ? (raw.pose as Pose) : 'stand';
+  return { x, y, dir, moving: raw.moving === true, pose, running: raw.running === true };
 }
 
 function cleanText(v: unknown, max: number) {
-  return typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, max) : '';
+  return typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, max) : '';
 }
 
 function loadPos() {
@@ -57,23 +75,31 @@ function loadPos() {
 
 export function BoxSpace({
   profile,
-  onOpenBoard,
-  chatRef,
+  onOpen,
+  onNearbyChange,
+  onActionState,
+  onChat,
+  onRequestChat,
+  handleRef,
 }: {
   profile: Profile;
-  onOpenBoard: (board: BoardKey) => void;
-  chatRef: React.RefObject<((text: string) => void) | null>;
+  onOpen: (target: ObjectKey) => void;
+  onNearbyChange?: (target: ObjectKey | null) => void;
+  onActionState?: (state: { pose: Pose; running: boolean }) => void;
+  onChat?: (message: ChatMessage) => void;
+  onRequestChat?: () => void;
+  handleRef?: React.RefObject<BoxSpaceHandle | null>;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [nearby, setNearby] = useState<BoardKey | null>(null);
+  const [nearby, setNearby] = useState<ObjectKey | null>(null);
   const [online, setOnline] = useState(1);
   const [connection, setConnection] = useState<'connecting' | 'online' | 'offline'>('connecting');
   const [connError, setConnError] = useState<string | null>(null);
   const avatarKey = JSON.stringify(normalizeAvatar(profile.avatar));
-  const openRef = useRef(onOpenBoard);
+  const callbacks = useRef({ onOpen, onNearbyChange, onActionState, onChat, onRequestChat });
   useEffect(() => {
-    openRef.current = onOpenBoard;
+    callbacks.current = { onOpen, onNearbyChange, onActionState, onChat, onRequestChat };
   });
 
   useEffect(() => {
@@ -90,22 +116,48 @@ export function BoxSpace({
     const start = loadPos();
     const me: Player = {
       id: profile.id, nickname: profile.nickname, avatar: JSON.parse(avatarKey) as Avatar,
-      x: start.x, y: start.y, tx: start.x, ty: start.y, dir: 'up', moving: false,
+      x: start.x, y: start.y, tx: start.x, ty: start.y, dir: 'up', moving: false, pose: 'stand', running: false,
     };
     const peers = new Map<string, Player>();
     const keys = new Set<string>();
     let path: { x: number; y: number }[] = [];
+    let pendingOpen: ObjectKey | null = null; // 클릭한 오브젝트에 도착하면 연다
     let zoom = 1.5;
     let cam = { x: 0, y: 0 };
     let raf = 0;
     let last = performance.now();
     let lastSent = 0;
     let lastSentKey = '';
-    let lastChat = 0;
-    let currentNearby: BoardKey | null = null;
+    let currentNearby: ObjectKey | null = null;
+    let runToggle = false; // 모바일: 달리기 켜기/끄기
     let channel: RealtimeChannel | null = null;
     let subscribed = false; // 채널 연결이 끝난 뒤에만 보낸다
     let disposed = false;
+
+    const bubble = (p: Player, text: string) => {
+      p.chat = cleanText(text, BUBBLE_MAX);
+      p.chatUntil = performance.now() + 6000;
+    };
+    const sendAct = (type: 'jump') => {
+      if (subscribed) channel?.send({ type: 'broadcast', event: 'act', payload: { id: me.id, type } });
+    };
+    const notify = () => callbacks.current.onActionState?.({ pose: me.pose, running: runToggle });
+    const act = (action: Action) => {
+      const now = performance.now();
+      if (action === 'jump') {
+        if (me.jumpStart && now - me.jumpStart < JUMP_MS) return;
+        me.jumpStart = now;
+        sendAct('jump');
+      } else if (action === 'run') {
+        runToggle = !runToggle;
+      } else {
+        me.pose = me.pose === action ? 'stand' : action;
+        if (me.pose === 'dance') me.dir = 'down';
+        lastSentKey = ''; // 자세가 바뀌면 바로 알린다
+      }
+      notify();
+    };
+    if (handleRef) handleRef.current = { showMyBubble: (text) => bubble(me, text), act };
 
     // ---- 화면 크기
     const resize = () => {
@@ -121,43 +173,77 @@ export function BoxSpace({
     const ro = new ResizeObserver(resize);
     ro.observe(wrap);
 
-    // ---- 키보드
+    // ---- 키보드 (한글 입력 상태에서도 동작하도록 물리 키 코드로 판단)
+    // 방향키/WASD 이동, Shift 달리기, Space 점프, C 앉기, Q 춤, E 열기, Enter 채팅
+    const MOVE_CODES: Record<string, string> = {
+      ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
+      ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
+    };
     const isTyping = () => {
       const el = document.activeElement;
-      return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+      return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (isTyping()) return;
-      const k = e.key.toLowerCase();
-      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'].includes(k)) {
-        keys.add(k);
+      if (isTyping() || e.isComposing) return;
+      const move = MOVE_CODES[e.code];
+      if (move) {
+        keys.add(move);
         path = [];
+        pendingOpen = null;
         e.preventDefault();
-      }
-      if ((k === ' ' || k === 'e' || k === 'enter') && currentNearby) {
+      } else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        keys.add('run');
+      } else if (e.code === 'Enter' || e.code === 'NumpadEnter') {
         e.preventDefault();
-        openRef.current(currentNearby);
+        callbacks.current.onRequestChat?.();
+      } else if (e.code === 'Space') {
+        e.preventDefault();
+        if (!e.repeat) act('jump');
+      } else if (e.code === 'KeyC' && !e.repeat) {
+        act('sit');
+      } else if (e.code === 'KeyQ' && !e.repeat) {
+        act('dance');
+      } else if (e.code === 'KeyE' && currentNearby) {
+        e.preventDefault();
+        callbacks.current.onOpen(currentNearby);
       }
     };
-    const onKeyUp = (e: KeyboardEvent) => keys.delete(e.key.toLowerCase());
+    const onKeyUp = (e: KeyboardEvent) => {
+      const move = MOVE_CODES[e.code];
+      if (move) keys.delete(move);
+      if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.delete('run');
+    };
     const onBlur = () => keys.clear();
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
 
-    // ---- 탭/클릭해서 이동
-    const onPointer = (e: PointerEvent) => {
+    // ---- 클릭/탭: 빈 곳은 이동, 오브젝트는 걸어가서 열기
+    const toWorld = (e: PointerEvent) => {
       const r = canvas.getBoundingClientRect();
       const dpr = canvas.width / r.width;
-      const wx = ((e.clientX - r.left) * dpr) / zoom + cam.x;
-      const wy = ((e.clientY - r.top) * dpr) / zoom + cam.y;
+      return { wx: ((e.clientX - r.left) * dpr) / zoom + cam.x, wy: ((e.clientY - r.top) * dpr) / zoom + cam.y };
+    };
+    const onPointer = (e: PointerEvent) => {
+      const { wx, wy } = toWorld(e);
+      const target = objectAt(wx, wy);
+      if (target && isNear(target, me.x, me.y)) {
+        callbacks.current.onOpen(target);
+        return;
+      }
+      pendingOpen = target;
       path = findPath(me.x, me.y, wx, wy);
     };
+    const onHover = (e: PointerEvent) => {
+      const { wx, wy } = toWorld(e);
+      canvas.style.cursor = objectAt(wx, wy) ? 'pointer' : 'default';
+    };
     canvas.addEventListener('pointerdown', onPointer);
+    canvas.addEventListener('pointermove', onHover);
 
     // ---- 실시간 (비공개 채널: 승인된 회원만 접속 가능)
     const presencePayload = () => ({
-      nickname: me.nickname, avatar: me.avatar, x: Math.round(me.x), y: Math.round(me.y), dir: me.dir,
+      nickname: me.nickname, avatar: me.avatar, x: Math.round(me.x), y: Math.round(me.y), dir: me.dir, pose: me.pose,
     });
 
     const syncPresence = () => {
@@ -178,9 +264,26 @@ export function BoxSpace({
           existing.nickname = nickname;
           existing.avatar = avatar;
         } else {
-          peers.set(id, { id, nickname, avatar, x: pos.x, y: pos.y, tx: pos.x, ty: pos.y, dir: pos.dir, moving: false });
+          peers.set(id, {
+            id, nickname, avatar, x: pos.x, y: pos.y, tx: pos.x, ty: pos.y, dir: pos.dir,
+            moving: false, pose: pos.pose, running: false,
+          });
         }
       }
+    };
+
+    // 새 채팅 (DB에 저장된 것만 실시간으로 받는다. 받는 사람에게도 RLS가 적용된다)
+    const onChatInsert = (row: Record<string, unknown>) => {
+      const id = String(row.id ?? '');
+      const userId = String(row.user_id ?? '');
+      const body = cleanText(row.body, 200);
+      if (!UUID.test(id) || !UUID.test(userId) || !body) return;
+      const speaker = userId === me.id ? me : peers.get(userId);
+      if (speaker && userId !== me.id) bubble(speaker, body);
+      callbacks.current.onChat?.({
+        id, user_id: userId, body, created_at: String(row.created_at ?? new Date().toISOString()),
+        nickname: speaker?.nickname ?? '회원',
+      });
     };
 
     // 연결이 끊기면 점점 간격을 늘려가며 다시 연결한다 (2초 → 최대 30초)
@@ -218,14 +321,16 @@ export function BoxSpace({
           p.ty = pos.y;
           p.dir = pos.dir;
           p.moving = pos.moving;
+          p.pose = pos.pose;
+          p.running = pos.running;
         })
-        .on('broadcast', { event: 'chat' }, ({ payload }) => {
+        .on('broadcast', { event: 'act' }, ({ payload }) => {
           const p = peers.get(String(payload?.id));
-          const text = cleanText(payload?.text, CHAT_MAX);
-          if (!p || !text) return;
-          p.chat = text;
-          p.chatUntil = performance.now() + 6000;
+          if (p && payload?.type === 'jump') p.jumpStart = performance.now();
         })
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) =>
+          onChatInsert(payload.new as Record<string, unknown>),
+        )
         .subscribe(async (status, err) => {
           // 이미 교체되었거나 화면을 떠난 뒤의 오래된 채널 신호는 무시한다
           if (disposed || channel !== ch) return;
@@ -253,16 +358,6 @@ export function BoxSpace({
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('online', onVisible);
 
-    chatRef.current = (raw: string) => {
-      const text = cleanText(raw, CHAT_MAX);
-      const now = performance.now();
-      if (!text || now - lastChat < 1500) return;
-      lastChat = now;
-      me.chat = text;
-      me.chatUntil = now + 6000;
-      if (subscribed) channel?.send({ type: 'broadcast', event: 'chat', payload: { id: me.id, text } });
-    };
-
     // ---- 게임 루프
     const step = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
@@ -270,10 +365,10 @@ export function BoxSpace({
 
       let vx = 0;
       let vy = 0;
-      if (keys.has('arrowleft') || keys.has('a')) vx -= 1;
-      if (keys.has('arrowright') || keys.has('d')) vx += 1;
-      if (keys.has('arrowup') || keys.has('w')) vy -= 1;
-      if (keys.has('arrowdown') || keys.has('s')) vy += 1;
+      if (keys.has('left')) vx -= 1;
+      if (keys.has('right')) vx += 1;
+      if (keys.has('up')) vy -= 1;
+      if (keys.has('down')) vy += 1;
       if (!vx && !vy && path.length) {
         const target = path[0];
         const dx = target.x - me.x;
@@ -287,11 +382,17 @@ export function BoxSpace({
       }
       const len = Math.hypot(vx, vy);
       me.moving = len > 0;
+      me.running = me.moving && (keys.has('run') || runToggle);
+      if (me.moving && me.pose !== 'stand') {
+        me.pose = 'stand'; // 움직이면 일어난다
+        notify();
+      }
       if (len > 0) {
         vx /= len;
         vy /= len;
-        const nx = me.x + vx * SPEED * dt;
-        const ny = me.y + vy * SPEED * dt;
+        const speed = me.running ? RUN_SPEED : SPEED;
+        const nx = me.x + vx * speed * dt;
+        const ny = me.y + vy * speed * dt;
         const beforeX = me.x;
         const beforeY = me.y;
         // 벽에 닿으면 미끄러지듯 한 축만 이동
@@ -303,13 +404,16 @@ export function BoxSpace({
       }
 
       // 위치 전송 (초당 최대 10회, 바뀌었을 때만)
-      const sendKey = `${Math.round(me.x)},${Math.round(me.y)},${me.dir},${me.moving}`;
+      const sendKey = `${Math.round(me.x)},${Math.round(me.y)},${me.dir},${me.moving},${me.pose},${me.running}`;
       if (channel && subscribed && now - lastSent > 100 && sendKey !== lastSentKey) {
         lastSent = now;
         lastSentKey = sendKey;
         channel.send({
           type: 'broadcast', event: 'move',
-          payload: { id: me.id, x: Math.round(me.x), y: Math.round(me.y), dir: me.dir, moving: me.moving },
+          payload: {
+            id: me.id, x: Math.round(me.x), y: Math.round(me.y), dir: me.dir,
+            moving: me.moving, pose: me.pose, running: me.running,
+          },
         });
       }
 
@@ -323,6 +427,12 @@ export function BoxSpace({
       if (near !== currentNearby) {
         currentNearby = near;
         setNearby(near);
+        callbacks.current.onNearbyChange?.(near);
+      }
+      // 클릭한 오브젝트에 도착하면 연다
+      if (pendingOpen && !path.length) {
+        if (isNear(pendingOpen, me.x, me.y)) callbacks.current.onOpen(pendingOpen);
+        pendingOpen = null;
       }
 
       // ---- 그리기
@@ -341,14 +451,27 @@ export function BoxSpace({
       if (near) drawObjectHint(ctx, near, now);
 
       const everyone = [...peers.values(), me].sort((a, b) => a.y - b.y);
-      const frame = (p: Player) => (p.moving ? (Math.floor(now / 160) % 2) + 1 : 0);
-      for (const p of everyone) drawAvatar(ctx, p.avatar, p.x, p.y, p.dir, frame(p), SPRITE_SCALE);
+      const frame = (p: Player) =>
+        p.pose === 'dance'
+          ? Math.floor(now / 260) % 3
+          : p.moving
+            ? (Math.floor(now / (p.running ? 100 : 160)) % 2) + 1
+            : 0;
+      const lift = (p: Player) => {
+        const t = p.jumpStart ? now - p.jumpStart : JUMP_MS;
+        const jump = t < JUMP_MS ? Math.sin((Math.PI * t) / JUMP_MS) * 22 : 0;
+        const bounce = p.pose === 'dance' ? Math.abs(Math.sin(now / 130)) * 3 : 0;
+        return jump + bounce;
+      };
+      for (const p of everyone) {
+        drawAvatar(ctx, p.avatar, p.x, p.y, p.pose === 'dance' ? 'down' : p.dir, frame(p), SPRITE_SCALE, p.pose, lift(p));
+      }
 
       // 이름표와 말풍선
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       for (const p of everyone) {
-        const headY = p.y - 22 * SPRITE_SCALE - 6;
+        const headY = p.y - SPRITE_H * SPRITE_SCALE - 6;
         ctx.font = 'bold 10px system-ui, "Malgun Gothic", sans-serif';
         const w = ctx.measureText(p.nickname).width + 10;
         ctx.fillStyle = p.id === me.id ? 'rgba(122,46,58,0.92)' : 'rgba(20,20,22,0.75)';
@@ -397,14 +520,15 @@ export function BoxSpace({
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
       canvas.removeEventListener('pointerdown', onPointer);
-      chatRef.current = null;
+      canvas.removeEventListener('pointermove', onHover);
+      if (handleRef) handleRef.current = null;
       clearTimeout(retryTimer);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('online', onVisible);
       if (channel) supabase.removeChannel(channel);
     };
     // 캐릭터는 내용(avatarKey)이 바뀔 때만 다시 연결한다 (같은 내용의 새 객체로는 재연결하지 않음)
-  }, [profile.id, profile.nickname, avatarKey, chatRef]);
+  }, [profile.id, profile.nickname, avatarKey, handleRef]);
 
   return (
     <div ref={wrapRef} className="relative h-full w-full touch-none select-none overflow-hidden">
@@ -422,10 +546,11 @@ export function BoxSpace({
       {nearby && (
         <button
           type="button"
-          onClick={() => onOpenBoard(nearby)}
+          onClick={() => onOpen(nearby)}
           className="absolute bottom-24 left-1/2 -translate-x-1/2 rounded-lg border-2 border-[#2A2320] bg-[#E8B923] px-4 py-2 text-sm font-bold text-[#2A2320] shadow-[0_3px_0_#2A2320] active:translate-y-0.5"
         >
-          {BOARDS[nearby].label} 열기 <span className="hidden sm:inline">(Space)</span>
+          {OBJECT_LABELS[nearby]} 열기{' '}
+          <span className="hidden sm:inline">(E · 클릭)</span>
         </button>
       )}
     </div>

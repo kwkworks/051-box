@@ -6,6 +6,7 @@ import { requireAdmin, requireAuth, requireMember } from './auth.js';
 import { config } from './config.js';
 import { HttpError, errorHandler } from './errors.js';
 import { adminRouter } from './routes/admin.js';
+import { chatRouter } from './routes/chat.js';
 import { eventsRouter } from './routes/events.js';
 import { feedRouter } from './routes/feed.js';
 import { meRouter } from './routes/me.js';
@@ -63,6 +64,7 @@ export function createApp() {
   app.use('/events', requireMember, eventsRouter);
   app.use('/one-rm', requireMember, oneRmRouter);
   app.use('/feed', requireMember, feedRouter);
+  app.use('/chat', requireMember, chatRouter);
   app.use('/admin', requireAdmin, adminRouter);
 
   app.use((req, res) => res.status(404).json({ error: '없는 주소입니다' }));

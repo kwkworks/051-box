@@ -7,15 +7,22 @@ export const MOVEMENTS = [
 ];
 
 export const AVATAR_OPTIONS = {
-  skin: ['s1', 's2', 's3', 's4', 's5'],
-  hair: ['short', 'buzz', 'long', 'ponytail', 'bun', 'curly'],
-  hairColor: ['black', 'brown', 'blonde', 'red', 'gray', 'blue', 'pink', 'green'],
-  top: ['tshirt', 'tank', 'hoodie'],
-  topColor: ['burgundy', 'yellow', 'black', 'white', 'blue', 'green', 'red', 'purple', 'gray', 'orange'],
-  bottom: ['shorts', 'pants'],
-  bottomColor: ['black', 'gray', 'navy', 'burgundy', 'khaki', 'white', 'blue', 'green'],
-  shoes: ['black', 'white', 'red', 'blue', 'yellow', 'green'],
-  acc: ['none', 'headband', 'cap', 'glasses', 'wristband'],
+  skin: ['s1', 's2', 's3', 's4', 's5', 's6'],
+  eyes: ['round', 'smile', 'sharp', 'sleepy', 'sparkle'],
+  brows: ['normal', 'thick', 'angry', 'none'],
+  mouth: ['smile', 'grin', 'neutral', 'open'],
+  facial: ['none', 'mustache', 'beard', 'stubble'],
+  hair: ['short', 'buzz', 'long', 'ponytail', 'bun', 'curly', 'mohawk', 'sidepart', 'bob', 'twintail', 'bald'],
+  hairColor: ['black', 'brown', 'blonde', 'red', 'gray', 'blue', 'pink', 'green', 'white', 'purple'],
+  top: ['tshirt', 'tank', 'hoodie', 'crop', 'longsleeve', 'jersey'],
+  topColor: ['burgundy', 'yellow', 'black', 'white', 'blue', 'green', 'red', 'purple', 'gray', 'orange', 'navy', 'pink'],
+  topPrint: ['none', 'stripe', 'logo'],
+  bottom: ['shorts', 'pants', 'leggings', 'joggers'],
+  bottomColor: ['black', 'gray', 'navy', 'burgundy', 'khaki', 'white', 'blue', 'green', 'pink'],
+  shoes: ['black', 'white', 'red', 'blue', 'yellow', 'green', 'pink'],
+  head: ['none', 'headband', 'cap', 'beanie', 'backcap'],
+  face: ['none', 'glasses', 'sunglasses'],
+  gear: ['none', 'wristwraps', 'kneesleeves', 'belt', 'headphones'],
 };
 
 // 허용 목록에 있는 값만 저장한다 (임의 JSON 저장 차단)
@@ -88,5 +95,14 @@ export const oneRmSchema = z
   .refine((v) => !v.is_custom || /^[0-9A-Za-z가-힣 ()_.-]+$/.test(v.movement), { message: '종목 이름에 쓸 수 없는 문자가 있어요', path: ['movement'] });
 
 export const roleSchema = z.strictObject({ role: z.enum(['pending', 'member', 'admin']) });
+
+export const chatSchema = z.strictObject({
+  body: z.string().trim().min(1).max(200).regex(/^[^\x00-\x08\x0B\x0C\x0E-\x1F\x7F]*$/),
+});
+
+export const sheetUrlSchema = z.strictObject({ url: z.url({ protocol: /^https$/ }).max(500) });
+
+export const chatMuteSchema = z.strictObject({ mute: z.enum(['1h', 'today', 'off']) });
+export const chatLockSchema = z.strictObject({ locked: z.boolean() });
 
 export const holidaySchema = z.strictObject({ day: isoDate, name: requiredText(30) });

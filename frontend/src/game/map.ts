@@ -7,27 +7,39 @@ export const WORLD_H = ROWS * TILE;
 
 export const SPAWN = { x: 36.5 * TILE, y: 23.5 * TILE };
 
-export type BoardKey = 'wod' | 'notices' | 'competition' | 'gathering' | 'one-rm' | 'wall';
+export type BoardKey = 'hub' | 'wod' | 'notices' | 'competition' | 'gathering' | 'one-rm' | 'wall';
+export type ObjectKey = BoardKey;
 
-export const BOARDS: Record<BoardKey, { label: string; href: string; hint: string }> = {
-  wod: { label: 'RECORD 화이트보드', href: '/wod', hint: '오늘 WOD와 기록 사진' },
-  notices: { label: '데스크', href: '/notices', hint: '공지사항' },
-  competition: { label: '대회 포스터', href: '/events?kind=competition', hint: '대회와 이벤트 신청' },
-  gathering: { label: '팀 배너 벽', href: '/events?kind=gathering', hint: '회원 모임' },
-  'one-rm': { label: '바벨 랙', href: '/one-rm', hint: '1RM 기록과 순위' },
-  wall: { label: '명예의 벽', href: '/wall', hint: 'PR 축하 피드' },
+// 이름만 보고도 무엇인지 알 수 있게 짓는다
+export const BOARDS: Record<BoardKey, { label: string; icon: string; href: string; hint: string }> = {
+  hub: { label: '게시판', icon: '🗂', href: '/board', hint: '모든 기능을 한눈에' },
+  wod: { label: '오늘의 WOD', icon: '📋', href: '/wod', hint: 'WOD, 내 무게, 기록 사진' },
+  notices: { label: '공지사항', icon: '📢', href: '/notices', hint: '박스 공지' },
+  competition: { label: '대회·이벤트', icon: '🏆', href: '/events?kind=competition', hint: '대회와 이벤트 참가 신청' },
+  gathering: { label: '회원 모임', icon: '🍻', href: '/events?kind=gathering', hint: '회식, 번개 모임' },
+  'one-rm': { label: '1RM 기록', icon: '🏋️', href: '/one-rm', hint: '내 최고 기록과 박스 순위' },
+  wall: { label: 'PR 명예의 벽', icon: '🎉', href: '/wall', hint: '회원들의 PR 축하' },
 };
+
+export const OBJECT_LABELS: Record<ObjectKey, string> = {
+  ...Object.fromEntries(Object.entries(BOARDS).map(([k, b]) => [k, `${b.icon} ${b.label}`])),
+} as Record<ObjectKey, string>;
 
 type Box = { x: number; y: number; w: number; h: number };
 
 // 상호작용 오브젝트: 타일 좌표
-export const OBJECTS: (Box & { board: BoardKey })[] = [
-  { board: 'wall', x: 2, y: 0, w: 6, h: 3 },
-  { board: 'gathering', x: 9, y: 0, w: 7, h: 3 },
-  { board: 'wod', x: 19, y: 3, w: 7, h: 2 },
-  { board: 'competition', x: 29, y: 0, w: 5, h: 3 },
-  { board: 'one-rm', x: 1, y: 13, w: 3, h: 7 },
-  { board: 'notices', x: 29, y: 19, w: 7, h: 3 },
+// 상호작용 오브젝트: 게시판 키오스크 하나로 모은다 (모든 기능은 게시판에서)
+export const OBJECTS: (Box & { board: ObjectKey })[] = [{ board: 'hub', x: 31, y: 23, w: 2, h: 1 }];
+
+// 장식 (실제 박스 모습. 지나갈 수 없지만 상호작용은 없다)
+const DECOR: Box[] = [
+  { x: 27, y: 19, w: 2, h: 1 }, // 스피커
+  { x: 2, y: 0, w: 6, h: 3 }, // 상장 벽
+  { x: 9, y: 0, w: 7, h: 3 }, // 팀 배너
+  { x: 19, y: 3, w: 7, h: 2 }, // RECORD 화이트보드
+  { x: 29, y: 0, w: 5, h: 3 }, // 대회 포스터
+  { x: 1, y: 13, w: 3, h: 7 }, // 바벨 랙
+  { x: 29, y: 19, w: 7, h: 3 }, // 데스크
 ];
 
 // 장애물 (상호작용 없음)
@@ -54,6 +66,7 @@ for (let y = 0; y < ROWS; y++) {
   block({ x: COLS - 1, y, w: 1, h: 1 });
 }
 OBJECTS.forEach(block);
+DECOR.forEach(block);
 RIG_POSTS.forEach(([x, y]) => block({ x, y, w: 1, h: 1 }));
 [...BIKES, ...PILLARS, ...BOXES, COOLER].forEach(block);
 
@@ -72,10 +85,10 @@ export function collides(x: number, y: number): boolean {
 }
 
 // 오브젝트 주변 1칸 안에 있으면 상호작용 가능
-export function nearbyBoard(x: number, y: number): BoardKey | null {
+export function nearbyBoard(x: number, y: number): ObjectKey | null {
   const tx = x / TILE;
   const ty = (y - 4) / TILE;
-  let best: BoardKey | null = null;
+  let best: ObjectKey | null = null;
   let bestDist = Infinity;
   for (const o of OBJECTS) {
     const dx = Math.max(o.x - tx, 0, tx - (o.x + o.w));
@@ -89,6 +102,29 @@ export function nearbyBoard(x: number, y: number): BoardKey | null {
   return best;
 }
 
+// 특정 오브젝트에 손이 닿는 거리인지
+export function isNear(board: ObjectKey, x: number, y: number): boolean {
+  const o = OBJECTS.find((b) => b.board === board);
+  if (!o) return false;
+  const tx = x / TILE;
+  const ty = (y - 4) / TILE;
+  const dx = Math.max(o.x - tx, 0, tx - (o.x + o.w));
+  const dy = Math.max(o.y - ty, 0, ty - (o.y + o.h));
+  return Math.hypot(dx, dy) < 1.1;
+}
+
+// 클릭한 지점에 있는 오브젝트 (주변 4px 여유)
+export function objectAt(wx: number, wy: number): ObjectKey | null {
+  for (const o of OBJECTS) {
+    // 오브젝트 본체 + 이름표(위 또는 아래 약 28px)까지 클릭 범위로 본다
+    if (wx >= o.x * TILE - 6 && wx <= (o.x + o.w) * TILE + 6 && wy >= o.y * TILE - 28 && wy <= (o.y + o.h) * TILE + 28) {
+      return o.board;
+    }
+  }
+  return null;
+}
+
+
 // 탭한 곳까지 타일 단위로 길 찾기 (BFS)
 export function findPath(fromX: number, fromY: number, toX: number, toY: number): { x: number; y: number }[] {
   const sx = Math.floor(fromX / TILE);
@@ -97,23 +133,24 @@ export function findPath(fromX: number, fromY: number, toX: number, toY: number)
   let gy = Math.floor(toY / TILE);
   gx = Math.max(0, Math.min(COLS - 1, gx));
   gy = Math.max(0, Math.min(ROWS - 1, gy));
-  // 막힌 곳을 누르면 가장 가까운 빈 칸으로
+  // 막힌 곳을 누르면 누른 지점에서 가장 가까운 빈 칸으로
   if (solid[gy][gx]) {
-    let found = false;
-    for (let r = 1; r < 4 && !found; r++) {
-      for (let dy = -r; dy <= r && !found; dy++) {
-        for (let dx = -r; dx <= r && !found; dx++) {
-          const nx = gx + dx;
-          const ny = gy + dy;
-          if (nx >= 0 && ny >= 0 && nx < COLS && ny < ROWS && !solid[ny][nx]) {
-            gx = nx;
-            gy = ny;
-            found = true;
-          }
+    let best: [number, number] | null = null;
+    let bestD = Infinity;
+    for (let dy = -3; dy <= 3; dy++) {
+      for (let dx = -3; dx <= 3; dx++) {
+        const nx = gx + dx;
+        const ny = gy + dy;
+        if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS || solid[ny][nx]) continue;
+        const d = Math.hypot((nx + 0.5) * TILE - toX, (ny + 0.5) * TILE - toY);
+        if (d < bestD) {
+          bestD = d;
+          best = [nx, ny];
         }
       }
     }
-    if (!found) return [];
+    if (!best) return [];
+    [gx, gy] = best;
   }
   const key = (x: number, y: number) => y * COLS + x;
   const prev = new Map<number, number>();
@@ -334,10 +371,40 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
   // 정수기
   rect(ctx, COOLER.x * T + 4, COOLER.y * T + 2, T - 8, 2 * T - 6, '#EDEDED');
   rect(ctx, COOLER.x * T + 8, COOLER.y * T + 8, T - 16, 10, '#5BB0E8');
+
+  // 게시판 키오스크 (입구 옆)
+  rect(ctx, 31 * T + 4, 23 * T - 10, 2 * T - 8, T + 6, '#2B2B30');
+  rect(ctx, 31 * T + 8, 23 * T - 6, 2 * T - 16, T - 6, '#3E82E6');
+  for (let i = 0; i < 3; i++) rect(ctx, 31 * T + 12, 23 * T - 1 + i * 6, 2 * T - 24, 3, '#CFE2FF');
+  rect(ctx, 32 * T - 3, 24 * T - 4, 6, 4, '#2B2B30');
+
+  // 스피커 (마샬 앰프 느낌)
+  rect(ctx, 27 * T + 2, 19 * T - 6, 2 * T - 4, T + 4, '#EFE6D2');
+  rect(ctx, 27 * T + 6, 19 * T - 2, 2 * T - 12, T - 8, '#3A3226');
+  for (let i = 0; i < 4; i++) rect(ctx, 27 * T + 8, 19 * T + i * 5, 2 * T - 16, 1, '#5A4E3C');
+  rect(ctx, 27 * T + 6, 19 * T - 5, 18, 2, '#B8962E');
+
+  // 이름표: 무엇인지 이름만 보고 알 수 있게
+  for (const o of OBJECTS) {
+    const text = OBJECT_LABELS[o.board];
+    const cx = (o.x + o.w / 2) * T;
+    // 위쪽 벽에 걸린 것은 아래에, 나머지는 위에 단다
+    const cy = o.y === 0 ? 3 * T + 12 : o.board === 'wod' ? (o.y + o.h) * T + 10 : o.y * T - 16;
+    ctx.font = 'bold 12px system-ui, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif';
+    const w = ctx.measureText(text).width + 14;
+    ctx.fillStyle = 'rgba(20,20,22,0.82)';
+    ctx.beginPath();
+    ctx.roundRect(cx - w / 2, cy - 10, w, 20, 6);
+    ctx.fill();
+    ctx.strokeStyle = '#E8B923';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    label(ctx, text, cx, cy + 1, '#FFFFFF', 12);
+  }
 }
 
 // 상호작용 가능한 오브젝트 위에 반짝이는 표시
-export function drawObjectHint(ctx: CanvasRenderingContext2D, board: BoardKey, t: number) {
+export function drawObjectHint(ctx: CanvasRenderingContext2D, board: ObjectKey, t: number) {
   const o = OBJECTS.find((x) => x.board === board);
   if (!o) return;
   const alpha = 0.55 + Math.sin(t / 180) * 0.25;

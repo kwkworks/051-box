@@ -56,9 +56,9 @@ export default function LoginPage() {
           <p className="mt-1 text-sm text-muted">크로스핏051 회원 전용 커뮤니티</p>
 
           <div className="my-5 flex justify-center gap-1">
-            <AvatarView scale={3} animate avatar={{ topColor: 'burgundy', hair: 'short' }} />
-            <AvatarView scale={3} animate dir="left" avatar={{ topColor: 'yellow', hair: 'ponytail', hairColor: 'brown', skin: 's1' }} />
-            <AvatarView scale={3} animate dir="right" avatar={{ topColor: 'black', hair: 'buzz', acc: 'headband', skin: 's3' }} />
+            <AvatarView scale={2} animate avatar={{ topColor: 'burgundy', hair: 'short', head: 'cap', gear: 'belt' }} />
+            <AvatarView scale={2} animate dir="left" avatar={{ topColor: 'yellow', hair: 'ponytail', hairColor: 'brown', skin: 's1', eyes: 'smile', bottom: 'leggings' }} />
+            <AvatarView scale={2} animate dir="right" avatar={{ topColor: 'black', hair: 'buzz', head: 'headband', gear: 'wristwraps', skin: 's3' }} />
           </div>
 
           {!isConfigured && (
