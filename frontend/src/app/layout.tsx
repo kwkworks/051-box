@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { AuthProvider } from '@/components/AuthProvider';
 import { IosInstallSheet } from '@/components/IosInstallSheet';
+import { UpdateNotice } from '@/components/UpdateNotice';
 import { WakeOverlay } from '@/components/WakeOverlay';
 import './globals.css';
 
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           {children}
           <WakeOverlay />
           <IosInstallSheet />
+          <UpdateNotice />
         </AuthProvider>
       </body>
     </html>

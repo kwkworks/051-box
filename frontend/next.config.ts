@@ -20,7 +20,11 @@ const csp = [
   "object-src 'none'",
 ].join("; ");
 
+// 배포마다 바뀌는 버전 번호 (Vercel이 넣어주는 커밋 번호). 열려 있는 화면이 새 버전을 알아채는 데 쓴다
+const buildId = (process.env.VERCEL_GIT_COMMIT_SHA ?? "dev").slice(0, 12);
+
 const nextConfig: NextConfig = {
+  env: { NEXT_PUBLIC_BUILD_ID: buildId },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
