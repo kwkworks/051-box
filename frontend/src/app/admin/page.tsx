@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Fragment, useState } from 'react';
 import { AvatarView } from '@/components/AvatarView';
 import { BoardShell } from '@/components/BoardShell';
@@ -34,6 +35,13 @@ function Admin({ me }: { me: Me }) {
       </div>
       {tab === 'members' && (
         <>
+          <Link href="/poster" className="card mb-4 flex items-center gap-3 p-4">
+            <span className="text-3xl" aria-hidden>🖨</span>
+            <span>
+              <span className="block font-black">앱 설치 QR 포스터 인쇄</span>
+              <span className="block text-sm text-muted">박스에 붙여두면 아이폰 카메라로 찍어 사파리에서 바로 설치해요</span>
+            </span>
+          </Link>
           <AdminPowers />
           <Members myId={me.profile.id} />
         </>

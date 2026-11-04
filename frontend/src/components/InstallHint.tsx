@@ -1,35 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { detectInstallEnv, isIos, type InstallEnv } from '@/lib/installEnv';
 
 type InstallEvent = Event & { prompt: () => Promise<void> };
 
-type Env =
-  | 'installed' // 이미 홈 화면 앱으로 열었음
-  | 'kakao' // 카카오톡 안의 브라우저
-  | 'inapp' // 인스타그램·네이버·라인 등 다른 앱 안의 브라우저
-  | 'ios-safari'
-  | 'ios-other' // 아이폰 크롬 등
-  | 'android'
-  | 'desktop';
-
-function detect(): Env {
-  if (typeof window === 'undefined') return 'desktop';
-  const ua = navigator.userAgent;
-  const standalone =
-    window.matchMedia('(display-mode: standalone)').matches ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true;
-  if (standalone) return 'installed';
-  if (/KAKAOTALK/i.test(ua)) return 'kakao';
-  if (/Instagram|FBAN|FBAV|NAVER\(inapp|Line\/|DaumApps|everytimeApp|Whale\/.*inapp/i.test(ua)) return 'inapp';
-  const ios = /iphone|ipad|ipod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
-  if (ios) return /CriOS|FxiOS|EdgiOS|Whale/i.test(ua) ? 'ios-other' : 'ios-safari';
-  if (/android/i.test(ua)) return 'android';
-  return 'desktop';
-}
+type Env = InstallEnv;
+const detect = detectInstallEnv;
 
 // 카카오톡에서 이 주소를 기본 브라우저(아이폰: 사파리, 안드로이드: 크롬)로 다시 연다
-function openInBrowser() {
+export function openInBrowser() {
   const url = window.location.href;
   window.location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(url)}`;
 }
@@ -81,7 +61,7 @@ export function InstallHint() {
 
   if (env === 'installed') return null;
 
-  const ios = /iphone|ipad|ipod/i.test(typeof navigator === 'undefined' ? '' : navigator.userAgent);
+  const ios = isIos();
 
   return (
     <section className="card mt-6 flex flex-col gap-3 p-4" aria-label="휴대폰에 앱으로 설치하기">
