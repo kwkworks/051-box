@@ -188,7 +188,7 @@ export function rowsToWods(rows, { from, to }) {
     const parts = [
       cell(r, col.content),
       cell(r, col.strength) && `[Strength]\n${cell(r, col.strength)}`,
-      cell(r, col.main) && `[WOD]\n${cell(r, col.main)}`,
+      cell(r, col.main) && `[Conditioning]\n${cell(r, col.main)}`,
       cell(r, col.note),
     ].filter(Boolean);
     let title = cell(r, col.title).slice(0, 80);
