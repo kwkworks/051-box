@@ -39,7 +39,7 @@ meRouter.get('/', async (req, res) => {
 // 닉네임, 캐릭터 저장 (승인 대기 중에도 가능)
 meRouter.patch('/', async (req, res) => {
   const body = meUpdateSchema.parse(req.body);
-  const result = await req.sb.from('profiles').update(body).eq('id', req.userId).select('id, nickname, role, avatar, gender').single();
+  const result = await req.sb.from('profiles').update(body).eq('id', req.userId).select('id, nickname, role, avatar, gender, notify_prefs').single();
   if (result.error?.code === '23505') throw new HttpError(409, '이미 다른 회원이 쓰는 닉네임이에요');
   const profile = unwrap(result);
   res.json({ profile });

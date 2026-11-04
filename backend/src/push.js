@@ -1,0 +1,78 @@
+// 푸시 알림 보내기. service_role 키 없이, 서버만 아는 비밀값(PUSH_SECRET)으로 DB 함수에서 받을 사람 목록을 받는다.
+// 키가 설정되지 않았으면 조용히 건너뛴다 (알림만 안 갈 뿐 다른 기능은 그대로).
+import { createClient } from '@supabase/supabase-js';
+import webpush from 'web-push';
+import { config } from './config.js';
+
+const enabled = Boolean(config.vapidPublicKey && config.vapidPrivateKey && config.pushSecret);
+if (enabled) {
+  webpush.setVapidDetails(config.vapidSubject, config.vapidPublicKey, config.vapidPrivateKey);
+} else {
+  console.warn('[push] VAPID 키 또는 PUSH_SECRET이 없어 푸시 알림을 보내지 않습니다');
+}
+
+// 로그인 없이(공개 키) 부르는 서버 전용 클라이언트. DB 함수가 비밀값을 확인한다
+const sb = createClient(config.supabaseUrl, config.supabasePublishableKey, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+});
+
+export const pushEnabled = () => enabled;
+
+async function deliver(targets, payload) {
+  const body = JSON.stringify(payload);
+  let sent = 0;
+  await Promise.all(
+    (targets ?? []).map(async (t) => {
+      try {
+        await webpush.sendNotification({ endpoint: t.endpoint, keys: { p256dh: t.p256dh, auth: t.auth } }, body, {
+          TTL: 12 * 60 * 60,
+          timeout: 10_000,
+        });
+        sent += 1;
+      } catch (e) {
+        // 404/410: 사용자가 알림을 끄거나 앱을 지운 구독 → 정리
+        if (e?.statusCode === 404 || e?.statusCode === 410) {
+          await sb.rpc('push_remove', { p_secret: config.pushSecret, p_endpoint: t.endpoint });
+        } else {
+          console.warn('[push] 보내기 실패', e?.statusCode ?? e?.message);
+        }
+      }
+    }),
+  );
+  return sent;
+}
+
+// kind: 'wod' | 'notices' | 'competition' | 'gathering', ref: 같은 알림 중복 방지용 (글 id, 날짜)
+export async function sendPush(kind, ref, actorId, payload) {
+  if (!enabled) return 0;
+  const { data, error } = await sb.rpc('push_claim', {
+    p_secret: config.pushSecret,
+    p_kind: kind,
+    p_ref: String(ref),
+    p_actor: actorId ?? null,
+  });
+  if (error) {
+    console.warn('[push] 받을 사람을 불러오지 못했어요', error.code);
+    return 0;
+  }
+  return deliver(data, payload);
+}
+
+// 응답을 기다리게 하지 않고 뒤에서 보낸다
+export function sendPushLater(kind, ref, actorId, payload) {
+  sendPush(kind, ref, actorId, payload).catch((e) => console.warn('[push]', e?.message));
+}
+
+export async function sendTestPush(userId) {
+  if (!enabled) return 0;
+  const { data, error } = await sb.rpc('push_targets_for_user', { p_secret: config.pushSecret, p_user: userId });
+  if (error) return 0;
+  return deliver(data, { title: '🔔 051 BOX 알림 테스트', body: '알림이 잘 도착했어요!', url: '/board' });
+}
+
+export async function tomorrowWod() {
+  if (!enabled) return null;
+  const { data, error } = await sb.rpc('push_wod_tomorrow', { p_secret: config.pushSecret });
+  if (error) return null;
+  return data?.[0] ?? null;
+}

@@ -3,7 +3,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { requireAdmin } from '../auth.js';
 import { HttpError, fromDbError, unwrap } from '../errors.js';
-import { isoDate, uuid, wodSchema } from '../schemas.js';
+import { isoDate, photoOrderSchema, uuid, wodSchema } from '../schemas.js';
 
 export const wodsRouter = Router();
 
@@ -44,7 +44,12 @@ wodsRouter.get('/', async (req, res) => {
   if (!wod) return res.json({ wod: null, photos: [], locked: false, opensAt: opensAt.toISOString(), released });
 
   const rows = unwrap(
-    await req.sb.from('wod_photos').select('id, storage_path, created_at').eq('wod_id', wod.id).order('created_at'),
+    await req.sb
+      .from('wod_photos')
+      .select('id, storage_path, created_at, sort_order')
+      .eq('wod_id', wod.id)
+      .order('sort_order')
+      .order('created_at'),
   );
   let photos = [];
   if (rows.length) {
@@ -88,12 +93,39 @@ wodsRouter.post('/:id/photos', requireAdmin, upload.single('photo'), async (req,
 
   const path = `wods/${wodId}/${randomUUID()}.${image.ext}`;
   unwrap(await req.sb.storage.from(BUCKET).upload(path, req.file.buffer, { contentType: image.type, upsert: false }));
-  const { data, error } = await req.sb.from('wod_photos').insert({ wod_id: wodId, storage_path: path }).select('id').single();
+  // 새 사진은 맨 뒤에
+  const { data: last } = await req.sb
+    .from('wod_photos')
+    .select('sort_order')
+    .eq('wod_id', wodId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const { data, error } = await req.sb
+    .from('wod_photos')
+    .insert({ wod_id: wodId, storage_path: path, sort_order: (last?.sort_order ?? 0) + 1 })
+    .select('id')
+    .single();
   if (error) {
     await req.sb.storage.from(BUCKET).remove([path]);
     throw fromDbError(error);
   }
   res.status(201).json({ photo: data });
+});
+
+// 기록 사진 순서 바꾸기 (관리자): 보여줄 순서대로 사진 id 목록을 받는다
+wodsRouter.put('/:id/photos/order', requireAdmin, async (req, res) => {
+  const wodId = uuid.parse(req.params.id);
+  const { ids } = photoOrderSchema.parse(req.body);
+  const rows = unwrap(await req.sb.from('wod_photos').select('id').eq('wod_id', wodId));
+  const known = new Set(rows.map((r) => r.id));
+  if (ids.length !== known.size || !ids.every((id) => known.has(id))) {
+    throw new HttpError(400, '사진 목록이 바뀌었어요. 새로고침 후 다시 해주세요');
+  }
+  for (const [i, id] of ids.entries()) {
+    unwrap(await req.sb.from('wod_photos').update({ sort_order: i + 1 }).eq('id', id).eq('wod_id', wodId));
+  }
+  res.status(204).end();
 });
 
 wodsRouter.delete('/:id/photos/:photoId', requireAdmin, async (req, res) => {

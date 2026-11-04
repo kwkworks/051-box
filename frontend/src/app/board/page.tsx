@@ -5,6 +5,7 @@ import { BoardShell } from '@/components/BoardShell';
 import { Guard } from '@/components/Guard';
 import { InstallHint } from '@/components/InstallHint';
 import { InviteButton } from '@/components/InviteButton';
+import { NotificationSettings } from '@/components/NotificationSettings';
 import { BOARDS, type BoardKey } from '@/game/map';
 import { formatDateLabel } from '@/lib/format';
 import type { Me } from '@/lib/types';
@@ -71,6 +72,7 @@ function Hub({ me }: { me: Me }) {
         <p className="text-sm text-muted">카카오톡 등으로 051 BOX 주소를 보내요. 가입한 사람은 관리자 승인 후 이용할 수 있어요.</p>
         <InviteButton className="btn btn-primary h-12 text-base" />
       </section>
+      <NotificationSettings profile={me.profile} />
       <InstallHint />
     </BoardShell>
   );

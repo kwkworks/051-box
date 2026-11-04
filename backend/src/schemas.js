@@ -50,8 +50,15 @@ export const meUpdateSchema = z
     nickname: nickname.optional(),
     avatar: avatarSchema.optional(),
     gender: z.enum(['M', 'F']).nullable().optional(), // 박스 순위 남/여 구분 (선택 안 함 = null)
+    // 푸시 알림 종류별 켜기/끄기
+    notify_prefs: z
+      .strictObject({ wod: z.boolean(), notices: z.boolean(), competition: z.boolean(), gathering: z.boolean() })
+      .optional(),
   })
-  .refine((v) => v.nickname !== undefined || v.avatar !== undefined || v.gender !== undefined, '변경할 내용이 없습니다');
+  .refine(
+    (v) => v.nickname !== undefined || v.avatar !== undefined || v.gender !== undefined || v.notify_prefs !== undefined,
+    '변경할 내용이 없습니다',
+  );
 
 export const wodSchema = z.strictObject({
   title: requiredText(80),
@@ -122,6 +129,19 @@ export const chatSchema = z.strictObject({
 export const sheetUrlSchema = z.strictObject({ url: z.url({ protocol: /^https$/ }).max(500) });
 
 export const chatReadSchema = z.strictObject({ at: z.iso.datetime({ offset: true }) });
+// 푸시 알림 구독 (브라우저가 만든 값)
+export const pushSubscribeSchema = z.strictObject({
+  endpoint: z.url({ protocol: /^https$/ }).max(1000),
+  expirationTime: z.number().nullable().optional(),
+  keys: z.strictObject({
+    p256dh: z.string().min(20).max(200).regex(/^[A-Za-z0-9_-]+=*$/),
+    auth: z.string().min(10).max(100).regex(/^[A-Za-z0-9_-]+=*$/),
+  }),
+});
+export const pushUnsubscribeSchema = z.strictObject({ endpoint: z.url({ protocol: /^https$/ }).max(1000) });
+
+export const photoOrderSchema = z.strictObject({ ids: z.array(z.uuid()).min(1).max(30) });
+
 export const chatMuteSchema = z.strictObject({ mute: z.enum(['1h', 'today', 'off']) });
 export const chatLockSchema = z.strictObject({ locked: z.boolean() });
 

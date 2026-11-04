@@ -10,7 +10,11 @@ export type Profile = {
   created_at?: string;
   chat_muted_until?: string | null;
   gender?: Gender | null; // 박스 순위 남/여 구분 (선택 안 함 = null)
+  notify_prefs?: Partial<NotifyPrefs>;
 };
+
+// 푸시 알림 종류별 켜기/끄기
+export type NotifyPrefs = { wod: boolean; notices: boolean; competition: boolean; gathering: boolean };
 
 export type Gender = 'M' | 'F';
 

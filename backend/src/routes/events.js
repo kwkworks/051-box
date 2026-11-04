@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { sendPushLater } from '../push.js';
 import { z } from 'zod';
 import { HttpError, unwrap } from '../errors.js';
 import { eventSchema, uuid } from '../schemas.js';
@@ -64,6 +65,12 @@ eventsRouter.post('/', async (req, res) => {
     throw new HttpError(403, '대회와 이벤트는 관리자만 등록할 수 있어요');
   }
   const event = unwrap(await req.sb.from('events').insert(body).select(COLUMNS).single());
+  const gathering = event.kind === 'gathering';
+  sendPushLater(gathering ? 'gathering' : 'competition', event.id, req.userId, {
+    title: gathering ? '🍻 새 회원 모임' : event.kind === 'competition' ? '🏆 새 대회' : '🎉 새 이벤트',
+    body: event.title,
+    url: `/events/${event.id}`,
+  });
   res.status(201).json({ event });
 });
 

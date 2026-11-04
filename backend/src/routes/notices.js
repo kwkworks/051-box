@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { sendPushLater } from '../push.js';
 import { requireAdmin } from '../auth.js';
 import { HttpError, unwrap } from '../errors.js';
 import { noticeSchema, noticeUpdateSchema, uuid } from '../schemas.js';
@@ -22,6 +23,7 @@ noticesRouter.get('/', async (req, res) => {
 noticesRouter.post('/', requireAdmin, async (req, res) => {
   const body = noticeSchema.parse(req.body);
   const notice = unwrap(await req.sb.from('notices').insert(body).select(COLUMNS).single());
+  sendPushLater('notices', notice.id, req.userId, { title: '📢 새 공지사항', body: notice.title, url: '/notices' });
   res.status(201).json({ notice });
 });
 

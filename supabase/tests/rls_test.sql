@@ -230,6 +230,20 @@ begin
   (69, '정해지지 않은 성별 값 저장', 'err', pg_temp.run_as(a, format('update public.profiles set gender = ''X'' where id = %L', a)));
   update public.profiles set gender = a_gender where id = a;  -- 원래 값으로 되돌림
 
+  -- ---- 0010: 푸시 알림 (비밀값 없이는 받을 사람 목록을 못 받음) + 사진 순서
+  insert into public.push_subscriptions (user_id, endpoint, p256dh, auth)
+  values (d, 'https://push.example.invalid/rls-test-admin', repeat('a', 40), repeat('b', 16));
+  insert into rls_results values
+  (70, '비로그인으로 알림 받을 사람 목록 요청 (틀린 비밀값)', 'err', pg_temp.run_as(null, 'select * from public.push_claim(''wrong'', ''notices'', ''rls-test'', null)')),
+  (71, '회원이 알림 받을 사람 목록 요청 (틀린 비밀값)', 'err', pg_temp.run_as(a, 'select * from public.push_claim(''wrong'', ''notices'', ''rls-test'', null)')),
+  (72, '회원이 다른 사람의 알림 구독 조회', 'ok:0', pg_temp.run_as(a, format('select * from public.push_subscriptions where user_id = %L', d))),
+  (73, '회원이 구독을 직접 넣기 (함수 우회)', 'err', pg_temp.run_as(a, format('insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) values (%L, ''https://x.invalid/y'', repeat(''a'', 40), repeat(''b'', 16))', a))),
+  (74, '회원이 본인 기기 알림 구독 (함수)', 'ok:1', pg_temp.run_as(a, 'select public.push_subscribe(''https://push.example.invalid/rls-test-member'', repeat(''a'', 40), repeat(''b'', 16))')),
+  (75, '승인 대기자가 알림 구독', 'err', pg_temp.run_as(c, 'select public.push_subscribe(''https://push.example.invalid/rls-test-pending'', repeat(''a'', 40), repeat(''b'', 16))')),
+  (76, '회원이 자기 알림 설정 저장', 'ok:1', pg_temp.run_as(a, format('update public.profiles set notify_prefs = notify_prefs where id = %L', a))),
+  (77, '회원이 기록 사진 순서 변경', 'ok:0', pg_temp.run_as(a, 'update public.wod_photos set sort_order = 1'));
+  delete from public.push_subscriptions where endpoint like 'https://push.example.invalid/rls-test%';
+
   -- 도배 방지: 10초 안에 5개를 이미 보냈으면 6번째는 거부
   -- 앞 테스트에서 관리자가 보낸 메시지를 지우고, 정확히 5개를 채운 뒤 6번째를 시도한다
   delete from public.chat_messages where user_id = d and body like 'rls-test%';

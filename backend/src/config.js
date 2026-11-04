@@ -19,6 +19,11 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   isProduction: process.env.NODE_ENV === 'production',
+  // 푸시 알림 (선택). 없으면 알림만 보내지 않는다. 비공개 키와 PUSH_SECRET은 Render 환경변수에만 둔다
+  vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? '',
+  vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? '',
+  vapidSubject: process.env.VAPID_SUBJECT ?? 'mailto:admin@051box.invalid',
+  pushSecret: process.env.PUSH_SECRET ?? '',
 };
 
 if (process.env.SUPABASE_SERVICE_ROLE_KEY) {

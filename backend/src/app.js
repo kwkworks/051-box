@@ -13,6 +13,7 @@ import { meRouter } from './routes/me.js';
 import { noticesRouter } from './routes/notices.js';
 import { oneRmRouter } from './routes/oneRm.js';
 import { wodsRouter } from './routes/wods.js';
+import { pushPublicRouter, pushRouter } from './routes/push.js';
 
 export function createApp() {
   const app = express();
@@ -64,6 +65,9 @@ export function createApp() {
   // 접속 유지 신호(30초마다)는 쓰기 제한에서 뺀다
   const writeLimiter = perUser({ windowMs: 60 * 1000, limit: 60, skip: (req) => req.method === 'GET' || isPing(req) });
 
+  // 매일 20:30 예약 작업이 부르는 WOD 공개 알림 (로그인 없음, 하루 한 번만 실제로 보냄)
+  app.use('/push', pushPublicRouter);
+
   app.use(requireAuth, userLimiter, writeLimiter);
   app.use('/me', meRouter);
   app.use('/wods', requireMember, wodsRouter);
@@ -72,6 +76,7 @@ export function createApp() {
   app.use('/one-rm', requireMember, oneRmRouter);
   app.use('/feed', requireMember, feedRouter);
   app.use('/chat', requireMember, chatRouter);
+  app.use('/push', requireMember, pushRouter);
   app.use('/admin', requireAdmin, adminRouter);
 
   app.use((req, res) => res.status(404).json({ error: '없는 주소입니다' }));

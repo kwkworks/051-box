@@ -256,26 +256,51 @@ function WodEditor({ date, wod, onDone }: { date: string; wod: Wod | null; onDon
 }
 
 function Photos({ wodId, photos, isAdmin, onChange }: { wodId: string; photos: WodPhoto[]; isAdmin: boolean; onChange: () => void }) {
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState<string | null>(null);
+  const [order, setOrder] = useState<string[] | null>(null); // 순서를 바꾸는 중이면 임시 순서
+  // 임시 순서는 지금 사진 목록과 같을 때만 쓴다 (새로 올리거나 지운 뒤에는 서버 순서)
+  const orderValid = !!order && order.length === photos.length && photos.every((p) => order.includes(p.id));
+  const shown = orderValid ? order!.map((id) => photos.find((p) => p.id === id)!) : photos;
 
-  const upload = async (file: File) => {
-    if (file.size > 5 * 1024 * 1024) {
-      setError('사진은 5MB 이하만 올릴 수 있어요');
-      return;
-    }
-    setUploading(true);
+  // 여러 장을 골라 한 장씩 차례로 올린다 (실패한 사진은 건너뛰고 알려줌)
+  const uploadMany = async (files: File[]) => {
+    const ok = files.filter((f) => f.size <= 5 * 1024 * 1024).slice(0, 20);
+    const tooBig = files.length - files.filter((f) => f.size <= 5 * 1024 * 1024).length;
     setError(null);
+    setUploading({ done: 0, total: ok.length });
+    let failed = 0;
+    for (const [i, file] of ok.entries()) {
+      try {
+        const form = new FormData();
+        form.append('photo', file);
+        await api.upload(`/wods/${wodId}/photos`, form);
+      } catch {
+        failed += 1;
+      }
+      setUploading({ done: i + 1, total: ok.length });
+    }
+    setUploading(null);
+    const problems = [tooBig ? `5MB가 넘는 사진 ${tooBig}장` : '', failed ? `올리지 못한 사진 ${failed}장` : ''].filter(Boolean);
+    if (problems.length) setError(`${problems.join(', ')}은 제외했어요`);
+    onChange();
+  };
+
+  // 순서 바꾸기 (관리자): 옆으로 한 칸씩 옮기고 바로 저장
+  const move = async (id: string, dir: -1 | 1) => {
+    const ids = shown.map((p) => p.id);
+    const i = ids.indexOf(id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    setOrder(ids);
     try {
-      const form = new FormData();
-      form.append('photo', file);
-      await api.upload(`/wods/${wodId}/photos`, form);
+      await api.put(`/wods/${wodId}/photos/order`, { ids });
       onChange();
     } catch (e) {
-      setError(e instanceof Error ? e.message : '올리지 못했어요');
-    } finally {
-      setUploading(false);
+      setOrder(null);
+      setError(e instanceof Error ? e.message : '순서를 바꾸지 못했어요');
     }
   };
 
@@ -294,7 +319,7 @@ function Photos({ wodId, photos, isAdmin, onChange }: { wodId: string; photos: W
       <h2 className="mb-2 text-lg font-black">📸 오늘의 기록</h2>
       {photos.length === 0 && <p className="card p-4 text-sm text-muted">수업이 끝나면 코치님이 화이트보드 사진을 올려줘요.</p>}
       <div className="grid grid-cols-2 gap-3">
-        {photos.map((p) =>
+        {shown.map((p, idx) =>
           p.url ? (
             <div key={p.id} className="card relative overflow-hidden">
               <button type="button" className="block w-full" onClick={() => setZoom(p.url)} aria-label="사진 크게 보기">
@@ -303,9 +328,22 @@ function Photos({ wodId, photos, isAdmin, onChange }: { wodId: string; photos: W
                 <img src={p.url} alt="화이트보드 기록 사진" className="aspect-[4/3] w-full object-cover" loading="lazy" />
               </button>
               {isAdmin && (
-                <button type="button" className="btn btn-sm btn-danger absolute right-2 top-2" onClick={() => remove(p.id)}>
-                  삭제
-                </button>
+                <>
+                  <button type="button" className="btn btn-sm btn-danger absolute right-2 top-2" onClick={() => remove(p.id)}>
+                    삭제
+                  </button>
+                  {shown.length > 1 && (
+                    <div className="absolute bottom-2 left-2 flex gap-1">
+                      <button type="button" className="btn btn-sm" disabled={idx === 0} onClick={() => move(p.id, -1)} aria-label="앞으로 옮기기">
+                        ◀
+                      </button>
+                      <span className="rounded bg-black/60 px-1.5 py-1 text-xs font-bold text-white">{idx + 1}</span>
+                      <button type="button" className="btn btn-sm" disabled={idx === shown.length - 1} onClick={() => move(p.id, 1)} aria-label="뒤로 옮기기">
+                        ▶
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ) : null,
@@ -313,15 +351,16 @@ function Photos({ wodId, photos, isAdmin, onChange }: { wodId: string; photos: W
       </div>
       {isAdmin && (
         <label className="btn btn-primary mt-3 w-full cursor-pointer">
-          {uploading ? '올리는 중…' : '+ 기록 사진 올리기'}
+          {uploading ? `올리는 중… ${uploading.done}/${uploading.total}` : '+ 기록 사진 올리기 (여러 장 선택 가능)'}
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
+            multiple
             className="sr-only"
-            disabled={uploading}
+            disabled={!!uploading}
             onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) upload(f);
+              const files = Array.from(e.target.files ?? []);
+              if (files.length) uploadMany(files);
               e.target.value = '';
             }}
           />
