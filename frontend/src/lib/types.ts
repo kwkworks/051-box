@@ -99,6 +99,7 @@ export type ChatMessage = {
   body: string;
   created_at: string;
   nickname: string;
+  role?: 'pending' | 'member' | 'admin';
 };
 
 export type ChatSession = { id: string; started_at: string; last_seen: string };

@@ -48,6 +48,7 @@ declare
   rm_first uuid;
   w_past uuid;
   w_future uuid;
+  anon_id uuid := gen_random_uuid();
   lock_before text;
   r text;
 begin
@@ -152,6 +153,25 @@ begin
   (43, '관리자는 미래 WOD 미리 보기 가능', 'ok:1', pg_temp.run_as(d, format('select * from public.wods where id = %L', w_future))),
   (44, '공개 시각 규칙: 모레 WOD는 항상 비공개', 'ok:false', 'ok:' || public.wod_visible(public.kst_today() + 2)::text);
   delete from public.wods where id in (w_past, w_future);
+
+  -- ---- 0005: 배포 전 보강 (닉네임 사칭, 하루 상한, 익명 가입)
+  insert into rls_results values
+  (45, '회원이 보이지 않는 문자가 섞인 닉네임으로 변경', 'err', pg_temp.run_as(a, format('update public.profiles set nickname = %L where id = %L', '관리' || chr(8203) || '자', a))),
+  (46, '회원이 관리자와 같은 닉네임(대소문자만 다르게)으로 변경', 'err', pg_temp.run_as(a, format('update public.profiles set nickname = %L where id = %L', upper((select nickname from public.profiles where id = d)) || '', a)));
+  -- 같은 날 1RM 20개를 채운 뒤 21번째는 거부
+  insert into public.one_rm_records (user_id, movement, is_custom, weight_kg)
+    select a, 'rls-test cap', true, 10 + g from generate_series(1, 20) g;
+  insert into rls_results values
+  (47, '하루 1RM 기록 21번째 (도배)', 'err', pg_temp.run_as(a, 'insert into public.one_rm_records (movement, is_custom, weight_kg) values (''rls-test cap'', true, 99)'));
+  insert into rls_results values
+  (49, '관리자가 회원의 1RM 기록 삭제', 'ok:1', pg_temp.run_as(d, format('delete from public.one_rm_records where id = (select id from public.one_rm_records where user_id = %L and movement = ''rls-test cap'' limit 1)', a)));
+  delete from public.one_rm_records where user_id = a and movement = 'rls-test cap';
+  -- 익명 로그인 계정은 회원 정보(승인 대기 목록)에 생기지 않는다
+  insert into auth.users (id, instance_id, aud, role, is_anonymous, raw_user_meta_data)
+  values (anon_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', true, '{}');
+  insert into rls_results values
+  (48, '익명 로그인 계정은 승인 대기 목록에 안 생김', 'ok:0', 'ok:' || (select count(*) from public.profiles where id = anon_id)::text);
+  delete from auth.users where id = anon_id;
 
   -- 도배 방지: 10초 안에 5개를 이미 보냈으면 6번째는 거부
   -- 앞 테스트에서 관리자가 보낸 메시지를 지우고, 정확히 5개를 채운 뒤 6번째를 시도한다

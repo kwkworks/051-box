@@ -29,6 +29,35 @@ adminRouter.patch('/members/:id', async (req, res) => {
   res.json({ member });
 });
 
+// 회원이 올린 기록 (관리자 정리용): 1RM 기록과 직접 만든 모임
+adminRouter.get('/members/:id/records', async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  const [oneRm, gatherings] = await Promise.all([
+    req.sb
+      .from('one_rm_records')
+      .select('id, movement, is_custom, weight_kg, achieved_on, created_at')
+      .eq('user_id', id)
+      .order('created_at', { ascending: false })
+      .limit(200),
+    req.sb
+      .from('events')
+      .select('id, title, starts_at, created_at')
+      .eq('created_by', id)
+      .eq('kind', 'gathering')
+      .order('created_at', { ascending: false })
+      .limit(100),
+  ]);
+  res.json({ oneRm: unwrap(oneRm), gatherings: unwrap(gatherings) });
+});
+
+// 회원의 1RM 기록 삭제 (PR 축하 글도 DB에서 함께 삭제)
+adminRouter.delete('/one-rm/:id', async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  const deleted = unwrap(await req.sb.from('one_rm_records').delete().eq('id', id).select('id'));
+  if (!deleted.length) throw new HttpError(404, '기록을 찾을 수 없습니다');
+  res.status(204).end();
+});
+
 adminRouter.get('/holidays', async (req, res) => {
   const holidays = unwrap(await req.sb.from('holidays').select('day, name').order('day').limit(1000));
   res.json({ holidays });

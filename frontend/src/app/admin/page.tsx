@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { AvatarView } from '@/components/AvatarView';
 import { BoardShell } from '@/components/BoardShell';
 import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { api } from '@/lib/api';
 import { formatDateLabel, formatRelative, kstToday } from '@/lib/format';
+import { movementLabel } from '@/lib/constants';
 import type { Me, Profile, Role } from '@/lib/types';
 import { useLoad } from '@/lib/useLoad';
 
@@ -23,7 +24,7 @@ function Admin({ me }: { me: Me }) {
     ['sheet', '구글 시트 WOD'],
   ] as const;
   return (
-    <BoardShell title="🔑 관리자" subtitle="가입 승인 · 휴무일 · 구글 시트 WOD">
+    <BoardShell title="🔑 관리자" subtitle="가입 승인 · 회원 기록 · 휴무일 · 구글 시트 WOD">
       <div className="mb-4 grid grid-cols-3 gap-2" role="tablist">
         {tabs.map(([key, label]) => (
           <button key={key} type="button" role="tab" aria-selected={tab === key} className={`btn ${tab === key ? 'btn-primary' : ''}`} onClick={() => setTab(key)}>
@@ -31,7 +32,12 @@ function Admin({ me }: { me: Me }) {
           </button>
         ))}
       </div>
-      {tab === 'members' && <Members myId={me.profile.id} />}
+      {tab === 'members' && (
+        <>
+          <AdminPowers />
+          <Members myId={me.profile.id} />
+        </>
+      )}
       {tab === 'holidays' && <Holidays />}
       {tab === 'sheet' && <SheetImport />}
       <p className="mt-6 text-xs text-muted">WOD, 공지, 대회는 각 게시판에서 바로 작성할 수 있어요.</p>
@@ -42,6 +48,7 @@ function Admin({ me }: { me: Me }) {
 function Members({ myId }: { myId: string }) {
   const { data, error, loading, reload } = useLoad(() => api.get<{ members: Profile[] }>('/admin/members'), 'members');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [recordsOf, setRecordsOf] = useState<string | null>(null);
 
   const setRole = async (m: Profile, role: Role) => {
     if (role === 'admin' && !confirm(`${m.nickname}님을 관리자로 지정할까요? 관리자는 모든 게시판과 회원을 관리할 수 있어요.`)) return;
@@ -119,8 +126,19 @@ function Members({ myId }: { myId: string }) {
           {m.role === 'admin' && (
             <button type="button" className="btn btn-sm" disabled={busyId === m.id} onClick={() => setRole(m, 'member')}>회원으로</button>
           )}
+          {m.role !== 'pending' && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              aria-expanded={recordsOf === m.id}
+              onClick={() => setRecordsOf((v) => (v === m.id ? null : m.id))}
+            >
+              📋 기록 관리
+            </button>
+          )}
         </div>
       )}
+      {recordsOf === m.id && <MemberRecords member={m} />}
     </li>
   );
 
@@ -136,6 +154,116 @@ function Members({ myId }: { myId: string }) {
       <h2 className="mb-2 font-black">회원 {others.length}명</h2>
       <ul className="card divide-y-2 divide-dashed divide-ink/15">{others.map(row)}</ul>
     </>
+  );
+}
+
+// 관리자가 할 수 있는 일을 한눈에
+function AdminPowers() {
+  const items = [
+    ['✅', '가입 승인 / 승인 취소', '아래 회원 목록의 "승인", "승인 취소" 버튼. 승인을 취소하면 다시 승인 대기 상태가 되어 게시판을 볼 수 없어요.'],
+    ['🔑', '관리자 지정 / 해제', '"관리자로", "회원으로" 버튼 (내 권한은 바꿀 수 없어요)'],
+    ['📋', '회원 기록 삭제', '"기록 관리"에서 회원이 올린 1RM 기록(PR 축하 글 포함)과 모임 글을 지울 수 있어요.'],
+    ['🚫', '채팅 제한 / 전체 잠금', '회원별 1시간·오늘 제한, 아래 "채팅 전체 잠금". 박스 채팅창에서 메시지를 직접 지울 수도 있어요.'],
+    ['📝', 'WOD · 공지 · 대회', '각 게시판에서 바로 작성·수정·삭제해요.'],
+  ];
+  return (
+    <details className="card mb-4 p-4">
+      <summary className="cursor-pointer font-black">🔑 관리자가 할 수 있는 일</summary>
+      <ul className="mt-3 flex flex-col gap-2 text-sm">
+        {items.map(([icon, title, desc]) => (
+          <li key={title} className="flex gap-2">
+            <span aria-hidden>{icon}</span>
+            <span>
+              <b>{title}</b>
+              <span className="block text-muted">{desc}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+type MemberRecordsData = {
+  oneRm: { id: string; movement: string; is_custom: boolean; weight_kg: number; achieved_on: string }[];
+  gatherings: { id: string; title: string; starts_at: string }[];
+};
+
+// 회원이 올린 기록을 보고 지운다 (1RM을 지우면 명예의 벽 PR 글도 함께 지워진다)
+function MemberRecords({ member }: { member: Profile }) {
+  const { data, error, loading, reload } = useLoad(
+    () => api.get<MemberRecordsData>(`/admin/members/${member.id}/records`),
+    `records-${member.id}`,
+  );
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const remove = async (what: string, path: string, id: string) => {
+    if (!confirm(`${member.nickname}님의 ${what}을(를) 삭제할까요? 되돌릴 수 없어요.`)) return;
+    setBusy(id);
+    try {
+      await api.del(path);
+      await reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '삭제하지 못했어요');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="w-full rounded-md border-2 border-dashed border-ink/20 bg-[var(--bg)] p-3 text-sm">
+      {loading && !data && <Loading />}
+      {error && <ErrorBox message={error} onRetry={reload} />}
+      {data && (
+        <>
+          <p className="mb-1 font-black">🏋️ 1RM 기록 {data.oneRm.length}개</p>
+          {data.oneRm.length === 0 ? (
+            <p className="mb-3 text-muted">기록이 없어요</p>
+          ) : (
+            <ul className="mb-3 flex flex-col gap-1">
+              {data.oneRm.map((r) => (
+                <li key={r.id} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate">
+                    {movementLabel(r.movement, r.is_custom)} <b>{Number(r.weight_kg)}kg</b>{' '}
+                    <span className="text-xs text-muted">{formatDateLabel(r.achieved_on)}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-danger"
+                    disabled={busy === r.id}
+                    onClick={() => remove('1RM 기록', `/admin/one-rm/${r.id}`, r.id)}
+                  >
+                    삭제
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mb-1 font-black">🍻 만든 모임 {data.gatherings.length}개</p>
+          {data.gatherings.length === 0 ? (
+            <p className="text-muted">모임 글이 없어요</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {data.gatherings.map((g) => (
+                <Fragment key={g.id}>
+                  <li className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate">{g.title}</span>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-danger"
+                      disabled={busy === g.id}
+                      onClick={() => remove('모임 글', `/events/${g.id}`, g.id)}
+                    >
+                      삭제
+                    </button>
+                  </li>
+                </Fragment>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 

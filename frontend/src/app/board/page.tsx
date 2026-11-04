@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { BoardShell } from '@/components/BoardShell';
 import { Guard } from '@/components/Guard';
 import { InstallHint } from '@/components/InstallHint';
+import { InviteButton } from '@/components/InviteButton';
 import { BOARDS, type BoardKey } from '@/game/map';
 import { formatDateLabel } from '@/lib/format';
 import type { Me } from '@/lib/types';
@@ -65,6 +66,11 @@ function Hub({ me }: { me: Me }) {
           </li>
         ))}
       </ul>
+      <section className="card mt-6 flex flex-col gap-2 p-4">
+        <h2 className="font-black">📨 박스 회원 초대하기</h2>
+        <p className="text-sm text-muted">카카오톡 등으로 051 BOX 주소를 보내요. 가입한 사람은 관리자 승인 후 이용할 수 있어요.</p>
+        <InviteButton className="btn btn-primary h-12 text-base" />
+      </section>
       <InstallHint />
     </BoardShell>
   );

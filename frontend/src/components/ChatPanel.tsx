@@ -269,6 +269,11 @@ export const ChatPanel = forwardRef<
               )}
               <p className={`group break-words py-0.5 text-[13px] leading-snug ${sid !== currentSessionId ? 'opacity-70' : ''}`}>
                 <span className="mr-1 text-[11px] text-white/50">{time(m.created_at)}</span>
+                {m.role === 'admin' && (
+                  <span className="mr-1 rounded bg-yellow px-1 text-[10px] font-black text-ink" title="관리자">
+                    관리자
+                  </span>
+                )}
                 <span className={`mr-1 font-bold ${m.user_id === myId ? 'text-yellow' : 'text-sky-300'}`}>{m.nickname}</span>
                 {m.body}
                 {(m.user_id === myId || canModerate) && open && (

@@ -33,10 +33,18 @@ export async function fetchSheetCsv(sheetUrl) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10_000);
   try {
-    const res = await fetch(sheetUrl, { signal: controller.signal, redirect: 'follow' });
-    const finalHost = new URL(res.url).hostname;
-    if (finalHost !== 'docs.google.com' && !finalHost.endsWith('.googleusercontent.com')) {
-      throw new HttpError(400, '구글 시트가 아닌 곳으로 연결되어 중단했어요');
+    // 리다이렉트는 자동으로 따라가지 않고, 매번 구글 주소인지 확인한 뒤 최대 3번까지만 따라간다
+    const allowed = (u) =>
+      u.protocol === 'https:' && (u.hostname === 'docs.google.com' || u.hostname.endsWith('.googleusercontent.com'));
+    let target = new URL(sheetUrl);
+    let res;
+    for (let hop = 0; ; hop++) {
+      if (!allowed(target)) throw new HttpError(400, '구글 시트가 아닌 곳으로 연결되어 중단했어요');
+      res = await fetch(target, { signal: controller.signal, redirect: 'manual' });
+      if (res.status < 300 || res.status >= 400) break;
+      const next = res.headers.get('location');
+      if (!next || hop >= 3) throw new HttpError(400, '시트를 읽지 못했어요. "웹에 게시"가 되어 있는지 확인해주세요');
+      target = new URL(next, target);
     }
     if (!res.ok) throw new HttpError(400, '시트를 읽지 못했어요. "웹에 게시"가 되어 있는지 확인해주세요');
     const type = res.headers.get('content-type') ?? '';

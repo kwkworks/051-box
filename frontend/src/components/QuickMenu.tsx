@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { BOARDS } from '@/game/map';
 import { useAuth } from './AuthProvider';
+import { InviteButton } from './InviteButton';
 
 const ITEMS = [
   { href: '/', label: '박스 공간', icon: '🏠' },
@@ -61,6 +62,10 @@ export function QuickMenu() {
               관리자
             </Link>
           )}
+          <InviteButton
+            compact
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-bold hover:bg-[var(--bg)]"
+          />
           <button
             type="button"
             onClick={() => signOut()}

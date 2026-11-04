@@ -32,6 +32,10 @@ export function fromDbError(error) {
   if (error.code === 'P0001' && SAFE_DB_MESSAGES.has(error.message)) {
     return new HttpError(400, error.message);
   }
+  // 하루 등록 상한 (DB가 개수를 넣어서 보낸다: "오늘은 더 등록할 수 없어요 (하루 N개까지)")
+  if (error.code === 'P0001' && /^오늘은 더 등록할 수 없어요 \(하루 \d+개까지\)$/.test(error.message)) {
+    return new HttpError(429, error.message);
+  }
   if (error.code === 'PGRST116') return new HttpError(404, '찾을 수 없습니다');
   console.error('[db]', error.code, error.message);
   return new HttpError(500, '요청을 처리하지 못했습니다');

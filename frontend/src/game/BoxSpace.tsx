@@ -347,6 +347,19 @@ export function BoxSpace({
     };
 
     // 새 채팅 (DB에 저장된 것만 실시간으로 받는다. 받는 사람에게도 RLS가 적용된다)
+    // 채팅 이름·역할은 다른 회원이 보내는 실시간 정보(위조 가능)가 아니라 DB 회원 정보에서 가져온다
+    const people = new Map<string, Promise<{ nickname: string; role: ChatMessage['role'] }>>();
+    const whoIs = (userId: string) => {
+      let p = people.get(userId);
+      if (!p) {
+        p = Promise.resolve(supabase.from('profiles').select('nickname, role').eq('id', userId).maybeSingle()).then(({ data }) => ({
+          nickname: cleanText(data?.nickname, 16) || '회원',
+          role: data?.role === 'admin' ? 'admin' : 'member',
+        }));
+        people.set(userId, p);
+      }
+      return p;
+    };
     const onChatInsert = (row: Record<string, unknown>) => {
       const id = String(row.id ?? '');
       const userId = String(row.user_id ?? '');
@@ -354,9 +367,11 @@ export function BoxSpace({
       if (!UUID.test(id) || !UUID.test(userId) || !body) return;
       const speaker = userId === me.id ? me : peers.get(userId);
       if (speaker && userId !== me.id) bubble(speaker, body);
-      callbacks.current.onChat?.({
-        id, user_id: userId, body, created_at: String(row.created_at ?? new Date().toISOString()),
-        nickname: speaker?.nickname ?? '회원',
+      whoIs(userId).then(({ nickname, role }) => {
+        if (disposed) return;
+        callbacks.current.onChat?.({
+          id, user_id: userId, body, created_at: String(row.created_at ?? new Date().toISOString()), nickname, role,
+        });
       });
     };
 

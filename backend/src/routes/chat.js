@@ -22,7 +22,7 @@ chatRouter.get('/', async (req, res) => {
   const [rows, sessions, locked] = await Promise.all([
     req.sb
       .from('chat_messages')
-      .select('id, user_id, body, created_at, profiles(nickname)')
+      .select('id, user_id, body, created_at, profiles(nickname, role)')
       .order('created_at', { ascending: false })
       .limit(300),
     req.sb.from('chat_sessions').select('id, started_at, last_seen').order('started_at'),
@@ -31,7 +31,7 @@ chatRouter.get('/', async (req, res) => {
   res.json({
     messages: unwrap(rows)
       .reverse()
-      .map(({ profiles, ...m }) => ({ ...m, nickname: profiles?.nickname ?? '알 수 없음' })),
+      .map(({ profiles, ...m }) => ({ ...m, nickname: profiles?.nickname ?? '알 수 없음', role: profiles?.role ?? 'member' })),
     sessions: unwrap(sessions),
     locked: Boolean(unwrap(locked)),
     mutedUntil: req.profile.chat_muted_until ?? null,
@@ -43,7 +43,7 @@ chatRouter.post('/', async (req, res) => {
   const message = unwrap(
     await req.sb.from('chat_messages').insert({ body }).select('id, user_id, body, created_at').single(),
   );
-  res.status(201).json({ message: { ...message, nickname: req.profile.nickname } });
+  res.status(201).json({ message: { ...message, nickname: req.profile.nickname, role: req.profile.role } });
 });
 
 // 본인 메시지 또는 관리자(부적절한 메시지 정리)

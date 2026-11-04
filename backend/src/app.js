@@ -39,25 +39,32 @@ export function createApp() {
   // 핑(외부 모니터)과 "서버 깨우기"용. 인증 없이 상태만 알려준다.
   app.get('/health', (req, res) => res.json({ ok: true }));
 
+  const tooMany = { error: '요청이 너무 많아요. 잠시 후 다시 시도해주세요' };
+  // 1) 로그인 전 IP 기준: 같은 박스 와이파이를 여러 회원이 함께 써도 막히지 않게 넉넉히 (무차별 요청만 차단)
   app.use(
     rateLimit({
       windowMs: 15 * 60 * 1000,
-      limit: 600,
+      limit: 5000,
       standardHeaders: 'draft-8',
       legacyHeaders: false,
-      message: { error: '요청이 너무 많아요. 잠시 후 다시 시도해주세요' },
+      message: tooMany,
     }),
   );
-  const writeLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    limit: 60,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-    skip: (req) => req.method === 'GET',
-    message: { error: '요청이 너무 많아요. 잠시 후 다시 시도해주세요' },
-  });
+  // 2) 로그인 후 회원 계정 기준 (IP를 공유해도 서로 영향 없음)
+  const perUser = (opts) =>
+    rateLimit({
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      message: tooMany,
+      keyGenerator: (req) => req.userId,
+      ...opts,
+    });
+  const isPing = (req) => /^\/chat\/session\/[^/]+\/ping$/.test(req.path);
+  const userLimiter = perUser({ windowMs: 15 * 60 * 1000, limit: 900 });
+  // 접속 유지 신호(30초마다)는 쓰기 제한에서 뺀다
+  const writeLimiter = perUser({ windowMs: 60 * 1000, limit: 60, skip: (req) => req.method === 'GET' || isPing(req) });
 
-  app.use(requireAuth, writeLimiter);
+  app.use(requireAuth, userLimiter, writeLimiter);
   app.use('/me', meRouter);
   app.use('/wods', requireMember, wodsRouter);
   app.use('/notices', requireMember, noticesRouter);
