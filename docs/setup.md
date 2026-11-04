@@ -78,3 +78,15 @@ claude mcp add --scope project --transport http supabase "https://mcp.supabase.c
 
 - 처음 사용할 때 브라우저에서 Supabase 로그인으로 권한을 승인한다.
 - 운영 데이터가 생긴 뒤에는 읽기 전용(`&read_only=true`)으로 쓰는 것을 권장한다.
+
+## 푸시 알림 설정 (2026-11-04)
+비공개 키와 비밀값은 각 서비스에 직접 넣고, 다른 곳(채팅, 문서, GitHub)에 남기지 않는다.
+
+1. 키 만들기 (내 컴퓨터): `npx web-push generate-vapid-keys` → Public/Private Key, `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` → PUSH_SECRET
+2. Render 환경변수: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`(이메일 또는 mailto:이메일), `PUSH_SECRET` → 로그에 `[push] 푸시 알림 준비 완료`
+3. Vercel 환경변수: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`(공개 키) → Redeploy
+4. Supabase SQL: `insert into private.settings (key, value) values ('push_secret_sha256', encode(extensions.digest('<PUSH_SECRET>', 'sha256'), 'hex')) on conflict (key) do update set value = excluded.value;` (해시만 저장)
+5. Supabase SQL: `supabase/migrations/0011_wod_push_schedule.sql` (매일 20:25 깨우기 · 20:30 발송 · 20:35 예비)
+6. 앱: 게시판 → 🔔 알림 설정 → 이 기기에서 알림 받기 → 테스트 알림
+
+키를 바꿀 때는 2~4를 같은 값으로 다시 하고, 회원들은 알림을 한 번 껐다 켜야 한다 (기존 구독은 예전 공개 키에 묶여 있음).
