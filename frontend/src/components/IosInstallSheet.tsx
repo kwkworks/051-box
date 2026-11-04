@@ -1,6 +1,5 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
 import { useSyncExternalStore } from 'react';
 import { openInBrowser } from './InstallHint';
 import { detectInstallEnv, isIos, isIpad, safariMajor } from '@/lib/installEnv';
@@ -12,6 +11,9 @@ const EVENT = 'box-install-sheet';
 type Mode = 'none' | 'kakao' | 'classic' | 'ios26' | 'ipad';
 
 function readMode(): Mode {
+  // 인쇄용 포스터와 로그인 처리 화면에서는 띄우지 않는다
+  const path = window.location.pathname;
+  if (path === '/poster' || path.startsWith('/auth')) return 'none';
   const env = detectInstallEnv();
   try {
     const closed = Number(localStorage.getItem(KEY) ?? 0);
@@ -26,9 +28,14 @@ function readMode(): Mode {
 function subscribe(cb: () => void) {
   window.addEventListener(EVENT, cb);
   window.addEventListener('storage', cb);
+  window.addEventListener('popstate', cb);
+  // 화면 이동(포스터 페이지 등)도 다시 확인
+  const timer = setInterval(cb, 1000);
   return () => {
     window.removeEventListener(EVENT, cb);
     window.removeEventListener('storage', cb);
+    window.removeEventListener('popstate', cb);
+    clearInterval(timer);
   };
 }
 
@@ -60,9 +67,8 @@ function Arrow({ up = false }: { up?: boolean }) {
 // 아이폰 사파리로 처음 들어오면 공유 버튼 위치를 화살표로 가리키며 "홈 화면에 추가"를 안내한다.
 // 카카오톡 안에서 열었으면 먼저 사파리(안드로이드는 크롬)로 옮기게 한다. 앱으로 열었거나 닫으면 3일간 숨김.
 export function IosInstallSheet() {
-  const pathname = usePathname();
   const mode = useSyncExternalStore(subscribe, readMode, () => 'none' as Mode);
-  if (mode === 'none' || pathname === '/poster' || pathname.startsWith('/auth')) return null;
+  if (mode === 'none') return null;
 
   const steps =
     mode === 'classic'
