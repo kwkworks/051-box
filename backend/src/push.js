@@ -4,12 +4,22 @@ import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
 import { config } from './config.js';
 
-const enabled = Boolean(config.vapidPublicKey && config.vapidPrivateKey && config.pushSecret);
-if (enabled) {
-  webpush.setVapidDetails(config.vapidSubject, config.vapidPublicKey, config.vapidPrivateKey);
-} else {
-  console.warn('[push] VAPID 키 또는 PUSH_SECRET이 없어 푸시 알림을 보내지 않습니다');
+// 키 값이 잘못돼도 서버 전체가 멈추지 않게: 알림만 끄고 이유를 로그에 남긴다 (키 값 자체는 남기지 않음)
+function setupVapid() {
+  if (!(config.vapidPublicKey && config.vapidPrivateKey && config.pushSecret)) {
+    console.warn('[push] VAPID 키 또는 PUSH_SECRET이 없어 푸시 알림을 보내지 않습니다');
+    return false;
+  }
+  try {
+    webpush.setVapidDetails(config.vapidSubject, config.vapidPublicKey, config.vapidPrivateKey);
+    console.log('[push] 푸시 알림 준비 완료');
+    return true;
+  } catch (e) {
+    console.error(`[push] 알림 키 설정이 올바르지 않아 알림을 끕니다: ${e?.message}`);
+    return false;
+  }
 }
+const enabled = setupVapid();
 
 // 로그인 없이(공개 키) 부르는 서버 전용 클라이언트. DB 함수가 비밀값을 확인한다
 const sb = createClient(config.supabaseUrl, config.supabasePublishableKey, {

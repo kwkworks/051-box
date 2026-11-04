@@ -9,6 +9,16 @@ function required(name) {
   return value;
 }
 
+function clean(v) {
+  return (v ?? '').trim().replace(/^["']|["']$/g, '').trim();
+}
+// "you@gmail.com"만 넣어도 동작하게 mailto:를 붙인다
+function subject(v) {
+  if (!v) return 'mailto:admin@051box.invalid';
+  if (/^(mailto:|https:\/\/)/.test(v)) return v;
+  return v.includes('@') ? `mailto:${v}` : v;
+}
+
 export const config = {
   port: Number(process.env.PORT ?? 4000),
   supabaseUrl: required('SUPABASE_URL'),
@@ -20,10 +30,11 @@ export const config = {
     .filter(Boolean),
   isProduction: process.env.NODE_ENV === 'production',
   // 푸시 알림 (선택). 없으면 알림만 보내지 않는다. 비공개 키와 PUSH_SECRET은 Render 환경변수에만 둔다
-  vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? '',
-  vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? '',
-  vapidSubject: process.env.VAPID_SUBJECT ?? 'mailto:admin@051box.invalid',
-  pushSecret: process.env.PUSH_SECRET ?? '',
+  // 복사할 때 따라온 공백·따옴표는 지운다
+  vapidPublicKey: clean(process.env.VAPID_PUBLIC_KEY),
+  vapidPrivateKey: clean(process.env.VAPID_PRIVATE_KEY),
+  vapidSubject: subject(clean(process.env.VAPID_SUBJECT)),
+  pushSecret: clean(process.env.PUSH_SECRET),
 };
 
 if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
