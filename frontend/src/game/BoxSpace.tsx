@@ -24,6 +24,7 @@ type Player = {
   pose: Pose;
   running: boolean;
   jumpStart?: number;
+  seenAt?: number; // 마지막으로 접속 신호를 받은 시각
   chat?: string;
   chatUntil?: number;
 };
@@ -67,6 +68,9 @@ const POSES: Pose[] = ['stand', 'sit', 'dance'];
 const SPRITE_SCALE = 1.4;
 const BUBBLE_MAX = 60;
 const POS_KEY = 'box-space-pos';
+// 접속 목록에서 잠깐 빠져도(신호 갱신 중) 바로 지우지 않는다. 이 시간 넘게 없으면 나간 것으로 본다
+const LEAVE_GRACE_MS = 10_000;
+const TRACK_MIN_MS = 10_000; // 접속 신호(presence) 재전송 최소 간격 (무료 요금제 초당 20건 한도)
 const DIRS: Dir[] = ['down', 'up', 'left', 'right'];
 const UUID = /^[0-9a-f-]{36}$/i;
 
@@ -166,6 +170,7 @@ export function BoxSpace({
     // 플로팅 조이스틱 (휴대폰): 누른 자리에 생기고, 밀면 이동. 짧게 탭하면 기존처럼 그 자리로 이동
     let joy: { id: number; sx: number; sy: number; cx: number; cy: number; active: boolean } | null = null;
     let channel: RealtimeChannel | null = null;
+    let presentIds = new Set<string>();
     let subscribed = false; // 채널 연결이 끝난 뒤에만 보낸다
     let disposed = false;
 
@@ -327,8 +332,14 @@ export function BoxSpace({
       if (!channel) return;
       const state = channel.presenceState<Record<string, unknown>>();
       const ids = new Set(Object.keys(state));
+      presentIds = ids;
       setOnline(Math.max(1, ids.size));
-      for (const id of [...peers.keys()]) if (!ids.has(id)) peers.delete(id);
+      const now = performance.now();
+      // 신호를 갱신하는 순간 잠깐 목록에서 빠질 수 있어서, 바로 지우지 않고 잠시 기다린다 (깜빡임 방지)
+      for (const [id, p] of peers) {
+        if (ids.has(id)) p.seenAt = now;
+        else if (now - (p.seenAt ?? 0) > LEAVE_GRACE_MS) peers.delete(id);
+      }
       for (const [id, metas] of Object.entries(state)) {
         if (id === me.id) continue;
         const meta = metas[metas.length - 1] as Record<string, unknown>;
@@ -343,7 +354,7 @@ export function BoxSpace({
         } else {
           peers.set(id, {
             id, nickname, avatar, x: pos.x, y: pos.y, tx: pos.x, ty: pos.y, dir: pos.dir,
-            moving: false, pose: pos.pose, running: false,
+            moving: false, pose: pos.pose, running: false, seenAt: now,
           });
         }
       }
@@ -409,6 +420,7 @@ export function BoxSpace({
           const p = peers.get(String(payload?.id));
           const pos = payload && readPeer(payload);
           if (!p || !pos) return;
+          p.seenAt = performance.now();
           p.tx = pos.x;
           p.ty = pos.y;
           p.dir = pos.dir;
@@ -521,6 +533,10 @@ export function BoxSpace({
         });
       }
 
+      // 오래 신호가 없는(나간) 회원 정리
+      for (const [id, p] of peers) {
+        if (!presentIds.has(id) && now - (p.seenAt ?? 0) > LEAVE_GRACE_MS) peers.delete(id);
+      }
       // 다른 회원은 부드럽게 따라가게
       for (const p of peers.values()) {
         p.x += (p.tx - p.x) * Math.min(1, dt * 10);
@@ -655,7 +671,19 @@ export function BoxSpace({
     };
     const saveTimer = setInterval(savePos, 2000);
     // 늦게 들어온 회원도 현재 위치를 보게 presence를 가끔 갱신
-    const presenceTimer = setInterval(() => subscribed && channel?.track(presencePayload()), 5000);
+    // 위치·자세가 바뀌었을 때만, 10초에 한 번까지 (계속 다시 보내면 다른 회원 화면에서 깜빡인다)
+    let trackedKey = '';
+    let trackedAt = 0;
+    const presenceTimer = setInterval(() => {
+      if (!subscribed || !channel) return;
+      const payload = presencePayload();
+      const key = JSON.stringify(payload);
+      const t = performance.now();
+      if (key === trackedKey || t - trackedAt < TRACK_MIN_MS) return;
+      trackedKey = key;
+      trackedAt = t;
+      channel.track(payload);
+    }, 2000);
 
     return () => {
       disposed = true;
