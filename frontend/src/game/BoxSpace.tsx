@@ -7,8 +7,9 @@ import { supabase } from '@/lib/supabase';
 import type { ChatMessage, Profile } from '@/lib/types';
 import { SPRITE_H, drawAvatar, type Dir, type Pose } from './avatar';
 import {
-  OBJECT_LABELS, SPAWN, WORLD_H, WORLD_W, collides, drawObjectHint, drawStaticMap, findPath, isNear,
-  nearbyBoard, objectAt, type ObjectKey,
+  GEAR, GEAR_KEYS, OBJECT_LABELS, SPAWN, WORLD_H, WORLD_W, collides, drawGear, drawObjectHint, drawStaticMap,
+  drawStationHint, findPath, isNear, isNearStation, nameAt, nearbyBoard, nearbyStation, objectAt, stationAt,
+  type GearKey, type ObjectKey,
 } from './map';
 
 type Player = {
@@ -24,6 +25,8 @@ type Player = {
   pose: Pose;
   running: boolean;
   jumpStart?: number;
+  hold: GearKey | null; // 들고 있는 운동기구
+  liftStart?: number; // 기구 들어올리기 시작 시각
   chat?: string;
   chatUntil?: number;
 };
@@ -37,7 +40,10 @@ export type BoxSpaceHandle = {
   zoomBy: (dir: 1 | -1) => number;
 };
 
-export type Action = 'jump' | 'sit' | 'dance' | 'run';
+export type Action = 'jump' | 'sit' | 'dance' | 'run' | 'grab';
+export type ActionState = { pose: Pose; running: boolean; hold: GearKey | null };
+
+const LIFT_MS = 700;
 
 const SPEED = 150; // 초당 이동 픽셀
 const RUN_SPEED = 260;
@@ -78,7 +84,8 @@ function readPeer(raw: Record<string, unknown>) {
   if (x === null || y === null) return null;
   const dir = DIRS.includes(raw.dir as Dir) ? (raw.dir as Dir) : 'down';
   const pose = POSES.includes(raw.pose as Pose) ? (raw.pose as Pose) : 'stand';
-  return { x, y, dir, moving: raw.moving === true, pose, running: raw.running === true };
+  const hold = GEAR_KEYS.includes(raw.hold as GearKey) ? (raw.hold as GearKey) : null;
+  return { x, y, dir, moving: raw.moving === true, pose, running: raw.running === true, hold };
 }
 
 function cleanText(v: unknown, max: number) {
@@ -105,7 +112,7 @@ export function BoxSpace({
   profile: Profile;
   onOpen: (target: ObjectKey) => void;
   onNearbyChange?: (target: ObjectKey | null) => void;
-  onActionState?: (state: { pose: Pose; running: boolean }) => void;
+  onActionState?: (state: ActionState) => void;
   onChat?: (message: ChatMessage) => void;
   onRequestChat?: () => void;
   handleRef?: React.RefObject<BoxSpaceHandle | null>;
@@ -113,6 +120,8 @@ export function BoxSpace({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [nearby, setNearby] = useState<ObjectKey | null>(null);
+  const [gearUi, setGearUi] = useState<{ station: GearKey | null; hold: GearKey | null }>({ station: null, hold: null });
+  const grabRef = useRef<() => void>(() => {});
   const [online, setOnline] = useState(1);
   const [connection, setConnection] = useState<'connecting' | 'online' | 'offline'>('connecting');
   const [connError, setConnError] = useState<string | null>(null);
@@ -137,6 +146,7 @@ export function BoxSpace({
     const me: Player = {
       id: profile.id, nickname: profile.nickname, avatar: JSON.parse(avatarKey) as Avatar,
       x: start.x, y: start.y, tx: start.x, ty: start.y, dir: 'up', moving: false, pose: 'stand', running: false,
+      hold: null,
     };
     const peers = new Map<string, Player>();
     const keys = new Set<string>();
@@ -155,6 +165,9 @@ export function BoxSpace({
     let lastSent = 0;
     let lastSentKey = '';
     let currentNearby: ObjectKey | null = null;
+    let currentStation: GearKey | null = null;
+    let pendingGear: GearKey | null = null; // 기구 자리를 누르면 걸어가서 집는다
+    let flash: { text: string; x: number; y: number; until: number } | null = null; // 누른 구조물 이름
     let runToggle = false; // 모바일: 달리기 켜기/끄기
     let channel: RealtimeChannel | null = null;
     let subscribed = false; // 채널 연결이 끝난 뒤에만 보낸다
@@ -164,12 +177,36 @@ export function BoxSpace({
       p.chat = cleanText(text, BUBBLE_MAX);
       p.chatUntil = performance.now() + 6000;
     };
-    const sendAct = (type: 'jump') => {
+    const sendAct = (type: 'jump' | 'lift') => {
       if (subscribed) channel?.send({ type: 'broadcast', event: 'act', payload: { id: me.id, type } });
     };
-    const notify = () => callbacks.current.onActionState?.({ pose: me.pose, running: runToggle });
+    const notify = () => {
+      callbacks.current.onActionState?.({ pose: me.pose, running: runToggle, hold: me.hold });
+      setGearUi({ station: currentStation, hold: me.hold });
+    };
+    // 기구 집기/내려놓기: 들고 있으면 내려놓고(제자리로), 기구 자리 옆이면 집는다
+    const grab = (gear: GearKey | null = currentStation) => {
+      if (me.hold && (!gear || gear === me.hold)) me.hold = null;
+      else if (gear) me.hold = gear;
+      else return;
+      if (me.pose === 'sit') me.pose = 'stand';
+      lastSentKey = '';
+      notify();
+    };
+    grabRef.current = () => grab();
     const act = (action: Action) => {
       const now = performance.now();
+      if (action === 'grab') {
+        grab(me.hold ?? currentStation); // 메뉴의 "내려놓기"는 항상 내려놓는다
+        return;
+      }
+      if (action === 'jump' && me.hold) {
+        // 기구를 들고 있으면 점프 대신 머리 위로 들어올리기
+        if (me.liftStart && now - me.liftStart < LIFT_MS) return;
+        me.liftStart = now;
+        sendAct('lift');
+        return;
+      }
       if (action === 'jump') {
         if (me.jumpStart && now - me.jumpStart < JUMP_MS) return;
         me.jumpStart = now;
@@ -242,6 +279,9 @@ export function BoxSpace({
       } else if (e.code === 'KeyE' && currentNearby) {
         e.preventDefault();
         callbacks.current.onOpen(currentNearby);
+      } else if ((e.code === 'KeyE' || e.code === 'KeyF') && !e.repeat && (currentStation || me.hold)) {
+        e.preventDefault();
+        grab();
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
@@ -267,12 +307,22 @@ export function BoxSpace({
         callbacks.current.onOpen(target);
         return;
       }
+      const gear = target ? null : stationAt(wx, wy);
+      if (gear && isNearStation(gear, me.x, me.y)) {
+        grab(gear);
+        return;
+      }
+      if (!target && !gear) {
+        const named = nameAt(wx, wy);
+        if (named) flash = { text: named.name, x: named.x, y: named.y, until: performance.now() + 1800 };
+      }
       pendingOpen = target;
+      pendingGear = gear;
       path = findPath(me.x, me.y, wx, wy);
     };
     const onHover = (e: PointerEvent) => {
       const { wx, wy } = toWorld(e);
-      canvas.style.cursor = objectAt(wx, wy) ? 'pointer' : 'default';
+      canvas.style.cursor = objectAt(wx, wy) || stationAt(wx, wy) ? 'pointer' : 'default';
     };
     canvas.addEventListener('pointerdown', onPointer);
     canvas.addEventListener('pointermove', onHover);
@@ -280,6 +330,7 @@ export function BoxSpace({
     // ---- 실시간 (비공개 채널: 승인된 회원만 접속 가능)
     const presencePayload = () => ({
       nickname: me.nickname, avatar: me.avatar, x: Math.round(me.x), y: Math.round(me.y), dir: me.dir, pose: me.pose,
+      hold: me.hold,
     });
 
     const syncPresence = () => {
@@ -299,10 +350,11 @@ export function BoxSpace({
         if (existing) {
           existing.nickname = nickname;
           existing.avatar = avatar;
+          existing.hold = pos.hold;
         } else {
           peers.set(id, {
             id, nickname, avatar, x: pos.x, y: pos.y, tx: pos.x, ty: pos.y, dir: pos.dir,
-            moving: false, pose: pos.pose, running: false,
+            moving: false, pose: pos.pose, running: false, hold: pos.hold,
           });
         }
       }
@@ -359,10 +411,12 @@ export function BoxSpace({
           p.moving = pos.moving;
           p.pose = pos.pose;
           p.running = pos.running;
+          p.hold = pos.hold;
         })
         .on('broadcast', { event: 'act' }, ({ payload }) => {
           const p = peers.get(String(payload?.id));
           if (p && payload?.type === 'jump') p.jumpStart = performance.now();
+          if (p && payload?.type === 'lift' && p.hold) p.liftStart = performance.now();
         })
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) =>
           onChatInsert(payload.new as Record<string, unknown>),
@@ -440,7 +494,7 @@ export function BoxSpace({
       }
 
       // 위치 전송 (초당 최대 10회, 바뀌었을 때만)
-      const sendKey = `${Math.round(me.x)},${Math.round(me.y)},${me.dir},${me.moving},${me.pose},${me.running}`;
+      const sendKey = `${Math.round(me.x)},${Math.round(me.y)},${me.dir},${me.moving},${me.pose},${me.running},${me.hold}`;
       if (channel && subscribed && now - lastSent > 100 && sendKey !== lastSentKey) {
         lastSent = now;
         lastSentKey = sendKey;
@@ -448,7 +502,7 @@ export function BoxSpace({
           type: 'broadcast', event: 'move',
           payload: {
             id: me.id, x: Math.round(me.x), y: Math.round(me.y), dir: me.dir,
-            moving: me.moving, pose: me.pose, running: me.running,
+            moving: me.moving, pose: me.pose, running: me.running, hold: me.hold,
           },
         });
       }
@@ -464,6 +518,15 @@ export function BoxSpace({
         currentNearby = near;
         setNearby(near);
         callbacks.current.onNearbyChange?.(near);
+      }
+      const station = nearbyStation(me.x, me.y);
+      if (station !== currentStation) {
+        currentStation = station;
+        setGearUi({ station, hold: me.hold });
+      }
+      if (pendingGear && !path.length) {
+        if (isNearStation(pendingGear, me.x, me.y)) grab(pendingGear);
+        pendingGear = null;
       }
       // 클릭한 오브젝트에 도착하면 연다
       if (pendingOpen && !path.length) {
@@ -485,6 +548,7 @@ export function BoxSpace({
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(bg, 0, 0);
       if (near) drawObjectHint(ctx, near, now);
+      else if (station) drawStationHint(ctx, station, now);
 
       const everyone = [...peers.values(), me].sort((a, b) => a.y - b.y);
       const frame = (p: Player) =>
@@ -500,10 +564,21 @@ export function BoxSpace({
         const bounce = p.pose === 'dance' && !j.air ? Math.abs(Math.sin(now / 130)) * 3 : 0;
         const lift = j.lift + bounce;
         lifts.set(p.id, lift);
+        const liftT = p.liftStart ? now - p.liftStart : LIFT_MS;
+        const lifting = p.hold !== null && liftT < LIFT_MS;
+        const dir = p.pose === 'dance' ? 'down' : p.dir;
+        const side = dir === 'left' || dir === 'right';
+        // 손 위치: 평소엔 허리 높이, 들어올리면 머리 위
+        const up = lifting ? Math.sin((Math.PI * liftT) / LIFT_MS) : 0;
+        const handY = p.y - lift - 14 * SPRITE_SCALE - up * 22 * SPRITE_SCALE;
+        const handX = p.x + (side ? (dir === 'right' ? 9 : -9) : 0);
+        if (lifting) lifts.set(p.id, lift + up * 16); // 머리 위 기구가 이름표를 가리지 않게
+        if (p.hold && dir === 'up') drawGear(ctx, p.hold, handX, handY, side);
         drawAvatar(
-          ctx, p.avatar, p.x, p.y, p.pose === 'dance' ? 'down' : p.dir,
-          j.air ? 0 : frame(p), SPRITE_SCALE, j.air ? 'air' : p.pose, lift, j.squash,
+          ctx, p.avatar, p.x, p.y, dir,
+          j.air || lifting ? 0 : frame(p), SPRITE_SCALE, j.air || up > 0.35 ? 'air' : p.pose, lift, j.squash,
         );
+        if (p.hold && dir !== 'up') drawGear(ctx, p.hold, handX, handY, side);
       }
 
       // 이름표와 말풍선
@@ -533,6 +608,21 @@ export function BoxSpace({
           ctx.fillText(p.chat, p.x, by, 180);
         }
       }
+
+      // 누른 구조물 이름 잠깐 보여주기
+      if (flash && flash.until > now) {
+        ctx.font = 'bold 11px system-ui, "Malgun Gothic", sans-serif';
+        const fw = ctx.measureText(flash.text).width + 14;
+        const fy = Math.max(12, flash.y - 12);
+        ctx.globalAlpha = Math.min(1, (flash.until - now) / 300);
+        ctx.fillStyle = 'rgba(20,20,22,0.85)';
+        ctx.beginPath();
+        ctx.roundRect(flash.x - fw / 2, fy - 10, fw, 20, 6);
+        ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(flash.text, flash.x, fy + 1);
+        ctx.globalAlpha = 1;
+      } else flash = null;
 
       raf = requestAnimationFrame(step);
     };
@@ -582,6 +672,18 @@ export function BoxSpace({
             ? '실시간 연결 중…'
             : `실시간 연결 끊김${connError ? ` (${connError})` : ''}`}
       </div>
+      {!nearby && (gearUi.station || gearUi.hold) && (
+        <button
+          type="button"
+          onClick={() => grabRef.current()}
+          className="absolute bottom-24 left-1/2 -translate-x-1/2 rounded-lg border-2 border-[#2A2320] bg-white px-4 py-2 text-sm font-bold text-[#2A2320] shadow-[0_3px_0_#2A2320] active:translate-y-0.5"
+        >
+          {gearUi.hold && (!gearUi.station || gearUi.station === gearUi.hold)
+            ? `${GEAR[gearUi.hold].icon} ${GEAR[gearUi.hold].label} 내려놓기`
+            : `${GEAR[gearUi.station!].icon} ${GEAR[gearUi.station!].label} 들기`}{' '}
+          <span className="hidden sm:inline">(E)</span>
+        </button>
+      )}
       {nearby && (
         <button
           type="button"

@@ -33,25 +33,64 @@ export const OBJECTS: (Box & { board: ObjectKey })[] = [{ board: 'hub', x: 31, y
 
 // 장식 (실제 박스 모습. 지나갈 수 없지만 상호작용은 없다)
 const DECOR: Box[] = [
-  { x: 27, y: 19, w: 2, h: 1 }, // 스피커
   { x: 2, y: 0, w: 6, h: 3 }, // 상장 벽
   { x: 9, y: 0, w: 7, h: 3 }, // 팀 배너
   { x: 19, y: 3, w: 7, h: 2 }, // RECORD 화이트보드
   { x: 29, y: 0, w: 5, h: 3 }, // 대회 포스터
-  { x: 1, y: 13, w: 3, h: 7 }, // 바벨 랙
   { x: 29, y: 19, w: 7, h: 3 }, // 데스크
 ];
 
 // 장애물 (상호작용 없음)
 const RIG_POSTS: [number, number][] = [];
 for (const row of [8, 14]) for (let x = 5; x <= 21; x += 4) RIG_POSTS.push([x, row]);
-const BIKES: Box[] = [30, 32, 34, 36].map((x) => ({ x, y: 6, w: 1, h: 2 }));
+// 유산소 구역 (오른쪽): 에어바이크, 바이크에르그, 로잉머신, 스키에르그
+const BIKES: Box[] = [30, 32, 34, 36].map((x) => ({ x, y: 5, w: 1, h: 2 }));
+const BIKE_ERGS: Box[] = [30, 32, 34, 36].map((x) => ({ x, y: 9, w: 1, h: 2 }));
+const ROWERS: Box[] = [
+  { x: 29, y: 13, w: 3, h: 1 },
+  { x: 33, y: 13, w: 3, h: 1 },
+  { x: 29, y: 15, w: 3, h: 1 },
+  { x: 33, y: 15, w: 3, h: 1 },
+];
+const SKI_ERGS: Box[] = [5, 7, 9, 11].map((y) => ({ x: 38, y, w: 1, h: 1 }));
 const PILLARS: Box[] = [
   { x: 26, y: 10, w: 2, h: 2 },
   { x: 26, y: 16, w: 2, h: 2 },
 ];
-const BOXES: Box[] = [{ x: 22, y: 10, w: 2, h: 1 }];
-const COOLER: Box = { x: 37, y: 19, w: 1, h: 2 };
+const BOXES: Box[] = [{ x: 19, y: 23, w: 2, h: 1 }]; // 플라이오 박스 (아래 벽 쪽 기구 줄)
+const COOLER: Box = { x: 38, y: 15, w: 1, h: 2 }; // 정수기 (오른쪽 벽)
+
+// ---- 들고 다닐 수 있는 운동기구: 기구 자리(스테이션)에서 집고, 아무 데서나 내려놓으면 제자리로 돌아간다
+export type GearKey = 'barbell' | 'kettlebell' | 'dumbbell' | 'medball';
+export const GEAR: Record<GearKey, { label: string; icon: string }> = {
+  barbell: { label: '바벨', icon: '🏋️' },
+  kettlebell: { label: '케틀벨', icon: '🔔' },
+  dumbbell: { label: '덤벨', icon: '💪' },
+  medball: { label: '메디신볼', icon: '⚫' },
+};
+export const GEAR_KEYS = Object.keys(GEAR) as GearKey[];
+export const STATIONS: (Box & { gear: GearKey })[] = [
+  { gear: 'barbell', x: 1, y: 13, w: 3, h: 7 },
+  { gear: 'kettlebell', x: 3, y: 23, w: 3, h: 1 },
+  { gear: 'dumbbell', x: 8, y: 23, w: 3, h: 1 },
+  { gear: 'medball', x: 13, y: 23, w: 3, h: 1 },
+];
+
+// 눌렀을 때 이름을 알려줄 구조물들
+const NAMED: (Box & { name: string })[] = [
+  { x: 2, y: 0, w: 6, h: 3, name: '🏅 상장 벽' },
+  { x: 9, y: 0, w: 7, h: 3, name: '🚩 팀 배너' },
+  { x: 19, y: 3, w: 7, h: 2, name: '📝 RECORD 화이트보드' },
+  { x: 29, y: 0, w: 5, h: 3, name: '🏆 대회 포스터' },
+  { x: 29, y: 19, w: 7, h: 3, name: '🛎 데스크' },
+  ...BIKES.map((b) => ({ ...b, name: '🚲 에어바이크' })),
+  ...BIKE_ERGS.map((b) => ({ ...b, name: '🚴 바이크에르그' })),
+  ...ROWERS.map((b) => ({ ...b, name: '🚣 로잉머신' })),
+  ...SKI_ERGS.map((b) => ({ ...b, name: '⛷ 스키에르그' })),
+  ...PILLARS.map((b) => ({ ...b, name: '노란 기둥' })),
+  ...BOXES.map((b) => ({ ...b, name: '📦 플라이오 박스' })),
+  { ...COOLER, name: '💧 정수기' },
+];
 
 export const solid: boolean[][] = Array.from({ length: ROWS }, () => Array<boolean>(COLS).fill(false));
 function block(b: Box) {
@@ -68,7 +107,8 @@ for (let y = 0; y < ROWS; y++) {
 OBJECTS.forEach(block);
 DECOR.forEach(block);
 RIG_POSTS.forEach(([x, y]) => block({ x, y, w: 1, h: 1 }));
-[...BIKES, ...PILLARS, ...BOXES, COOLER].forEach(block);
+STATIONS.forEach(block);
+[...BIKES, ...BIKE_ERGS, ...ROWERS, ...SKI_ERGS, ...PILLARS, ...BOXES, COOLER].forEach(block);
 
 export function isSolidAt(px: number, py: number): boolean {
   const tx = Math.floor(px / TILE);
@@ -100,6 +140,43 @@ export function nearbyBoard(x: number, y: number): ObjectKey | null {
     }
   }
   return best;
+}
+
+function boxDist(o: Box, x: number, y: number) {
+  const tx = x / TILE;
+  const ty = (y - 4) / TILE;
+  const dx = Math.max(o.x - tx, 0, tx - (o.x + o.w));
+  const dy = Math.max(o.y - ty, 0, ty - (o.y + o.h));
+  return Math.hypot(dx, dy);
+}
+
+// 손이 닿는 기구 자리
+export function nearbyStation(x: number, y: number): GearKey | null {
+  let best: GearKey | null = null;
+  let bestDist = 1.1;
+  for (const s of STATIONS) {
+    const d = boxDist(s, x, y);
+    if (d < bestDist) {
+      best = s.gear;
+      bestDist = d;
+    }
+  }
+  return best;
+}
+
+export function isNearStation(gear: GearKey, x: number, y: number): boolean {
+  return STATIONS.some((s) => s.gear === gear && boxDist(s, x, y) < 1.1);
+}
+
+export function stationAt(wx: number, wy: number): GearKey | null {
+  const s = STATIONS.find((o) => wx >= o.x * TILE - 4 && wx <= (o.x + o.w) * TILE + 4 && wy >= o.y * TILE - 8 && wy <= (o.y + o.h) * TILE + 4);
+  return s?.gear ?? null;
+}
+
+// 누른 곳의 구조물 이름 (이름표 대신 잠깐 보여준다)
+export function nameAt(wx: number, wy: number): { name: string; x: number; y: number } | null {
+  const o = NAMED.find((b) => wx >= b.x * TILE && wx <= (b.x + b.w) * TILE && wy >= b.y * TILE && wy <= (b.y + b.h) * TILE);
+  return o ? { name: o.name, x: (o.x + o.w / 2) * TILE, y: o.y * TILE } : null;
 }
 
 // 특정 오브젝트에 손이 닿는 거리인지
@@ -324,17 +401,109 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
     rect(ctx, b.x * T + 6, b.y * T + 4, T - 12, 4, '#D9443E');
   }
 
+  // 바이크에르그 (앉아서 타는 자전거, 작은 플라이휠)
+  for (const b of BIKE_ERGS) {
+    rect(ctx, b.x * T + 10, b.y * T + 4, 12, 2 * T - 8, '#1B1B1E');
+    rect(ctx, b.x * T + 6, b.y * T + 6, T - 12, 10, '#2F2F35');
+    rect(ctx, b.x * T + 11, b.y * T + 8, 10, 5, '#5BB0E8');
+    rect(ctx, b.x * T + 8, b.y * T + 2 * T - 18, T - 16, 8, '#3A3A40');
+    ctx.fillStyle = '#5F5E5A';
+    ctx.beginPath();
+    ctx.arc(b.x * T + T / 2, b.y * T + T + 4, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 로잉머신 (긴 레일 + 앞쪽 플라이휠 + 발판 + 시트)
+  for (const r of ROWERS) {
+    const x0 = r.x * T;
+    const y0 = r.y * T;
+    rect(ctx, x0 + 26, y0 + 13, r.w * T - 30, 6, '#9C9C9C');
+    rect(ctx, x0 + 26, y0 + 14, r.w * T - 30, 2, '#C9C9C9');
+    rect(ctx, x0 + 4, y0 + 6, 22, 20, '#1B1B1E');
+    ctx.fillStyle = '#3A3A40';
+    ctx.beginPath();
+    ctx.arc(x0 + 15, y0 + 16, 8, 0, Math.PI * 2);
+    ctx.fill();
+    rect(ctx, x0 + 12, y0 + 4, 6, 4, '#5BB0E8');
+    rect(ctx, x0 + 28, y0 + 7, 6, 18, '#2B2B30');
+    rect(ctx, x0 + 54, y0 + 9, 14, 14, '#1F1F22');
+    rect(ctx, x0 + 56, y0 + 11, 10, 10, '#3A3A40');
+  }
+
+  // 스키에르그 (벽에 붙은 기둥 + 손잡이 두 개)
+  for (const k of SKI_ERGS) {
+    const x0 = k.x * T;
+    const y0 = k.y * T;
+    rect(ctx, x0 + 18, y0 + 2, 12, T - 4, '#1B1B1E');
+    rect(ctx, x0 + 20, y0 + 6, 8, 6, '#5BB0E8');
+    rect(ctx, x0 + 6, y0 + 8, 12, 2, '#5F5E5A');
+    rect(ctx, x0 + 6, y0 + 22, 12, 2, '#5F5E5A');
+    rect(ctx, x0 + 4, y0 + 6, 4, 6, '#D9443E');
+    rect(ctx, x0 + 4, y0 + 20, 4, 6, '#D9443E');
+  }
+
   // 노란 기둥
   for (const p of PILLARS) {
     rect(ctx, p.x * T, p.y * T, p.w * T, p.h * T, '#B88F12');
     rect(ctx, p.x * T, p.y * T, p.w * T - 6, p.h * T - 6, C.yellow);
   }
 
-  // 플라이오 박스
+  // 플라이오 박스 (두 개, 높이 표시)
   for (const b of BOXES) {
-    rect(ctx, b.x * T + 2, b.y * T + 2, b.w * T - 4, b.h * T - 4, '#A9845A');
-    rect(ctx, b.x * T + 6, b.y * T + 6, b.w * T - 12, b.h * T - 12, '#C29A6B');
+    for (let i = 0; i < b.w; i++) {
+      const x0 = (b.x + i) * T;
+      rect(ctx, x0 + 2, b.y * T + 2, T - 4, T - 4, '#7A5A36');
+      rect(ctx, x0 + 4, b.y * T + 4, T - 8, T - 8, '#B98B57');
+      rect(ctx, x0 + 4, b.y * T + 14, T - 8, 3, '#7A5A36');
+      label(ctx, i ? '20' : '24', x0 + T / 2, b.y * T + 9, '#2A2320', 8);
+    }
   }
+
+  // 케틀벨 랙
+  const kb = STATIONS.find((s) => s.gear === 'kettlebell')!;
+  rect(ctx, kb.x * T + 2, kb.y * T + 18, kb.w * T - 4, 10, '#2B2B30');
+  ['#E8B923', '#3E9E5F', '#3B6FD1', '#D9443E', '#8C5BB0'].forEach((c, i) => {
+    const cx = kb.x * T + 12 + i * 18;
+    ctx.fillStyle = '#17171A';
+    ctx.beginPath();
+    ctx.arc(cx, kb.y * T + 14, 7, 0, Math.PI * 2);
+    ctx.fill();
+    rect(ctx, cx - 5, kb.y * T + 8, 10, 3, c);
+    ctx.strokeStyle = '#17171A';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, kb.y * T + 7, 4, Math.PI, 0);
+    ctx.stroke();
+  });
+
+  // 덤벨 랙
+  const db = STATIONS.find((s) => s.gear === 'dumbbell')!;
+  rect(ctx, db.x * T + 2, db.y * T + 4, db.w * T - 4, T - 6, '#2B2B30');
+  for (let i = 0; i < 4; i++) {
+    const x0 = db.x * T + 8 + i * 22;
+    for (const row of [0, 1]) {
+      const y0 = db.y * T + 9 + row * 12;
+      rect(ctx, x0, y0, 4, 7, '#17171A');
+      rect(ctx, x0 + 4, y0 + 2, 8, 3, '#9C9C9C');
+      rect(ctx, x0 + 12, y0, 4, 7, '#17171A');
+    }
+  }
+
+  // 메디신볼 더미
+  const mb = STATIONS.find((s) => s.gear === 'medball')!;
+  ['#3B3B40', '#D9443E', '#3B6FD1', '#3E9E5F'].forEach((c, i) => {
+    const cx = mb.x * T + 14 + i * 22;
+    const cy = mb.y * T + 16 + (i % 2) * 3;
+    ctx.fillStyle = '#17171A';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+    ctx.fill();
+    rect(ctx, cx - 8, cy - 1, 16, 2, '#17171A');
+  });
 
   // 바벨/플레이트 랙
   rect(ctx, 1 * T, 13 * T, 3 * T, 7 * T, '#202024');
@@ -368,21 +537,22 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
   rect(ctx, 30 * T, 19.3 * T, 14, 18, '#F2EEE4');
   rect(ctx, 34.6 * T, 19.4 * T, 10, 14, '#5BB0E8');
 
-  // 정수기
-  rect(ctx, COOLER.x * T + 4, COOLER.y * T + 2, T - 8, 2 * T - 6, '#EDEDED');
-  rect(ctx, COOLER.x * T + 8, COOLER.y * T + 8, T - 16, 10, '#5BB0E8');
+  // 정수기 (위에 파란 물통)
+  rect(ctx, COOLER.x * T + 5, COOLER.y * T + 14, T - 10, 2 * T - 18, '#EDEDED');
+  rect(ctx, COOLER.x * T + 5, COOLER.y * T + 14, T - 10, 3, '#CFCFCF');
+  ctx.fillStyle = '#7CC4F0';
+  ctx.beginPath();
+  ctx.roundRect(COOLER.x * T + 8, COOLER.y * T + 1, T - 16, 14, 4);
+  ctx.fill();
+  rect(ctx, COOLER.x * T + 10, COOLER.y * T + 3, 3, 9, '#B9E1F8');
+  rect(ctx, COOLER.x * T + 10, COOLER.y * T + 26, 4, 3, '#3B82C4');
+  rect(ctx, COOLER.x * T + 18, COOLER.y * T + 26, 4, 3, '#D9443E');
 
   // 게시판 키오스크 (입구 옆)
   rect(ctx, 31 * T + 4, 23 * T - 10, 2 * T - 8, T + 6, '#2B2B30');
   rect(ctx, 31 * T + 8, 23 * T - 6, 2 * T - 16, T - 6, '#3E82E6');
   for (let i = 0; i < 3; i++) rect(ctx, 31 * T + 12, 23 * T - 1 + i * 6, 2 * T - 24, 3, '#CFE2FF');
   rect(ctx, 32 * T - 3, 24 * T - 4, 6, 4, '#2B2B30');
-
-  // 스피커 (마샬 앰프 느낌)
-  rect(ctx, 27 * T + 2, 19 * T - 6, 2 * T - 4, T + 4, '#EFE6D2');
-  rect(ctx, 27 * T + 6, 19 * T - 2, 2 * T - 12, T - 8, '#3A3226');
-  for (let i = 0; i < 4; i++) rect(ctx, 27 * T + 8, 19 * T + i * 5, 2 * T - 16, 1, '#5A4E3C');
-  rect(ctx, 27 * T + 6, 19 * T - 5, 18, 2, '#B8962E');
 
   // 이름표: 무엇인지 이름만 보고 알 수 있게
   for (const o of OBJECTS) {
@@ -406,9 +576,60 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
 // 상호작용 가능한 오브젝트 위에 반짝이는 표시
 export function drawObjectHint(ctx: CanvasRenderingContext2D, board: ObjectKey, t: number) {
   const o = OBJECTS.find((x) => x.board === board);
-  if (!o) return;
+  if (o) drawBoxHint(ctx, o, t);
+}
+
+export function drawStationHint(ctx: CanvasRenderingContext2D, gear: GearKey, t: number) {
+  const o = STATIONS.find((x) => x.gear === gear);
+  if (o) drawBoxHint(ctx, o, t);
+}
+
+function drawBoxHint(ctx: CanvasRenderingContext2D, o: Box, t: number) {
   const alpha = 0.55 + Math.sin(t / 180) * 0.25;
   ctx.strokeStyle = `rgba(232,185,35,${alpha})`;
   ctx.lineWidth = 3;
   ctx.strokeRect(o.x * TILE - 2, o.y * TILE - 2, o.w * TILE + 4, o.h * TILE + 4);
+}
+
+// 캐릭터가 들고 있는 기구 (cx, cy = 손 위치, 월드 좌표)
+export function drawGear(ctx: CanvasRenderingContext2D, gear: GearKey, cx: number, cy: number, side: boolean) {
+  const r = (x: number, y: number, w: number, h: number, c: string) => rect(ctx, cx + x, cy + y, w, h, c);
+  if (gear === 'barbell') {
+    if (side) {
+      // 옆에서 보면 원판만 보인다
+      r(-3, -9, 6, 18, '#17171A');
+      r(-2, -8, 4, 16, '#D9443E');
+      return;
+    }
+    r(-26, -1, 52, 3, '#B5B5B5');
+    for (const sx of [-26, 20]) {
+      r(sx, -8, 6, 17, '#17171A');
+      r(sx + 1, -7, 4, 15, '#D9443E');
+    }
+  } else if (gear === 'kettlebell') {
+    ctx.fillStyle = '#17171A';
+    ctx.beginPath();
+    ctx.arc(cx, cy + 5, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#17171A';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy - 1, 3.5, Math.PI, 0);
+    ctx.stroke();
+    r(-4, 2, 8, 2, '#E8B923');
+  } else if (gear === 'dumbbell') {
+    r(-8, -3, 4, 7, '#17171A');
+    r(-4, -1, 8, 3, '#9C9C9C');
+    r(4, -3, 4, 7, '#17171A');
+  } else {
+    ctx.fillStyle = '#17171A';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#D9443E';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6.5, 0, Math.PI * 2);
+    ctx.fill();
+    r(-7, -1, 14, 2, '#17171A');
+  }
 }

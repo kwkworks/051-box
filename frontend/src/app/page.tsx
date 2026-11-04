@@ -9,8 +9,7 @@ import { Guard } from '@/components/Guard';
 import { ActionPad } from '@/components/ActionPad';
 import { BgmControl } from '@/components/BgmControl';
 import { QuickMenu } from '@/components/QuickMenu';
-import type { Pose } from '@/game/avatar';
-import { BoxSpace, type BoxSpaceHandle } from '@/game/BoxSpace';
+import { BoxSpace, type ActionState, type BoxSpaceHandle } from '@/game/BoxSpace';
 import { BOARDS, type ObjectKey } from '@/game/map';
 import { api } from '@/lib/api';
 import type { ChatMessage, ChatSession, ChatState, Me } from '@/lib/types';
@@ -31,7 +30,7 @@ function Space({ me }: { me: Me }) {
   const [mutedUntil, setMutedUntil] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [action, setAction] = useState<{ pose: Pose; running: boolean }>({ pose: 'stand', running: false });
+  const [action, setAction] = useState<ActionState>({ pose: 'stand', running: false, hold: null });
   const [help, setHelp] = useState(false);
 
   const showToast = (text: string) => {
@@ -177,7 +176,7 @@ function Space({ me }: { me: Me }) {
             onDelete={deleteChat}
           />
         <div className="absolute bottom-3 right-3 z-20 flex items-end gap-2">
-          <ActionPad pose={action.pose} running={action.running} onAct={(a) => spaceRef.current?.act(a)} />
+          <ActionPad pose={action.pose} running={action.running} hold={action.hold} onAct={(a) => spaceRef.current?.act(a)} />
           <QuickMenu />
         </div>
         <div className="absolute right-3 top-3 z-10 flex flex-col overflow-hidden rounded-md bg-black/60 text-white lg:top-12" role="group" aria-label="화면 확대·축소">
@@ -196,7 +195,8 @@ function Space({ me }: { me: Me }) {
             <ul className="rounded-md bg-black/75 px-3 py-2 text-xs leading-relaxed text-white">
               <li>방향키 / WASD 이동 · Shift 달리기</li>
               <li>Space 점프 · C 앉기 · Q 춤추기</li>
-              <li>E 또는 클릭: 게시판 열기 · Enter 채팅</li>
+              <li>E 또는 클릭: 게시판 열기 · 기구 들기/내려놓기</li>
+              <li>기구를 들고 Space: 들어올리기 · Enter 채팅</li>
             </ul>
           )}
         </div>
