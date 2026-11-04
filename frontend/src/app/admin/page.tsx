@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Fragment, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { AvatarView } from '@/components/AvatarView';
 import { BoardShell } from '@/components/BoardShell';
 import { ErrorBox, Guard, Loading } from '@/components/Guard';
@@ -59,14 +59,28 @@ function Members({ myId }: { myId: string }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [recordsOf, setRecordsOf] = useState<string | null>(null);
 
-  const setRole = async (m: Profile, role: Role) => {
-    if (role === 'rejected' && !confirm(`${m.nickname}님의 가입 신청을 거절할까요?\n승인 대기 목록에서 빠지고, 본인이 원하면 다시 신청할 수 있어요.`)) return;
-    if (role === 'admin' && !confirm(`${m.nickname}님을 관리자로 지정할까요? 관리자는 모든 게시판과 회원을 관리할 수 있어요.`)) return;
-    if (role === 'pending' && !confirm(`${m.nickname}님의 승인을 취소할까요?
+  // 방금 거절한 신청 (실수했을 때 10초 안에 되돌리기)
+  const [undo, setUndo] = useState<Profile | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const setRole = async (m: Profile, role: Role, opts: { silent?: boolean } = {}) => {
+    const restoring = m.role === 'rejected' && role === 'pending'; // 거절 되돌리기는 확인 없이
+    if (!opts.silent && !restoring) {
+      if (role === 'rejected' && !confirm(`${m.nickname}님의 가입 신청을 거절할까요?\n승인 대기 목록에서 빠지고, 본인이 원하면 다시 신청할 수 있어요.`)) return;
+      if (role === 'admin' && !confirm(`${m.nickname}님을 관리자로 지정할까요? 관리자는 모든 게시판과 회원을 관리할 수 있어요.`)) return;
+      if (role === 'pending' && !confirm(`${m.nickname}님의 승인을 취소할까요?
 이 회원의 기록(1RM, PR 글, 채팅, 모임, 참가 명단)은 다른 회원에게 보이지 않게 돼요. 다시 승인하면 돌아와요.`)) return;
+    }
     setBusyId(m.id);
     try {
       await api.patch(`/admin/members/${m.id}`, { role });
+      if (undoTimer.current) clearTimeout(undoTimer.current);
+      if (role === 'rejected') {
+        setUndo({ ...m, role: 'rejected' });
+        undoTimer.current = setTimeout(() => setUndo(null), 10_000);
+      } else {
+        setUndo(null);
+      }
       await reload();
     } catch (e) {
       alert(e instanceof Error ? e.message : '변경하지 못했어요');
@@ -134,6 +148,11 @@ function Members({ myId }: { myId: string }) {
               거절
             </button>
           )}
+          {m.role === 'rejected' && (
+            <button type="button" className="btn btn-sm" disabled={busyId === m.id} onClick={() => setRole(m, 'pending')}>
+              ↩ 승인 대기로 되돌리기
+            </button>
+          )}
           {m.role === 'member' && (
             <>
               <button type="button" className="btn btn-sm" disabled={busyId === m.id} onClick={() => setRole(m, 'admin')}>관리자로</button>
@@ -160,6 +179,16 @@ function Members({ myId }: { myId: string }) {
 
   return (
     <>
+      {undo && (
+        <div className="fixed inset-x-0 bottom-20 z-40 flex justify-center px-4" role="status">
+          <div className="card flex items-center gap-3 px-4 py-3 shadow-xl">
+            <span className="text-sm font-bold">{undo.nickname}님의 신청을 거절했어요</span>
+            <button type="button" className="btn btn-sm btn-primary" disabled={busyId === undo.id} onClick={() => setRole(undo, 'pending')}>
+              ↩ 되돌리기
+            </button>
+          </div>
+        </div>
+      )}
       <ChatLock />
       <h2 className="mb-2 font-black">승인 대기 {pending.length}명</h2>
       {pending.length === 0 ? (
