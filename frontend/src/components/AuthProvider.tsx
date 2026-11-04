@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { ApiError, api } from '@/lib/api';
+import { stopBgm } from '@/lib/bgm';
 import { supabase } from '@/lib/supabase';
 import type { Me } from '@/lib/types';
 
@@ -86,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [userId]);
 
   const signOut = useCallback(async () => {
+    stopBgm();
     await supabase.auth.signOut();
     try {
       sessionStorage.clear();

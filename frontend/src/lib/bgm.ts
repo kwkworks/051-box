@@ -156,3 +156,17 @@ export class Bgm {
     }
   }
 }
+
+// 앱 전체에서 플레이어 하나만 쓴다. 화면(박스 ↔ 게시판)을 옮겨도 음악이 끊기지 않게
+// 컴포넌트가 사라져도 멈추지 않고, 로그아웃할 때만 멈춘다.
+let shared: Bgm | null = null;
+
+export function getBgm(): Bgm {
+  shared ??= new Bgm(loadBgmSettings());
+  return shared;
+}
+
+export function stopBgm() {
+  shared?.stop();
+  shared = null;
+}

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { BgmControl } from './BgmControl';
 import { QuickMenu } from './QuickMenu';
 
 // 게시판 공통 틀: 상단에 "박스로 돌아가기"
@@ -28,6 +29,7 @@ export function BoardShell({
             {subtitle && <p className="truncate text-xs text-white/80">{subtitle}</p>}
           </div>
           {actions}
+          <BgmControl />
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-4 py-5">{children}</main>

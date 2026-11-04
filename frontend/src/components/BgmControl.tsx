@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Bgm, loadBgmSettings, saveBgmSettings, type BgmSettings } from '@/lib/bgm';
+import { useEffect, useState } from 'react';
+import { getBgm, loadBgmSettings, saveBgmSettings, type BgmSettings } from '@/lib/bgm';
 
 // 박스 BGM 음량 조절 + 음소거. 설정은 이 기기에만 저장된다.
 export function BgmControl() {
@@ -9,28 +9,25 @@ export function BgmControl() {
     typeof window === 'undefined' ? { volume: 0.4, muted: false } : loadBgmSettings(),
   );
   const [open, setOpen] = useState(false);
-  const bgm = useRef<Bgm | null>(null);
 
-  // 첫 클릭이나 키 입력 때 음악 시작 (브라우저 자동재생 정책)
+  // 첫 클릭이나 키 입력 때 음악 시작 (브라우저 자동재생 정책).
+  // 화면을 떠나도 멈추지 않는다: 플레이어는 앱 전체에서 하나를 같이 쓴다.
   useEffect(() => {
-    const player = new Bgm(loadBgmSettings());
-    bgm.current = player;
-    const kick = () => player.start();
+    const kick = () => getBgm().start();
     window.addEventListener('pointerdown', kick, { once: true });
     window.addEventListener('keydown', kick, { once: true });
     return () => {
       window.removeEventListener('pointerdown', kick);
       window.removeEventListener('keydown', kick);
-      player.stop();
-      bgm.current = null;
     };
   }, []);
 
   const update = (next: BgmSettings) => {
     setSettings(next);
     saveBgmSettings(next);
-    bgm.current?.setSettings(next);
-    bgm.current?.start();
+    const player = getBgm();
+    player.setSettings(next);
+    player.start();
   };
 
   return (
