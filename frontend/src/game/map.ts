@@ -1,11 +1,11 @@
 // 크로스핏051 박스를 탑뷰 픽셀 맵으로 옮긴다. 모든 그림은 코드로 그린다.
 export const TILE = 32;
 export const COLS = 40;
-export const ROWS = 26;
+export const ROWS = 30;
 export const WORLD_W = COLS * TILE;
 export const WORLD_H = ROWS * TILE;
 
-export const SPAWN = { x: 36.5 * TILE, y: 23.5 * TILE };
+export const SPAWN = { x: 36.5 * TILE, y: 28.5 * TILE };
 
 export type BoardKey = 'hub' | 'wod' | 'notices' | 'competition' | 'gathering' | 'one-rm' | 'wall';
 export type ObjectKey = BoardKey;
@@ -29,7 +29,7 @@ type Box = { x: number; y: number; w: number; h: number };
 
 // 상호작용 오브젝트: 타일 좌표
 // 상호작용 오브젝트: 게시판 키오스크 하나로 모은다 (모든 기능은 게시판에서)
-export const OBJECTS: (Box & { board: ObjectKey })[] = [{ board: 'hub', x: 31, y: 23, w: 2, h: 1 }];
+export const OBJECTS: (Box & { board: ObjectKey })[] = [{ board: 'hub', x: 31, y: 27, w: 2, h: 1 }];
 
 // 장식 (실제 박스 모습. 지나갈 수 없지만 상호작용은 없다)
 const DECOR: Box[] = [
@@ -37,7 +37,7 @@ const DECOR: Box[] = [
   { x: 9, y: 0, w: 7, h: 3 }, // 팀 배너
   { x: 19, y: 3, w: 7, h: 2 }, // RECORD 화이트보드
   { x: 29, y: 0, w: 5, h: 3 }, // 대회 포스터
-  { x: 29, y: 19, w: 7, h: 3 }, // 데스크
+  { x: 29, y: 23, w: 6, h: 3 }, // 데스크
 ];
 
 // 장애물 (상호작용 없음)
@@ -59,12 +59,12 @@ const MACHINE_ORDER: MachineKind[] = [
   'assault', 'assault',
   'treadmill', 'treadmill',
 ];
-export const MACHINES: (Box & { kind: MachineKind })[] = MACHINE_ORDER.map((kind, i) => ({ kind, x: 36, y: 3 + i, w: 3, h: 1 }));
+export const MACHINES: (Box & { kind: MachineKind })[] = MACHINE_ORDER.map((kind, i) => ({ kind, x: 36, y: 3 + i * 2, w: 3, h: 1 })); // 사이에 한 칸씩 (캐릭터가 설 자리)
 
 // 머신을 탈 때 캐릭터 발 위치
 export function seatOf(i: number): { x: number; y: number } {
   const m = MACHINES[i];
-  const offset = m.kind === 'rower' ? 1.75 : m.kind === 'ski' ? 1.9 : m.kind === 'treadmill' ? 1.55 : 1.6;
+  const offset = m.kind === 'rower' ? 1.3 : m.kind === 'ski' ? 1.4 : 1.6;
   return { x: (m.x + offset) * TILE, y: (m.y + 1) * TILE - 3 };
 }
 
@@ -90,8 +90,8 @@ const PILLARS: Box[] = [
   { x: 26, y: 10, w: 2, h: 2 },
   { x: 26, y: 16, w: 2, h: 2 },
 ];
-const BOXES: Box[] = [{ x: 19, y: 23, w: 2, h: 1 }]; // 플라이오 박스 (아래 벽 쪽 기구 줄)
-const COOLER: Box = { x: 38, y: 17, w: 1, h: 2 }; // 정수기 (오른쪽 벽, 머신 줄 아래)
+const BOXES: Box[] = [{ x: 19, y: 27, w: 2, h: 1 }]; // 플라이오 박스 (아래 벽 쪽 기구 줄)
+const COOLER: Box = { x: 28, y: 3, w: 1, h: 2 }; // 정수기 (위쪽 벽, 화이트보드 옆)
 
 // ---- 철봉 (풀업 리그): 두 줄. 매달리면 손은 봉에, 몸은 바로 아래 칸
 export const BAR_ROWS = [8, 14] as const;
@@ -123,9 +123,9 @@ export const GEAR: Record<GearKey, { label: string; icon: string }> = {
 export const GEAR_KEYS = Object.keys(GEAR) as GearKey[];
 export const STATIONS: (Box & { gear: GearKey })[] = [
   { gear: 'barbell', x: 1, y: 13, w: 3, h: 7 },
-  { gear: 'kettlebell', x: 3, y: 23, w: 3, h: 1 },
-  { gear: 'dumbbell', x: 8, y: 23, w: 3, h: 1 },
-  { gear: 'medball', x: 13, y: 23, w: 3, h: 1 },
+  { gear: 'kettlebell', x: 3, y: 27, w: 3, h: 1 },
+  { gear: 'dumbbell', x: 8, y: 27, w: 3, h: 1 },
+  { gear: 'medball', x: 13, y: 27, w: 3, h: 1 },
 ];
 
 // 눌렀을 때 이름을 알려줄 구조물들
@@ -134,7 +134,7 @@ const NAMED: (Box & { name: string })[] = [
   { x: 9, y: 0, w: 7, h: 3, name: '🚩 팀 배너' },
   { x: 19, y: 3, w: 7, h: 2, name: '📝 RECORD 화이트보드' },
   { x: 29, y: 0, w: 5, h: 3, name: '🏆 대회 포스터' },
-  { x: 29, y: 19, w: 7, h: 3, name: '🛎 데스크' },
+  { x: 29, y: 23, w: 6, h: 3, name: '🛎 데스크' },
   ...PILLARS.map((b) => ({ ...b, name: '노란 기둥' })),
   { x: 5, y: 8, w: 17, h: 1, name: '🤸 철봉 (풀업 리그)' },
   { x: 5, y: 14, w: 17, h: 1, name: '🤸 철봉 (풀업 리그)' },
@@ -362,7 +362,7 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
     }
   }
   // 바닥 라인 (WOD 구역 표시)
-  rect(ctx, 5 * T, 21 * T, 17 * T, 2, '#BDBDBD');
+  rect(ctx, 5 * T, 25 * T, 17 * T, 2, '#BDBDBD');
 
   // 벽 (위, 좌우, 아래)
   rect(ctx, 0, 0, WORLD_W, 3 * T, C.wall);
@@ -524,19 +524,19 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
   for (let i = 0; i < 7; i++) rect(ctx, 2.9 * T + (i % 2) * 6, 13.4 * T + i * 30, 4, 26, ['#E58FB5', '#3B82C4', '#1B1B1E'][i % 3]);
 
   // 데스크 (원형 로고)
-  rect(ctx, 29 * T, 19 * T, 7 * T, 3 * T - 4, '#DCD8D0');
-  rect(ctx, 29 * T + 4, 19 * T + 4, 7 * T - 8, 2 * T, '#F6F4EF');
+  rect(ctx, 29 * T, 23 * T, 6 * T, 3 * T - 4, '#DCD8D0');
+  rect(ctx, 29 * T + 4, 23 * T + 4, 6 * T - 8, 2 * T, '#F6F4EF');
   ctx.fillStyle = '#1B1B1E';
   ctx.beginPath();
-  ctx.arc(32.5 * T, 20 * T, 22, 0, Math.PI * 2);
+  ctx.arc(32 * T, 24 * T, 22, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = '#F0C850';
   ctx.lineWidth = 2;
   ctx.stroke();
-  label(ctx, 'CROSSFIT', 32.5 * T, 20 * T - 6, '#F0C850', 8);
-  label(ctx, '051', 32.5 * T, 20 * T + 7, C.white, 13);
-  rect(ctx, 30 * T, 19.3 * T, 14, 18, '#F2EEE4');
-  rect(ctx, 34.6 * T, 19.4 * T, 10, 14, '#5BB0E8');
+  label(ctx, 'CROSSFIT', 32 * T, 24 * T - 6, '#F0C850', 8);
+  label(ctx, '051', 32 * T, 24 * T + 7, C.white, 13);
+  rect(ctx, 29.6 * T, 23.3 * T, 14, 18, '#F2EEE4');
+  rect(ctx, 33.8 * T, 23.4 * T, 10, 14, '#5BB0E8');
 
   // 정수기 (위에 파란 물통)
   rect(ctx, COOLER.x * T + 5, COOLER.y * T + 14, T - 10, 2 * T - 18, '#EDEDED');
@@ -550,10 +550,10 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
   rect(ctx, COOLER.x * T + 18, COOLER.y * T + 26, 4, 3, '#D9443E');
 
   // 게시판 키오스크 (입구 옆)
-  rect(ctx, 31 * T + 4, 23 * T - 10, 2 * T - 8, T + 6, '#2B2B30');
-  rect(ctx, 31 * T + 8, 23 * T - 6, 2 * T - 16, T - 6, '#3E82E6');
-  for (let i = 0; i < 3; i++) rect(ctx, 31 * T + 12, 23 * T - 1 + i * 6, 2 * T - 24, 3, '#CFE2FF');
-  rect(ctx, 32 * T - 3, 24 * T - 4, 6, 4, '#2B2B30');
+  rect(ctx, 31 * T + 4, 27 * T - 10, 2 * T - 8, T + 6, '#2B2B30');
+  rect(ctx, 31 * T + 8, 27 * T - 6, 2 * T - 16, T - 6, '#3E82E6');
+  for (let i = 0; i < 3; i++) rect(ctx, 31 * T + 12, 27 * T - 1 + i * 6, 2 * T - 24, 3, '#CFE2FF');
+  rect(ctx, 32 * T - 3, 28 * T - 4, 6, 4, '#2B2B30');
 
   // 이름표: 무엇인지 이름만 보고 알 수 있게
   for (const o of OBJECTS) {
@@ -640,6 +640,10 @@ function drawMachine(ctx: CanvasRenderingContext2D, m: Box & { kind: MachineKind
   const T = TILE;
   const x0 = m.x * T;
   const y0 = m.y * T;
+  // 그림은 "벽쪽이 앞"으로 그려져 있어서 좌우를 뒤집어, 머신 앞이 넓은 필드(왼쪽)를 보게 한다
+  ctx.save();
+  ctx.translate(2 * x0 + 3 * T, 0);
+  ctx.scale(-1, 1);
   const r = (x: number, y: number, w: number, h: number, c: string) => rect(ctx, x0 + x, y0 + y, w, h, c);
   const wheel = (cx: number, cy: number, rad: number, c: string) => {
     ctx.fillStyle = c;
@@ -690,4 +694,5 @@ function drawMachine(ctx: CanvasRenderingContext2D, m: Box & { kind: MachineKind
     r(80, 4, 10, 24, '#2B2B30'); // 콘솔
     r(82, 8, 6, 8, '#5BB0E8');
   }
+  ctx.restore();
 }
