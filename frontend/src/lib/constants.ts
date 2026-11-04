@@ -17,9 +17,30 @@ export const MOVEMENTS = {
 
 export type MovementKey = keyof typeof MOVEMENTS;
 
+// 네임드 WOD (시간 기록, 짧을수록 좋음). 백엔드·DB 목록과 같게 유지한다.
+export const NAMED_WODS = {
+  fran: 'Fran',
+  grace: 'Grace',
+  isabel: 'Isabel',
+  helen: 'Helen',
+  diane: 'Diane',
+  elizabeth: 'Elizabeth',
+  annie: 'Annie',
+  jackie: 'Jackie',
+  karen: 'Karen',
+  nancy: 'Nancy',
+  kelly: 'Kelly',
+  amanda: 'Amanda',
+  murph: 'Murph (Hero)',
+  dt: 'DT (Hero)',
+  jt: 'JT (Hero)',
+} as const;
+
+export type NamedWodKey = keyof typeof NAMED_WODS;
+
 export function movementLabel(movement: string, isCustom = false) {
   if (isCustom) return movement;
-  return MOVEMENTS[movement as MovementKey] ?? movement;
+  return MOVEMENTS[movement as MovementKey] ?? NAMED_WODS[movement as NamedWodKey] ?? movement;
 }
 
 export const EVENT_KINDS = {

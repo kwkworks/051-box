@@ -65,11 +65,15 @@ export type EventDetail = BoxEvent & {
   can_manage: boolean;
 };
 
+export type RecordUnit = 'lb' | 'time';
+
 export type OneRmRecord = {
   id: string;
   movement: string;
   is_custom: boolean;
-  weight_kg: number;
+  unit: RecordUnit;
+  weight_lb: number | null; // 파운드
+  time_sec: number | null; // 초 (네임드 WOD)
   achieved_on: string;
   created_at: string;
 };
@@ -78,7 +82,9 @@ export type RankRow = {
   user_id: string;
   movement: string;
   is_custom: boolean;
-  weight_kg: number;
+  unit: RecordUnit;
+  weight_lb: number | null;
+  time_sec: number | null;
   achieved_on: string;
   nickname: string;
 };
@@ -86,7 +92,15 @@ export type RankRow = {
 export type FeedItem = {
   id: string;
   kind: 'pr';
-  payload: { movement: string; is_custom: boolean; weight_kg: number; prev_kg: number | null };
+  payload: {
+    movement: string;
+    is_custom: boolean;
+    unit?: RecordUnit;
+    weight_lb?: number;
+    prev_lb?: number | null;
+    time_sec?: number;
+    prev_sec?: number | null;
+  };
   created_at: string;
   user_id: string;
   nickname: string;

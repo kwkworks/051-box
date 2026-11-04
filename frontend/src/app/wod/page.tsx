@@ -5,7 +5,7 @@ import { BoardShell } from '@/components/BoardShell';
 import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { api } from '@/lib/api';
 import { MOVEMENTS, movementLabel, type MovementKey } from '@/lib/constants';
-import { formatDateLabel, kstToday, percentWeight, shiftDate } from '@/lib/format';
+import { fmtLb, formatDateLabel, kstToday, lbToKg, percentWeight, shiftDate } from '@/lib/format';
 import type { Lift, Me, Wod, WodPhoto } from '@/lib/types';
 import { useLoad } from '@/lib/useLoad';
 
@@ -132,13 +132,13 @@ function WodView({ wod, bestLifts }: { wod: Wod; bestLifts: Record<string, numbe
                 <div key={i}>
                   <p className="text-sm font-bold">
                     {movementLabel(lift.movement)}
-                    {best ? <span className="ml-2 text-muted">1RM {best}kg</span> : null}
+                    {best ? <span className="ml-2 text-muted">1RM {fmtLb(best)} ({lbToKg(best)} kg)</span> : null}
                   </p>
                   {best ? (
                     <div className="mt-1 flex flex-wrap gap-2">
                       {lift.percents.map((p, j) => (
                         <span key={j} className="chip bg-yellow">
-                          {p}% → {percentWeight(best, p)}kg
+                          {p}% → {fmtLb(percentWeight(best, p))} <span className="font-normal">({lbToKg(percentWeight(best, p))} kg)</span>
                         </span>
                       ))}
                     </div>

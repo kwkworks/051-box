@@ -6,6 +6,12 @@ export const MOVEMENTS = [
   'clean_and_jerk', 'snatch', 'power_snatch', 'push_press', 'strict_press', 'bench_press', 'thruster',
 ];
 
+// 네임드 WOD (시간 기록, 짧을수록 좋음). DB 제약(0007)과 프론트 목록과 같게 유지한다.
+export const NAMED_WODS = [
+  'fran', 'grace', 'isabel', 'helen', 'diane', 'elizabeth', 'annie', 'jackie', 'karen',
+  'nancy', 'kelly', 'amanda', 'murph', 'dt', 'jt',
+];
+
 export const AVATAR_OPTIONS = {
   skin: ['s1', 's2', 's3', 's4', 's5', 's6'],
   eyes: ['round', 'smile', 'sharp', 'sleepy', 'sparkle'],
@@ -88,10 +94,19 @@ export const oneRmSchema = z
   .strictObject({
     movement: z.string().trim().min(1).max(30),
     is_custom: z.boolean(),
-    weight_kg: z.number().positive().max(500).multipleOf(0.5),
+    unit: z.enum(['lb', 'time']).default('lb'),
+    weight_lb: z.number().positive().max(1200).multipleOf(0.5).optional(), // 파운드
+    time_sec: z.number().int().min(1).max(86400).optional(), // 초
     achieved_on: isoDate.optional(),
   })
-  .refine((v) => v.is_custom || MOVEMENTS.includes(v.movement), { message: '종목을 다시 선택해주세요', path: ['movement'] })
+  .refine((v) => (v.unit === 'lb' ? v.weight_lb !== undefined && v.time_sec === undefined : v.time_sec !== undefined && v.weight_lb === undefined), {
+    message: '기록 값을 다시 입력해주세요',
+    path: ['unit'],
+  })
+  .refine((v) => v.is_custom || (v.unit === 'lb' ? MOVEMENTS : NAMED_WODS).includes(v.movement), {
+    message: '종목을 다시 선택해주세요',
+    path: ['movement'],
+  })
   .refine((v) => !v.is_custom || /^[0-9A-Za-z가-힣 ()_.-]+$/.test(v.movement), { message: '종목 이름에 쓸 수 없는 문자가 있어요', path: ['movement'] });
 
 export const roleSchema = z.strictObject({ role: z.enum(['pending', 'member', 'admin']) });

@@ -48,6 +48,7 @@ declare
   w_past uuid;
   w_future uuid;
   anon_id uuid := gen_random_uuid();
+  t_first uuid;
   lock_before text;
   r text;
 begin
@@ -61,7 +62,7 @@ begin
   insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data)
   values (c, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
           'rls-test@example.invalid', '{"name":"RLS테스트"}');
-  insert into public.one_rm_records (user_id, movement, weight_kg) values (d, 'deadlift', 100) returning id into rm;
+  insert into public.one_rm_records (user_id, movement, weight_lb) values (d, 'deadlift', 100) returning id into rm;
   insert into public.events (kind, title, starts_at, capacity, created_by)
     values ('gathering', 'RLS 테스트 정원', now() + interval '1 day', 1, d) returning id into ev_full;
   insert into public.events (kind, title, starts_at, signup_deadline, created_by)
@@ -92,8 +93,8 @@ begin
 
   -- ---- 0002: 채팅, 앱 설정, PR 글 연동 삭제
   insert into public.chat_messages (user_id, body) values (d, 'rls-test 관리자 메시지') returning id into dm;
-  insert into public.one_rm_records (user_id, movement, weight_kg) values (a, 'snatch', 50);
-  insert into public.one_rm_records (user_id, movement, weight_kg) values (a, 'snatch', 55) returning id into rm_pr;
+  insert into public.one_rm_records (user_id, movement, weight_lb) values (a, 'snatch', 50);
+  insert into public.one_rm_records (user_id, movement, weight_lb) values (a, 'snatch', 55) returning id into rm_pr;
 
   insert into rls_results values
   (19, '승인 대기자가 채팅 기록 조회', 'ok:0', pg_temp.run_as(c, 'select * from public.chat_messages')),
@@ -138,7 +139,7 @@ begin
   end if;
 
   -- 처음 기록한 종목도 명예의 벽에 올라가는지
-  insert into public.one_rm_records (user_id, movement, weight_kg) values (a, 'clean', 61.5) returning id into rm_first;
+  insert into public.one_rm_records (user_id, movement, weight_lb) values (a, 'clean', 61.5) returning id into rm_first;
   insert into rls_results values
   (40, '종목 첫 기록도 PR 글 생성', 'ok:1', 'ok:' || (select count(*) from public.activities where one_rm_id = rm_first)::text);
   delete from public.one_rm_records where id = rm_first;
@@ -158,10 +159,10 @@ begin
   (45, '회원이 보이지 않는 문자가 섞인 닉네임으로 변경', 'err', pg_temp.run_as(a, format('update public.profiles set nickname = %L where id = %L', '관리' || chr(8203) || '자', a))),
   (46, '회원이 관리자와 같은 닉네임(대소문자만 다르게)으로 변경', 'err', pg_temp.run_as(a, format('update public.profiles set nickname = %L where id = %L', upper((select nickname from public.profiles where id = d)) || '', a)));
   -- 같은 날 1RM 20개를 채운 뒤 21번째는 거부
-  insert into public.one_rm_records (user_id, movement, is_custom, weight_kg)
+  insert into public.one_rm_records (user_id, movement, is_custom, weight_lb)
     select a, 'rls-test cap', true, 10 + g from generate_series(1, 20) g;
   insert into rls_results values
-  (47, '하루 1RM 기록 21번째 (도배)', 'err', pg_temp.run_as(a, 'insert into public.one_rm_records (movement, is_custom, weight_kg) values (''rls-test cap'', true, 99)'));
+  (47, '하루 1RM 기록 21번째 (도배)', 'err', pg_temp.run_as(a, 'insert into public.one_rm_records (movement, is_custom, weight_lb) values (''rls-test cap'', true, 99)'));
   insert into rls_results values
   (49, '관리자가 회원의 1RM 기록 삭제', 'ok:1', pg_temp.run_as(d, format('delete from public.one_rm_records where id = (select id from public.one_rm_records where user_id = %L and movement = ''rls-test cap'' limit 1)', a)));
   delete from public.one_rm_records where user_id = a and movement = 'rls-test cap';
@@ -182,6 +183,20 @@ begin
   (53, '승인 대기자가 읽은 위치 저장', 'err', pg_temp.run_as(c, 'select public.chat_mark_read(now())'));
   delete from public.chat_messages where id = dm2;
 
+  -- ---- 0007: 파운드 + 네임드 WOD 시간 기록 (빠를수록 PR)
+  insert into public.one_rm_records (user_id, movement, unit, time_sec) values (a, 'fran', 'time', 300) returning id into t_first;
+  insert into public.one_rm_records (user_id, movement, unit, time_sec) values (a, 'fran', 'time', 320);
+  insert into public.one_rm_records (user_id, movement, unit, time_sec) values (a, 'fran', 'time', 280);
+  insert into rls_results values
+  (54, '네임드 WOD: 첫 기록 + 더 빠른 기록만 PR (느린 기록은 PR 아님)', 'ok:2',
+   'ok:' || (select count(*) from public.activities a2 join public.one_rm_records r on r.id = a2.one_rm_id
+             where r.user_id = a and r.movement = 'fran')::text),
+  (55, '시간 기록에 무게를 같이 넣기', 'err', pg_temp.run_as(a, 'insert into public.one_rm_records (movement, unit, time_sec, weight_lb) values (''fran'', ''time'', 200, 95)')),
+  (56, '리프트 종목을 시간으로 기록 (목록 밖)', 'err', pg_temp.run_as(a, 'insert into public.one_rm_records (movement, unit, time_sec) values (''back_squat'', ''time'', 200)')),
+  (57, '회원이 파운드 기록 저장', 'ok:1', pg_temp.run_as(a, 'insert into public.one_rm_records (movement, weight_lb) values (''front_squat'', 185)'));
+  delete from public.one_rm_records where user_id = a and ((movement = 'fran' and unit = 'time') or (movement = 'front_squat' and weight_lb = 185))
+    and created_at > now() - interval '1 minute';
+
   -- 도배 방지: 10초 안에 5개를 이미 보냈으면 6번째는 거부
   -- 앞 테스트에서 관리자가 보낸 메시지를 지우고, 정확히 5개를 채운 뒤 6번째를 시도한다
   delete from public.chat_messages where user_id = d and body like 'rls-test%';
@@ -201,7 +216,7 @@ begin
   delete from realtime.messages where event = 'rls-test';
   delete from public.chat_messages where body like 'rls-test%';
   delete from public.chat_sessions where user_id = a and started_at = now();
-  delete from public.one_rm_records where user_id = a and movement = 'snatch' and weight_kg in (50, 55) and created_at > now() - interval '1 minute';
+  delete from public.one_rm_records where user_id = a and movement = 'snatch' and weight_lb in (50, 55) and created_at > now() - interval '1 minute';
   delete from public.events where id in (ev_full, ev_closed);
   delete from public.one_rm_records where id = rm;
   delete from public.activities where user_id = d and payload ->> 'movement' = 'deadlift' and created_at > now() - interval '1 minute';

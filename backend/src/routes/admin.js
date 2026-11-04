@@ -35,7 +35,7 @@ adminRouter.get('/members/:id/records', async (req, res) => {
   const [oneRm, gatherings] = await Promise.all([
     req.sb
       .from('one_rm_records')
-      .select('id, movement, is_custom, weight_kg, achieved_on, created_at')
+      .select('id, movement, is_custom, unit, weight_lb, time_sec, achieved_on, created_at')
       .eq('user_id', id)
       .order('created_at', { ascending: false })
       .limit(200),

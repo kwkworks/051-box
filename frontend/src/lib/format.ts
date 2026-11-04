@@ -50,3 +50,21 @@ export function safeHttpsUrl(url: string | null | undefined): string | null {
     return null;
   }
 }
+
+// 무게는 파운드(lb)로 기록하고 kg 환산값을 함께 보여준다
+export function lbToKg(lb: number): number {
+  return Math.round(lb * 0.45359237 * 10) / 10;
+}
+export function fmtLb(lb: number): string {
+  return `${Math.round(lb * 10) / 10} lb`;
+}
+
+// 시간 기록: 초 → "4:05" 또는 "1:02:30"
+export function fmtTime(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  const ss = String(s).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+

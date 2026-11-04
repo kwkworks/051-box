@@ -16,7 +16,7 @@ meRouter.get('/', async (req, res) => {
   const [streak, today, best] = await Promise.all([
     sb.rpc('my_streak'),
     sb.rpc('kst_today'),
-    sb.from('one_rm_best').select('movement, weight_kg').eq('user_id', userId).eq('is_custom', false),
+    sb.from('one_rm_best').select('movement, weight_lb').eq('user_id', userId).eq('is_custom', false).eq('unit', 'lb'),
   ]);
   const todayDate = unwrap(today);
   const { data: attended, error } = await sb
@@ -32,7 +32,7 @@ meRouter.get('/', async (req, res) => {
     streak: unwrap(streak),
     today: todayDate,
     checkedInToday: Boolean(attended),
-    bestLifts: Object.fromEntries(unwrap(best).map((r) => [r.movement, Number(r.weight_kg)])),
+    bestLifts: Object.fromEntries(unwrap(best).map((r) => [r.movement, Number(r.weight_lb)])),
   });
 });
 

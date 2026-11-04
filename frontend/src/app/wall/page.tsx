@@ -5,8 +5,12 @@ import { BoardShell } from '@/components/BoardShell';
 import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { api } from '@/lib/api';
 import { movementLabel } from '@/lib/constants';
-import { formatRelative } from '@/lib/format';
+import { fmtTime, formatRelative } from '@/lib/format';
 import type { FeedItem } from '@/lib/types';
+import { RecordValue } from '@/components/RecordValue';
+
+// 이전 최고 기록 (없으면 그 종목 첫 기록)
+const prevOf = (item: FeedItem) => (item.payload.unit === 'time' ? item.payload.prev_sec : item.payload.prev_lb) ?? null;
 import { useLoad } from '@/lib/useLoad';
 
 export default function WallPage() {
@@ -32,13 +36,15 @@ function Wall() {
             <div className="min-w-0 flex-1">
               <p className="font-bold">
                 🎉 <span className="text-[var(--burgundy)]">{item.nickname}</span>님{' '}
-                {movementLabel(item.payload.movement, item.payload.is_custom)} {item.payload.prev_kg == null ? '첫 기록!' : 'PR!'}
+                {movementLabel(item.payload.movement, item.payload.is_custom)} {prevOf(item) == null ? '첫 기록!' : 'PR!'}
               </p>
-              <p className="text-2xl font-black">
-                {Number(item.payload.weight_kg)}kg
-                {item.payload.prev_kg != null && (
+              <p className="text-2xl">
+                <RecordValue unit={item.payload.unit ?? 'lb'} weightLb={item.payload.weight_lb} timeSec={item.payload.time_sec} size="lg" />
+                {prevOf(item) != null && (
                   <span className="ml-2 text-sm font-bold text-[var(--ok)]">
-                    +{Math.round((Number(item.payload.weight_kg) - Number(item.payload.prev_kg)) * 10) / 10}kg
+                    {item.payload.unit === 'time'
+                      ? `${fmtTime(Number(item.payload.prev_sec) - Number(item.payload.time_sec))} 단축`
+                      : `+${Math.round((Number(item.payload.weight_lb) - Number(item.payload.prev_lb)) * 10) / 10} lb`}
                   </span>
                 )}
               </p>
