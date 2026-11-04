@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
-import { ChatPanel } from '@/components/ChatPanel';
+import { ChatPanel, type ChatPanelHandle } from '@/components/ChatPanel';
 import { Guard } from '@/components/Guard';
 import { ActionPad } from '@/components/ActionPad';
 import { BgmControl } from '@/components/BgmControl';
@@ -23,7 +23,7 @@ function Space({ me }: { me: Me }) {
   const router = useRouter();
   const { setMe } = useAuth();
   const spaceRef = useRef<BoxSpaceHandle | null>(null);
-  const chatInputRef = useRef<HTMLInputElement>(null);
+  const chatInputRef = useRef<ChatPanelHandle>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -165,8 +165,7 @@ function Space({ me }: { me: Me }) {
           </div>
         )}
 
-        <div className="pointer-events-none absolute bottom-3 left-3 right-24 sm:right-auto">
-          <ChatPanel
+        <ChatPanel
             ref={chatInputRef}
             messages={messages}
             sessions={sessions}
@@ -177,12 +176,19 @@ function Space({ me }: { me: Me }) {
             onSend={sendChat}
             onDelete={deleteChat}
           />
-        </div>
-        <div className="absolute bottom-3 right-3 flex items-end gap-2">
+        <div className="absolute bottom-3 right-3 z-20 flex items-end gap-2">
           <ActionPad pose={action.pose} running={action.running} onAct={(a) => spaceRef.current?.act(a)} />
           <QuickMenu />
         </div>
-        <div className="absolute right-3 top-3 hidden flex-col items-end gap-1 lg:flex">
+        <div className="absolute right-3 top-3 z-10 flex flex-col overflow-hidden rounded-md bg-black/60 text-white lg:top-12" role="group" aria-label="화면 확대·축소">
+          <button type="button" className="h-9 w-9 text-lg font-bold hover:bg-white/10" onClick={() => spaceRef.current?.zoomBy(1)} aria-label="확대">
+            ＋
+          </button>
+          <button type="button" className="h-9 w-9 text-lg font-bold hover:bg-white/10" onClick={() => spaceRef.current?.zoomBy(-1)} aria-label="축소">
+            －
+          </button>
+        </div>
+        <div className="absolute right-3 top-3 z-10 hidden flex-col items-end gap-1 lg:flex">
           <button type="button" className="rounded-md bg-black/60 px-2.5 py-1 text-xs text-white" onClick={() => setHelp((v) => !v)} aria-expanded={help}>
             ⌨️ 조작법
           </button>

@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState, useSyncExternalStore } from 'react';
+import { ActionPad } from '@/components/ActionPad';
 import { AvatarView } from '@/components/AvatarView';
-import { BoxSpace } from '@/game/BoxSpace';
+import { ChatPanel } from '@/components/ChatPanel';
+import { BoxSpace, type BoxSpaceHandle } from '@/game/BoxSpace';
 import { AVATAR_OPTIONS, type Avatar } from '@/lib/constants';
-import type { Profile } from '@/lib/types';
+import type { ChatMessage, Profile } from '@/lib/types';
 
 const DEMO: Profile = {
   id: '00000000-0000-0000-0000-000000000000',
@@ -24,6 +26,10 @@ function samples(): Partial<Avatar>[] {
 export function DevPreview() {
   const [opened, setOpened] = useState("");
   const [view, setView] = useState<'space' | 'avatars'>('space');
+  const space = useRef<BoxSpaceHandle | null>(null);
+  const [msgs, setMsgs] = useState<ChatMessage[]>([]);
+  // 실제 박스 화면처럼 브라우저에서만 채팅창을 그린다 (저장된 위치를 읽기 때문)
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   return (
     <div className="flex h-dvh flex-col">
       <div className="flex gap-2 p-2">
@@ -31,9 +37,29 @@ export function DevPreview() {
         <button type="button" className="btn btn-sm" onClick={() => setView('avatars')}>캐릭터</button>
       </div>
       {view === 'space' ? (
-        <div className="min-h-0 flex-1">
+        <div className="relative min-h-0 flex-1">
           <p id="opened" className="absolute z-10 ml-40 mt-2 rounded bg-white px-2 text-xs">열림: {opened}</p>
-          <BoxSpace profile={DEMO} onOpen={(b) => setOpened(`${b} @ ${new Date().toLocaleTimeString()}`)} />
+          <BoxSpace profile={DEMO} handleRef={space} onOpen={(b) => setOpened(`${b} @ ${new Date().toLocaleTimeString()}`)} />
+          {mounted && <ChatPanel
+            messages={msgs}
+            sessions={[]}
+            currentSessionId={null}
+            myId={DEMO.id}
+            canModerate={false}
+            blockedReason={null}
+            onSend={async (body) => {
+              setMsgs((m) => [...m, { id: String(m.length + 1), user_id: DEMO.id, nickname: DEMO.nickname, body, created_at: new Date().toISOString() } as ChatMessage]);
+              return true;
+            }}
+            onDelete={() => {}}
+          />}
+          <div className="absolute right-3 top-3 z-10 flex flex-col rounded-md bg-black/60 text-white">
+            <button type="button" className="h-9 w-9" onClick={() => space.current?.zoomBy(1)}>＋</button>
+            <button type="button" className="h-9 w-9" onClick={() => space.current?.zoomBy(-1)}>－</button>
+          </div>
+          <div className="absolute bottom-3 right-3 z-20">
+            <ActionPad pose="stand" running={false} onAct={(a) => space.current?.act(a)} />
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-4 gap-2 overflow-auto bg-[var(--mat)] p-3">

@@ -33,12 +33,16 @@ export type BoxSpaceHandle = {
   showMyBubble: (text: string) => void;
   // 모바일 액션 버튼에서 호출
   act: (action: Action) => void;
+  // 화면 확대/축소 (+1 확대, -1 축소). 바뀐 배율(1 = 기본)을 돌려준다
+  zoomBy: (dir: 1 | -1) => number;
 };
 
 export type Action = 'jump' | 'sit' | 'dance' | 'run';
 
 const SPEED = 150; // 초당 이동 픽셀
 const RUN_SPEED = 260;
+const ZOOM_MIN = 0.6;
+const ZOOM_MAX = 1.6;
 const JUMP_MS = 560;
 // 점프 동작: 웅크림(준비) → 공중(팔 번쩍, 포물선) → 착지(살짝 눌림)
 const JUMP_PREP = 90;
@@ -139,6 +143,12 @@ export function BoxSpace({
     let path: { x: number; y: number }[] = [];
     let pendingOpen: ObjectKey | null = null; // 클릭한 오브젝트에 도착하면 연다
     let zoom = 1.5;
+    let baseZoom = 1.5;
+    let userZoom = 1;
+    try {
+      const saved = Number(localStorage.getItem('box-zoom'));
+      if (saved >= ZOOM_MIN && saved <= ZOOM_MAX) userZoom = saved;
+    } catch {}
     let cam = { x: 0, y: 0 };
     let raf = 0;
     let last = performance.now();
@@ -173,7 +183,15 @@ export function BoxSpace({
       }
       notify();
     };
-    if (handleRef) handleRef.current = { showMyBubble: (text) => bubble(me, text), act };
+    const zoomBy = (dir: 1 | -1) => {
+      userZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((userZoom + dir * 0.2) * 10) / 10));
+      zoom = baseZoom * userZoom;
+      try {
+        localStorage.setItem('box-zoom', String(userZoom));
+      } catch {}
+      return userZoom;
+    };
+    if (handleRef) handleRef.current = { showMyBubble: (text) => bubble(me, text), act, zoomBy };
 
     // ---- 화면 크기
     const resize = () => {
@@ -183,7 +201,9 @@ export function BoxSpace({
       canvas.height = Math.floor(height * dpr);
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
-      zoom = (width < 640 ? 1.3 : 1.6) * dpr;
+      // 휴대폰은 더 넓게 보이도록 기본 배율을 낮춘다
+      baseZoom = (width < 640 ? 0.8 : width < 1024 ? 1.25 : 1.6) * dpr;
+      zoom = baseZoom * userZoom;
     };
     resize();
     const ro = new ResizeObserver(resize);
