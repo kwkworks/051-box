@@ -1,11 +1,11 @@
 // 크로스핏051 박스를 탑뷰 픽셀 맵으로 옮긴다. 모든 그림은 코드로 그린다.
 export const TILE = 32;
-export const COLS = 40;
-export const ROWS = 30;
+export const COLS = 34;
+export const ROWS = 22;
 export const WORLD_W = COLS * TILE;
 export const WORLD_H = ROWS * TILE;
 
-export const SPAWN = { x: 36.5 * TILE, y: 28.5 * TILE };
+export const SPAWN = { x: 30.5 * TILE, y: 19.5 * TILE };
 
 export type BoardKey = 'hub' | 'wod' | 'notices' | 'competition' | 'gathering' | 'one-rm' | 'wall';
 export type ObjectKey = BoardKey;
@@ -29,23 +29,24 @@ type Box = { x: number; y: number; w: number; h: number };
 
 // 상호작용 오브젝트: 타일 좌표
 // 상호작용 오브젝트: 게시판 키오스크 하나로 모은다 (모든 기능은 게시판에서)
-export const OBJECTS: (Box & { board: ObjectKey })[] = [{ board: 'hub', x: 31, y: 27, w: 2, h: 1 }];
+export const OBJECTS: (Box & { board: ObjectKey })[] = [{ board: 'hub', x: 26, y: 19, w: 2, h: 1 }];
 
 // 장식 (실제 박스 모습. 지나갈 수 없지만 상호작용은 없다)
 const DECOR: Box[] = [
   { x: 2, y: 0, w: 6, h: 3 }, // 상장 벽
   { x: 9, y: 0, w: 7, h: 3 }, // 팀 배너
-  { x: 19, y: 3, w: 7, h: 2 }, // RECORD 화이트보드
-  { x: 29, y: 0, w: 5, h: 3 }, // 대회 포스터
-  { x: 29, y: 23, w: 6, h: 3 }, // 데스크
+  { x: 13, y: 3, w: 7, h: 2 }, // RECORD 화이트보드
+  { x: 23, y: 0, w: 5, h: 3 }, // 대회 포스터
+  { x: 23, y: 16, w: 6, h: 3 }, // 데스크
 ];
 
 // 장애물 (상호작용 없음)
 const RIG_POSTS: [number, number][] = [];
-for (const row of [8, 14]) for (let x = 5; x <= 21; x += 4) RIG_POSTS.push([x, row]);
+const RIG_ROWS = [7, 12];
+for (const row of RIG_ROWS) for (let x = 5; x <= 17; x += 4) RIG_POSTS.push([x, row]);
 // 유산소 머신: 오른쪽 벽을 따라 위에서부터 한 줄 (가로 3칸, 회원은 왼쪽을 보고 탄다)
-export type MachineKind = 'rower' | 'ski' | 'bikeErg' | 'assault' | 'treadmill';
-export const MACHINE_INFO: Record<MachineKind, { label: string; icon: string }> = {
+type MachineKind = 'rower' | 'ski' | 'bikeErg' | 'assault' | 'treadmill';
+const MACHINE_INFO: Record<MachineKind, { label: string; icon: string }> = {
   rower: { label: '로잉머신', icon: '🚣' },
   ski: { label: '스키에르그', icon: '⛷' },
   bikeErg: { label: '바이크에르그', icon: '🚴' },
@@ -53,94 +54,52 @@ export const MACHINE_INFO: Record<MachineKind, { label: string; icon: string }> 
   treadmill: { label: '트레드밀', icon: '🏃' },
 };
 const MACHINE_ORDER: MachineKind[] = [
-  'rower', 'rower', 'rower', 'rower', 'rower',
+  'rower', 'rower', 'rower',
   'ski', 'ski',
-  'bikeErg', 'bikeErg',
-  'assault', 'assault',
-  'treadmill', 'treadmill',
+  'bikeErg',
+  'assault',
+  'treadmill',
 ];
-export const MACHINES: (Box & { kind: MachineKind })[] = MACHINE_ORDER.map((kind, i) => ({ kind, x: 36, y: 3 + i * 2, w: 3, h: 1 })); // 사이에 한 칸씩 (캐릭터가 설 자리)
-
-// 머신을 탈 때 캐릭터 발 위치
-export function seatOf(i: number): { x: number; y: number } {
-  const m = MACHINES[i];
-  const offset = m.kind === 'rower' ? 1.3 : m.kind === 'ski' ? 1.4 : 1.6;
-  return { x: (m.x + offset) * TILE, y: (m.y + 1) * TILE - 3 };
-}
-
-export function nearbyMachine(x: number, y: number): number | null {
-  let best: number | null = null;
-  let bestDist = 1.1;
-  MACHINES.forEach((m, i) => {
-    const d = boxDist(m, x, y);
-    if (d < bestDist) {
-      best = i;
-      bestDist = d;
-    }
-  });
-  return best;
-}
-
-export function machineAt(wx: number, wy: number): number | null {
-  const i = MACHINES.findIndex((m) => wx >= m.x * TILE && wx <= (m.x + m.w) * TILE && wy >= m.y * TILE && wy <= (m.y + m.h) * TILE);
-  return i < 0 ? null : i;
-}
+const MACHINES: (Box & { kind: MachineKind })[] = MACHINE_ORDER.map((kind, i) => ({ kind, x: 30, y: 3 + i * 2, w: 3, h: 1 })); // 사이에 한 칸씩 (캐릭터가 설 자리)
 
 const PILLARS: Box[] = [
-  { x: 26, y: 10, w: 2, h: 2 },
-  { x: 26, y: 16, w: 2, h: 2 },
+  { x: 21, y: 8, w: 2, h: 2 },
+  { x: 21, y: 13, w: 2, h: 2 },
 ];
-const BOXES: Box[] = [{ x: 19, y: 27, w: 2, h: 1 }]; // 플라이오 박스 (아래 벽 쪽 기구 줄)
-const COOLER: Box = { x: 28, y: 3, w: 1, h: 2 }; // 정수기 (위쪽 벽, 화이트보드 옆)
+const BOXES: Box[] = [{ x: 17, y: 19, w: 2, h: 1 }]; // 플라이오 박스 (아래 벽 쪽 기구 줄)
+const COOLER: Box = { x: 21, y: 3, w: 1, h: 2 }; // 정수기 (위쪽 벽, 화이트보드 옆)
 
-// ---- 철봉 (풀업 리그): 두 줄. 매달리면 손은 봉에, 몸은 바로 아래 칸
-export const BAR_ROWS = [8, 14] as const;
-export const BAR_MIN_X = 5.6 * TILE;
-export const BAR_MAX_X = 21.4 * TILE;
-export function hangY(row: number) {
-  return (row + 1) * TILE + 18;
-}
-// 철봉 바로 위나 아래에 서 있으면 매달릴 수 있다
-export function nearbyBar(x: number, y: number): number | null {
-  if (x < BAR_MIN_X || x > BAR_MAX_X) return null;
-  for (const row of BAR_ROWS) if (y > (row - 1) * TILE + 8 && y < (row + 2) * TILE) return row;
-  return null;
-}
-export function barAt(wx: number, wy: number): number | null {
-  if (wx < BAR_MIN_X || wx > BAR_MAX_X) return null;
-  for (const row of BAR_ROWS) if (Math.abs(wy - (row * TILE + 7)) < 14) return row;
-  return null;
-}
-
-// ---- 들고 다닐 수 있는 운동기구: 기구 자리(스테이션)에서 집고, 아무 데서나 내려놓으면 제자리로 돌아간다
-export type GearKey = 'barbell' | 'kettlebell' | 'dumbbell' | 'medball';
-export const GEAR: Record<GearKey, { label: string; icon: string }> = {
-  barbell: { label: '바벨', icon: '🏋️' },
-  kettlebell: { label: '케틀벨', icon: '🔔' },
-  dumbbell: { label: '덤벨', icon: '💪' },
-  medball: { label: '메디신볼', icon: '⚫' },
+// ---- 기구 랙 (장식)
+type GearKey = 'barbell' | 'kettlebell' | 'dumbbell' | 'medball';
+const GEAR_NAMES: Record<GearKey, string> = {
+  barbell: '🏋️ 바벨·원판 랙',
+  kettlebell: '🔔 케틀벨 랙',
+  dumbbell: '💪 덤벨 랙',
+  medball: '⚫ 메디신볼',
 };
-export const GEAR_KEYS = Object.keys(GEAR) as GearKey[];
-export const STATIONS: (Box & { gear: GearKey })[] = [
-  { gear: 'barbell', x: 1, y: 13, w: 3, h: 7 },
-  { gear: 'kettlebell', x: 3, y: 27, w: 3, h: 1 },
-  { gear: 'dumbbell', x: 8, y: 27, w: 3, h: 1 },
-  { gear: 'medball', x: 13, y: 27, w: 3, h: 1 },
+const STATIONS: (Box & { gear: GearKey })[] = [
+  { gear: 'barbell', x: 1, y: 11, w: 3, h: 6 },
+  { gear: 'kettlebell', x: 3, y: 19, w: 3, h: 1 },
+  { gear: 'dumbbell', x: 8, y: 19, w: 3, h: 1 },
+  { gear: 'medball', x: 13, y: 19, w: 3, h: 1 },
 ];
 
 // 눌렀을 때 이름을 알려줄 구조물들
 const NAMED: (Box & { name: string })[] = [
   { x: 2, y: 0, w: 6, h: 3, name: '🏅 상장 벽' },
   { x: 9, y: 0, w: 7, h: 3, name: '🚩 팀 배너' },
-  { x: 19, y: 3, w: 7, h: 2, name: '📝 RECORD 화이트보드' },
-  { x: 29, y: 0, w: 5, h: 3, name: '🏆 대회 포스터' },
-  { x: 29, y: 23, w: 6, h: 3, name: '🛎 데스크' },
+  { x: 13, y: 3, w: 7, h: 2, name: '📝 RECORD 화이트보드' },
+  { x: 23, y: 0, w: 5, h: 3, name: '🏆 대회 포스터' },
+  { x: 23, y: 16, w: 6, h: 3, name: '🛎 데스크' },
   ...PILLARS.map((b) => ({ ...b, name: '노란 기둥' })),
-  { x: 5, y: 8, w: 17, h: 1, name: '🤸 철봉 (풀업 리그)' },
-  { x: 5, y: 14, w: 17, h: 1, name: '🤸 철봉 (풀업 리그)' },
+  ...RIG_ROWS.map((y) => ({ x: 5, y, w: 13, h: 1, name: '🤸 풀업 리그' })),
   ...BOXES.map((b) => ({ ...b, name: '📦 플라이오 박스' })),
   { ...COOLER, name: '💧 정수기' },
+  ...MACHINES.map((m) => ({ ...m, name: `${MACHINE_INFO[m.kind].icon} ${MACHINE_INFO[m.kind].label}` })),
+  ...STATIONS.map((st) => ({ ...st, name: GEAR_NAMES[st.gear] })),
 ];
+
+const ENTRANCE_X = 29; // 입구 (아래 벽, 3칸)
 
 export const solid: boolean[][] = Array.from({ length: ROWS }, () => Array<boolean>(COLS).fill(false));
 function block(b: Box) {
@@ -148,7 +107,7 @@ function block(b: Box) {
 }
 for (let x = 0; x < COLS; x++) {
   block({ x, y: 0, w: 1, h: 3 });
-  if (x < 35 || x > 37) block({ x, y: ROWS - 1, w: 1, h: 1 });
+  if (x < ENTRANCE_X || x > ENTRANCE_X + 2) block({ x, y: ROWS - 1, w: 1, h: 1 });
 }
 for (let y = 0; y < ROWS; y++) {
   block({ x: 0, y, w: 1, h: 1 });
@@ -190,37 +149,6 @@ export function nearbyBoard(x: number, y: number): ObjectKey | null {
     }
   }
   return best;
-}
-
-function boxDist(o: Box, x: number, y: number) {
-  const tx = x / TILE;
-  const ty = (y - 4) / TILE;
-  const dx = Math.max(o.x - tx, 0, tx - (o.x + o.w));
-  const dy = Math.max(o.y - ty, 0, ty - (o.y + o.h));
-  return Math.hypot(dx, dy);
-}
-
-// 손이 닿는 기구 자리
-export function nearbyStation(x: number, y: number): GearKey | null {
-  let best: GearKey | null = null;
-  let bestDist = 1.1;
-  for (const s of STATIONS) {
-    const d = boxDist(s, x, y);
-    if (d < bestDist) {
-      best = s.gear;
-      bestDist = d;
-    }
-  }
-  return best;
-}
-
-export function isNearStation(gear: GearKey, x: number, y: number): boolean {
-  return STATIONS.some((s) => s.gear === gear && boxDist(s, x, y) < 1.1);
-}
-
-export function stationAt(wx: number, wy: number): GearKey | null {
-  const s = STATIONS.find((o) => wx >= o.x * TILE - 4 && wx <= (o.x + o.w) * TILE + 4 && wy >= o.y * TILE - 8 && wy <= (o.y + o.h) * TILE + 4);
-  return s?.gear ?? null;
 }
 
 // 누른 곳의 구조물 이름 (이름표 대신 잠깐 보여준다)
@@ -347,7 +275,7 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
   rect(ctx, 0, 0, WORLD_W, WORLD_H, C.mat);
   for (let y = 3; y < ROWS; y++) {
     for (let x = 1; x < COLS - 1; x++) {
-      const walk = x >= 25;
+      const walk = x >= 21;
       rect(ctx, x * T, y * T, T, T, walk ? C.walk : C.mat);
       ctx.strokeStyle = walk ? '#333338' : C.matLine;
       ctx.lineWidth = 1;
@@ -362,7 +290,7 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
     }
   }
   // 바닥 라인 (WOD 구역 표시)
-  rect(ctx, 5 * T, 25 * T, 17 * T, 2, '#BDBDBD');
+  rect(ctx, 5 * T, 17 * T, 13 * T, 2, '#BDBDBD');
 
   // 벽 (위, 좌우, 아래)
   rect(ctx, 0, 0, WORLD_W, 3 * T, C.wall);
@@ -371,11 +299,11 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
   rect(ctx, 0, 1.55 * T + 8, WORLD_W, 5, C.yellow);
   rect(ctx, 0, 3 * T, T, WORLD_H, C.wallShade);
   rect(ctx, WORLD_W - T, 3 * T, T, WORLD_H, C.wallShade);
-  rect(ctx, 0, WORLD_H - T, 35 * T, T, C.wallShade);
-  rect(ctx, 38 * T, WORLD_H - T, 2 * T, T, C.wallShade);
+  rect(ctx, 0, WORLD_H - T, ENTRANCE_X * T, T, C.wallShade);
+  rect(ctx, (ENTRANCE_X + 3) * T, WORLD_H - T, (COLS - ENTRANCE_X - 3) * T, T, C.wallShade);
   // 입구
-  rect(ctx, 35 * T, WORLD_H - T, 3 * T, T, '#5C5C63');
-  label(ctx, '입구', 36.5 * T, WORLD_H - T / 2, '#E8E8E8', 12);
+  rect(ctx, ENTRANCE_X * T, WORLD_H - T, 3 * T, T, '#5C5C63');
+  label(ctx, '입구', (ENTRANCE_X + 1.5) * T, WORLD_H - T / 2, '#E8E8E8', 12);
 
   // 051 로고 벽화 (왼쪽 벽 위쪽)
   label(ctx, '051', 17.5 * T, 1 * T, '#C9C2B5', 26);
@@ -406,31 +334,31 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
   });
 
   // 대회 포스터
-  rect(ctx, 29.3 * T, 0.2 * T, 4.4 * T, 2.5 * T, '#2F6FD1');
-  rect(ctx, 29.3 * T + 4, 0.2 * T + 4, 4.4 * T - 8, 2.5 * T - 8, '#3E82E6');
-  label(ctx, '멋지다 051', 31.5 * T, 0.8 * T, C.white, 13);
-  label(ctx, 'COMPETITION', 31.5 * T, 1.55 * T, '#FFE27A', 11);
-  rect(ctx, 30.6 * T, 1.95 * T, 1.8 * T, 6, C.yellow);
+  rect(ctx, 23.3 * T, 0.2 * T, 4.4 * T, 2.5 * T, '#2F6FD1');
+  rect(ctx, 23.3 * T + 4, 0.2 * T + 4, 4.4 * T - 8, 2.5 * T - 8, '#3E82E6');
+  label(ctx, '멋지다 051', 25.5 * T, 0.8 * T, C.white, 13);
+  label(ctx, 'COMPETITION', 25.5 * T, 1.55 * T, '#FFE27A', 11);
+  rect(ctx, 24.6 * T, 1.95 * T, 1.8 * T, 6, C.yellow);
 
   // RECORD 화이트보드 (스탠드형)
-  rect(ctx, 19 * T, 3 * T, 7 * T, 2 * T - 6, '#9A9A9A');
-  rect(ctx, 19 * T + 4, 3 * T + 4, 7 * T - 8, 2 * T - 14, C.white);
-  label(ctx, 'RECORD 2026', 22.5 * T, 3 * T + 16, '#C2453A', 13);
-  rect(ctx, 19.4 * T, 3.9 * T, 2.4 * T, 3, '#3B82C4');
-  rect(ctx, 19.4 * T, 4.15 * T, 2.0 * T, 3, '#5F5E5A');
-  rect(ctx, 23 * T, 3.9 * T, 2.4 * T, 3, '#5F5E5A');
-  rect(ctx, 23 * T, 4.15 * T, 1.6 * T, 3, '#5F5E5A');
+  rect(ctx, 13 * T, 3 * T, 7 * T, 2 * T - 6, '#9A9A9A');
+  rect(ctx, 13 * T + 4, 3 * T + 4, 7 * T - 8, 2 * T - 14, C.white);
+  label(ctx, 'RECORD 2026', 16.5 * T, 3 * T + 16, '#C2453A', 13);
+  rect(ctx, 13.4 * T, 3.9 * T, 2.4 * T, 3, '#3B82C4');
+  rect(ctx, 13.4 * T, 4.15 * T, 2.0 * T, 3, '#5F5E5A');
+  rect(ctx, 17 * T, 3.9 * T, 2.4 * T, 3, '#5F5E5A');
+  rect(ctx, 17 * T, 4.15 * T, 1.6 * T, 3, '#5F5E5A');
+  rect(ctx, 13.4 * T, 5 * T - 4, 4, 6, '#777');
   rect(ctx, 19.4 * T, 5 * T - 4, 4, 6, '#777');
-  rect(ctx, 25.4 * T, 5 * T - 4, 4, 6, '#777');
 
   // 풀업 리그: 기둥 + 철봉 + 링
-  for (const row of [8, 14]) {
-    rect(ctx, 5 * T + 12, row * T + 4, 16 * T + 8, 6, '#0E0E10');
-    for (let x = 5; x <= 21; x += 4) {
+  for (const row of RIG_ROWS) {
+    rect(ctx, 5 * T + 12, row * T + 4, 12 * T + 8, 6, '#0E0E10');
+    for (let x = 5; x <= 17; x += 4) {
       rect(ctx, x * T + 8, row * T - 6, 16, T + 4, '#0E0E10');
       rect(ctx, x * T + 11, row * T - 6, 3, T + 4, '#3A3A3F');
     }
-    for (let x = 7; x <= 19; x += 4) {
+    for (let x = 7; x <= 15; x += 4) {
       ctx.strokeStyle = '#C9A36B';
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -507,10 +435,10 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
   });
 
   // 바벨/플레이트 랙
-  rect(ctx, 1 * T, 13 * T, 3 * T, 7 * T, '#202024');
+  rect(ctx, 1 * T, 11 * T, 3 * T, 6 * T, '#202024');
   const plateColors = ['#3B6FD1', '#3E9E5F', '#D9443E', '#E8B923', '#8C8B88'];
-  for (let i = 0; i < 6; i++) {
-    const py = 13.3 * T + i * 34;
+  for (let i = 0; i < 5; i++) {
+    const py = 11.3 * T + i * 36;
     const color = plateColors[i % plateColors.length];
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -521,22 +449,22 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
     ctx.arc(1.8 * T, py + 12, 3, 0, Math.PI * 2);
     ctx.fill();
   }
-  for (let i = 0; i < 7; i++) rect(ctx, 2.9 * T + (i % 2) * 6, 13.4 * T + i * 30, 4, 26, ['#E58FB5', '#3B82C4', '#1B1B1E'][i % 3]);
+  for (let i = 0; i < 6; i++) rect(ctx, 2.9 * T + (i % 2) * 6, 11.4 * T + i * 30, 4, 26, ['#E58FB5', '#3B82C4', '#1B1B1E'][i % 3]);
 
   // 데스크 (원형 로고)
-  rect(ctx, 29 * T, 23 * T, 6 * T, 3 * T - 4, '#DCD8D0');
-  rect(ctx, 29 * T + 4, 23 * T + 4, 6 * T - 8, 2 * T, '#F6F4EF');
+  rect(ctx, 23 * T, 16 * T, 6 * T, 3 * T - 4, '#DCD8D0');
+  rect(ctx, 23 * T + 4, 16 * T + 4, 6 * T - 8, 2 * T, '#F6F4EF');
   ctx.fillStyle = '#1B1B1E';
   ctx.beginPath();
-  ctx.arc(32 * T, 24 * T, 22, 0, Math.PI * 2);
+  ctx.arc(26 * T, 17 * T, 22, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = '#F0C850';
   ctx.lineWidth = 2;
   ctx.stroke();
-  label(ctx, 'CROSSFIT', 32 * T, 24 * T - 6, '#F0C850', 8);
-  label(ctx, '051', 32 * T, 24 * T + 7, C.white, 13);
-  rect(ctx, 29.6 * T, 23.3 * T, 14, 18, '#F2EEE4');
-  rect(ctx, 33.8 * T, 23.4 * T, 10, 14, '#5BB0E8');
+  label(ctx, 'CROSSFIT', 26 * T, 17 * T - 6, '#F0C850', 8);
+  label(ctx, '051', 26 * T, 17 * T + 7, C.white, 13);
+  rect(ctx, 23.6 * T, 16.3 * T, 14, 18, '#F2EEE4');
+  rect(ctx, 27.8 * T, 16.4 * T, 10, 14, '#5BB0E8');
 
   // 정수기 (위에 파란 물통)
   rect(ctx, COOLER.x * T + 5, COOLER.y * T + 14, T - 10, 2 * T - 18, '#EDEDED');
@@ -550,10 +478,12 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
   rect(ctx, COOLER.x * T + 18, COOLER.y * T + 26, 4, 3, '#D9443E');
 
   // 게시판 키오스크 (입구 옆)
-  rect(ctx, 31 * T + 4, 27 * T - 10, 2 * T - 8, T + 6, '#2B2B30');
-  rect(ctx, 31 * T + 8, 27 * T - 6, 2 * T - 16, T - 6, '#3E82E6');
-  for (let i = 0; i < 3; i++) rect(ctx, 31 * T + 12, 27 * T - 1 + i * 6, 2 * T - 24, 3, '#CFE2FF');
-  rect(ctx, 32 * T - 3, 28 * T - 4, 6, 4, '#2B2B30');
+  const kx = OBJECTS[0].x;
+  const ky = OBJECTS[0].y;
+  rect(ctx, kx * T + 4, ky * T - 10, 2 * T - 8, T + 6, '#2B2B30');
+  rect(ctx, kx * T + 8, ky * T - 6, 2 * T - 16, T - 6, '#3E82E6');
+  for (let i = 0; i < 3; i++) rect(ctx, kx * T + 12, ky * T - 1 + i * 6, 2 * T - 24, 3, '#CFE2FF');
+  rect(ctx, (kx + 1) * T - 3, (ky + 1) * T - 4, 6, 4, '#2B2B30');
 
   // 이름표: 무엇인지 이름만 보고 알 수 있게
   for (const o of OBJECTS) {
@@ -580,59 +510,11 @@ export function drawObjectHint(ctx: CanvasRenderingContext2D, board: ObjectKey, 
   if (o) drawBoxHint(ctx, o, t);
 }
 
-export function drawStationHint(ctx: CanvasRenderingContext2D, gear: GearKey, t: number) {
-  const o = STATIONS.find((x) => x.gear === gear);
-  if (o) drawBoxHint(ctx, o, t);
-}
-
 function drawBoxHint(ctx: CanvasRenderingContext2D, o: Box, t: number) {
   const alpha = 0.55 + Math.sin(t / 180) * 0.25;
   ctx.strokeStyle = `rgba(232,185,35,${alpha})`;
   ctx.lineWidth = 3;
   ctx.strokeRect(o.x * TILE - 2, o.y * TILE - 2, o.w * TILE + 4, o.h * TILE + 4);
-}
-
-// 캐릭터가 들고 있는 기구 (cx, cy = 손 위치, 월드 좌표)
-export function drawGear(ctx: CanvasRenderingContext2D, gear: GearKey, cx: number, cy: number, side: boolean) {
-  const r = (x: number, y: number, w: number, h: number, c: string) => rect(ctx, cx + x, cy + y, w, h, c);
-  if (gear === 'barbell') {
-    if (side) {
-      // 옆에서 보면 원판만 보인다
-      r(-3, -9, 6, 18, '#17171A');
-      r(-2, -8, 4, 16, '#D9443E');
-      return;
-    }
-    r(-26, -1, 52, 3, '#B5B5B5');
-    for (const sx of [-26, 20]) {
-      r(sx, -8, 6, 17, '#17171A');
-      r(sx + 1, -7, 4, 15, '#D9443E');
-    }
-  } else if (gear === 'kettlebell') {
-    ctx.fillStyle = '#17171A';
-    ctx.beginPath();
-    ctx.arc(cx, cy + 5, 6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#17171A';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy - 1, 3.5, Math.PI, 0);
-    ctx.stroke();
-    r(-4, 2, 8, 2, '#E8B923');
-  } else if (gear === 'dumbbell') {
-    r(-8, -3, 4, 7, '#17171A');
-    r(-4, -1, 8, 3, '#9C9C9C');
-    r(4, -3, 4, 7, '#17171A');
-  } else {
-    ctx.fillStyle = '#17171A';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 8, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#D9443E';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 6.5, 0, Math.PI * 2);
-    ctx.fill();
-    r(-7, -1, 14, 2, '#17171A');
-  }
 }
 
 // 머신 하나 그리기 (가로 3칸, 오른쪽이 벽)
