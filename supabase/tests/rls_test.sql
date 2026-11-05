@@ -1,7 +1,8 @@
 -- =====================================================================
 -- 051 BOX 보안(RLS) 자동 테스트
 -- SQL Editor에서 실행한다. 실제 사용자 권한으로 "막혀야 하는 요청"을 보내고 결과를 표로 보여준다.
--- 필요: 관리자 1명(admin) + 승인된 회원 1명(member). 승인 대기 계정은 테스트 중에 임시로 만들고 지운다.
+-- 필요: 관리자 1명(admin) + 승인된 회원 1명(member). 승인 대기 계정과 기록 테스트용 회원은 테스트 중에 임시로 만들고 지운다.
+-- 1RM·기록 테스트는 임시 회원으로만 해서 실제 회원의 기록은 건드리지 않는다.
 -- 테스트로 만든 데이터는 마지막에 모두 삭제한다.
 -- =====================================================================
 
@@ -38,6 +39,7 @@ declare
   d uuid;  -- 관리자
   a uuid;  -- 승인된 회원
   c uuid := gen_random_uuid();  -- 임시 승인 대기 계정
+  m uuid := gen_random_uuid();  -- 임시 승인 회원 (기록 테스트용, 실제 회원 기록 보호)
   rm uuid;
   ev_full uuid;
   ev_closed uuid;
@@ -63,6 +65,10 @@ begin
   insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data)
   values (c, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
           'rls-test@example.invalid', '{"name":"RLS테스트"}');
+  insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data)
+  values (m, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+          'rls-test-member@example.invalid', '{"name":"RLS회원"}');
+  update public.profiles set role = 'member' where id = m;
   insert into public.one_rm_records (user_id, movement, weight_lb) values (d, 'deadlift', 100) returning id into rm;
   insert into public.events (kind, title, starts_at, capacity, created_by)
     values ('gathering', 'RLS 테스트 정원', now() + interval '1 day', 1, d) returning id into ev_full;
@@ -94,8 +100,8 @@ begin
 
   -- ---- 0002: 채팅, 앱 설정, PR 글 연동 삭제
   insert into public.chat_messages (user_id, body) values (d, 'rls-test 관리자 메시지') returning id into dm;
-  insert into public.one_rm_records (user_id, movement, weight_lb) values (a, 'snatch', 50);
-  insert into public.one_rm_records (user_id, movement, weight_lb) values (a, 'snatch', 55) returning id into rm_pr;
+  insert into public.one_rm_records (user_id, movement, weight_lb) values (m, 'snatch', 50);
+  insert into public.one_rm_records (user_id, movement, weight_lb) values (m, 'snatch', 55) returning id into rm_pr;
 
   insert into rls_results values
   (19, '승인 대기자가 채팅 기록 조회', 'ok:0', pg_temp.run_as(c, 'select * from public.chat_messages')),
@@ -105,7 +111,7 @@ begin
   (23, '회원 본인 채팅 작성', 'ok:1', pg_temp.run_as(a, 'insert into public.chat_messages (body) values (''rls-test 회원 메시지'')')),
   (24, '회원이 앱 설정(시트 주소) 조회', 'ok:0', pg_temp.run_as(a, 'select * from public.app_settings')),
   (25, '회원이 시트 주소 바꾸기', 'err', pg_temp.run_as(a, 'insert into public.app_settings (key, value) values (''wod_sheet_url'', ''https://evil.example'')')),
-  (26, '회원이 PR 글을 직접 지우기', 'err', pg_temp.run_as(a, format('delete from public.activities where one_rm_id = %L', rm_pr)));
+  (26, '회원이 PR 글을 직접 지우기', 'err', pg_temp.run_as(m, format('delete from public.activities where one_rm_id = %L', rm_pr)));
 
   -- ---- 0003: 접속해 있던 동안의 대화만, 채팅 제한/잠금, 첫 기록도 PR
   -- 회원이 접속하기 전에 오간 대화처럼 보이도록 관리자 메시지 시간을 1분 앞당긴다
@@ -140,7 +146,7 @@ begin
   end if;
 
   -- 처음 기록한 종목도 명예의 벽에 올라가는지
-  insert into public.one_rm_records (user_id, movement, weight_lb) values (a, 'clean', 61.5) returning id into rm_first;
+  insert into public.one_rm_records (user_id, movement, weight_lb) values (m, 'clean', 61.5) returning id into rm_first;
   insert into rls_results values
   (40, '종목 첫 기록도 PR 글 생성', 'ok:1', 'ok:' || (select count(*) from public.activities where one_rm_id = rm_first)::text);
   delete from public.one_rm_records where id = rm_first;
@@ -161,12 +167,12 @@ begin
   (46, '회원이 관리자와 같은 닉네임(대소문자만 다르게)으로 변경', 'err', pg_temp.run_as(a, format('update public.profiles set nickname = %L where id = %L', upper((select nickname from public.profiles where id = d)) || '', a)));
   -- 같은 날 1RM 20개를 채운 뒤 21번째는 거부
   insert into public.one_rm_records (user_id, movement, is_custom, weight_lb)
-    select a, 'rls-test cap', true, 10 + g from generate_series(1, 20) g;
+    select m, 'rls-test cap', true, 10 + g from generate_series(1, 20) g;
   insert into rls_results values
-  (47, '하루 1RM 기록 21번째 (도배)', 'err', pg_temp.run_as(a, 'insert into public.one_rm_records (movement, is_custom, weight_lb) values (''rls-test cap'', true, 99)'));
+  (47, '하루 1RM 기록 21번째 (도배)', 'err', pg_temp.run_as(m, 'insert into public.one_rm_records (movement, is_custom, weight_lb) values (''rls-test cap'', true, 99)'));
   insert into rls_results values
-  (49, '관리자가 회원의 1RM 기록 삭제', 'ok:1', pg_temp.run_as(d, format('delete from public.one_rm_records where id = (select id from public.one_rm_records where user_id = %L and movement = ''rls-test cap'' limit 1)', a)));
-  delete from public.one_rm_records where user_id = a and movement = 'rls-test cap';
+  (49, '관리자가 회원의 1RM 기록 삭제', 'ok:1', pg_temp.run_as(d, format('delete from public.one_rm_records where id = (select id from public.one_rm_records where user_id = %L and movement = ''rls-test cap'' limit 1)', m)));
+  delete from public.one_rm_records where user_id = m and movement = 'rls-test cap';
   -- 익명 로그인 계정은 회원 정보(승인 대기 목록)에 생기지 않는다
   insert into auth.users (id, instance_id, aud, role, is_anonymous, raw_user_meta_data)
   values (anon_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', true, '{}');
@@ -185,30 +191,30 @@ begin
   delete from public.chat_messages where id = dm2;
 
   -- ---- 0007: 파운드 + 네임드 WOD 시간 기록 (빠를수록 PR)
-  insert into public.one_rm_records (user_id, movement, unit, time_sec) values (a, 'fran', 'time', 300) returning id into t_first;
-  insert into public.one_rm_records (user_id, movement, unit, time_sec) values (a, 'fran', 'time', 320);
-  insert into public.one_rm_records (user_id, movement, unit, time_sec) values (a, 'fran', 'time', 280);
+  insert into public.one_rm_records (user_id, movement, unit, time_sec) values (m, 'fran', 'time', 300) returning id into t_first;
+  insert into public.one_rm_records (user_id, movement, unit, time_sec) values (m, 'fran', 'time', 320);
+  insert into public.one_rm_records (user_id, movement, unit, time_sec) values (m, 'fran', 'time', 280);
   insert into rls_results values
   (54, '네임드 WOD: 첫 기록 + 더 빠른 기록만 PR (느린 기록은 PR 아님)', 'ok:2',
    'ok:' || (select count(*) from public.activities a2 join public.one_rm_records r on r.id = a2.one_rm_id
-             where r.user_id = a and r.movement = 'fran')::text),
-  (55, '시간 기록에 무게를 같이 넣기', 'err', pg_temp.run_as(a, 'insert into public.one_rm_records (movement, unit, time_sec, weight_lb) values (''fran'', ''time'', 200, 95)')),
-  (56, '리프트 종목을 시간으로 기록 (목록 밖)', 'err', pg_temp.run_as(a, 'insert into public.one_rm_records (movement, unit, time_sec) values (''back_squat'', ''time'', 200)')),
-  (57, '회원이 파운드 기록 저장', 'ok:1', pg_temp.run_as(a, 'insert into public.one_rm_records (movement, weight_lb) values (''front_squat'', 185)'));
-  delete from public.one_rm_records where user_id = a and ((movement = 'fran' and unit = 'time') or (movement = 'front_squat' and weight_lb = 185))
+             where r.user_id = m and r.movement = 'fran')::text),
+  (55, '시간 기록에 무게를 같이 넣기', 'err', pg_temp.run_as(m, 'insert into public.one_rm_records (movement, unit, time_sec, weight_lb) values (''fran'', ''time'', 200, 95)')),
+  (56, '리프트 종목을 시간으로 기록 (목록 밖)', 'err', pg_temp.run_as(m, 'insert into public.one_rm_records (movement, unit, time_sec) values (''back_squat'', ''time'', 200)')),
+  (57, '회원이 파운드 기록 저장', 'ok:1', pg_temp.run_as(m, 'insert into public.one_rm_records (movement, weight_lb) values (''front_squat'', 185)'));
+  delete from public.one_rm_records where user_id = m and ((movement = 'fran' and unit = 'time') or (movement = 'front_squat' and weight_lb = 185))
     and created_at > now() - interval '1 minute';
 
   -- ---- 0008: 승인 취소 회원 기록 숨김 + 관리자 전체 삭제
-  -- 임시 계정 c를 회원으로 올려 "다른 회원" 시점으로 보고, 회원 a를 잠시 승인 취소한다
+  -- 임시 계정 c를 회원으로 올려 "다른 회원" 시점으로 보고, 임시 회원 m을 잠시 승인 취소한다
   update public.profiles set role = 'member' where id = c;
-  update public.profiles set role = 'pending' where id = a;
+  update public.profiles set role = 'pending' where id = m;
   insert into rls_results values
-  (58, '승인 취소 회원의 1RM 기록을 다른 회원이 조회', 'ok:0', pg_temp.run_as(c, format('select 1 from public.one_rm_records where user_id = %L', a))),
-  (59, '관리자는 승인 취소 회원 기록 조회 가능', 'ok:1', pg_temp.run_as(d, format('select 1 from public.one_rm_records where user_id = %L limit 1', a)));
-  update public.profiles set role = 'member' where id = a;
+  (58, '승인 취소 회원의 1RM 기록을 다른 회원이 조회', 'ok:0', pg_temp.run_as(c, format('select 1 from public.one_rm_records where user_id = %L', m))),
+  (59, '관리자는 승인 취소 회원 기록 조회 가능', 'ok:1', pg_temp.run_as(d, format('select 1 from public.one_rm_records where user_id = %L limit 1', m)));
+  update public.profiles set role = 'member' where id = m;
   insert into rls_results values
-  (60, '다시 승인하면 기록이 다시 보임', 'ok:1', pg_temp.run_as(c, format('select 1 from public.one_rm_records where user_id = %L limit 1', a))),
-  (61, '회원이 기록 전체 삭제 함수 실행', 'err', pg_temp.run_as(c, format('select public.admin_purge_member_records(%L)', a))),
+  (60, '다시 승인하면 기록이 다시 보임', 'ok:1', pg_temp.run_as(c, format('select 1 from public.one_rm_records where user_id = %L limit 1', m))),
+  (61, '회원이 기록 전체 삭제 함수 실행', 'err', pg_temp.run_as(c, format('select public.admin_purge_member_records(%L)', m))),
   (62, '관리자 계정의 기록 전체 삭제 시도', 'err', pg_temp.run_as(d, format('select public.admin_purge_member_records(%L)', d)));
   update public.profiles set role = 'pending' where id = c;
 
@@ -260,7 +266,7 @@ begin
   (27, '10초 안에 6번째 채팅 (도배)', 'err', pg_temp.run_as(d, 'insert into public.chat_messages (body) values (''rls-test 도배'')'));
 
   -- PR 기록을 지우면 명예의 벽 글도 함께 사라지는지
-  r := pg_temp.run_as(a, format('delete from public.one_rm_records where id = %L', rm_pr));
+  r := pg_temp.run_as(m, format('delete from public.one_rm_records where id = %L', rm_pr));
   insert into rls_results values
   (28, '1RM 기록 삭제 시 PR 글도 자동 삭제', 'ok:0',
    r || ' → 남은 PR 글 ' || (select count(*) from public.activities where one_rm_id = rm_pr)::text);
@@ -270,11 +276,12 @@ begin
   delete from realtime.messages where event = 'rls-test';
   delete from public.chat_messages where body like 'rls-test%';
   delete from public.chat_sessions where user_id = a and started_at = now();
-  delete from public.one_rm_records where user_id = a and movement = 'snatch' and weight_lb in (50, 55) and created_at > now() - interval '1 minute';
+  delete from public.one_rm_records where user_id = m and movement = 'snatch' and weight_lb in (50, 55) and created_at > now() - interval '1 minute';
   delete from public.events where id in (ev_full, ev_closed);
   delete from public.one_rm_records where id = rm;
   delete from public.activities where user_id = d and payload ->> 'movement' = 'deadlift' and created_at > now() - interval '1 minute';
   delete from auth.users where id = c;
+  delete from auth.users where id = m;  -- 임시 회원의 기록·PR 글도 함께 지워진다
 end;
 $$;
 
