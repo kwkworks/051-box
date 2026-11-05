@@ -23,6 +23,7 @@ function Detail() {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [now] = useState(() => Date.now());
   const ev = data?.event;
 
   const toggleJoin = async () => {
@@ -51,6 +52,8 @@ function Detail() {
   };
 
   const closed = ev?.signup_deadline ? new Date(ev.signup_deadline) < new Date() : false;
+  // 시작 후 12시간이 지나면 지난 일정 (목록 기준과 같음)
+  const ended = ev ? new Date(ev.starts_at).getTime() < now - 12 * 3600 * 1000 : false;
   const full = ev ? ev.capacity !== null && ev.participants.length >= ev.capacity : false;
   const link = safeHttpsUrl(ev?.link_url);
 
@@ -94,10 +97,10 @@ function Detail() {
           <button
             type="button"
             className={`btn mt-4 h-12 w-full ${ev.joined ? '' : 'btn-primary'}`}
-            disabled={busy || (!ev.joined && (closed || full))}
+            disabled={busy || ended || (!ev.joined && (closed || full))}
             onClick={toggleJoin}
           >
-            {busy ? '처리 중…' : ev.joined ? '참가 취소' : closed ? '신청 마감' : full ? '정원이 가득 찼어요' : '🙋 참가하기'}
+            {busy ? '처리 중…' : ended ? (ev.joined ? '✓ 참가했던 일정이에요' : '지난 일정이에요') : ev.joined ? '참가 취소' : closed ? '신청 마감' : full ? '정원이 가득 찼어요' : '🙋 참가하기'}
           </button>
 
           <section className="mt-6">
