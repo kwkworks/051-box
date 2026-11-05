@@ -3,12 +3,13 @@
 import { useSyncExternalStore } from 'react';
 import { openInBrowser } from './InstallHint';
 import { detectInstallEnv, isIos, isIpad, safariMajor } from '@/lib/installEnv';
+import { canInstall, promptInstall, subscribeInstall } from '@/lib/installPrompt';
 
 const KEY = 'box-install-sheet'; // 닫은 시각 (3일 동안 다시 안 띄움)
 const HIDE_MS = 3 * 24 * 60 * 60 * 1000;
 const EVENT = 'box-install-sheet';
 
-type Mode = 'none' | 'kakao' | 'classic' | 'ios26' | 'ipad';
+type Mode = 'none' | 'kakao' | 'android' | 'classic' | 'ios26' | 'ipad';
 
 function readMode(): Mode {
   // 인쇄용 포스터와 로그인 처리 화면에서는 띄우지 않는다
@@ -20,6 +21,8 @@ function readMode(): Mode {
     if (Date.now() - closed < HIDE_MS) return 'none';
   } catch {}
   if (env === 'kakao') return 'kakao';
+  // 안드로이드 크롬 등: 브라우저가 설치 가능하다고 알려주면 "앱 설치" 버튼 하나로 설치
+  if (env === 'android' && canInstall()) return 'android';
   if (env !== 'ios-safari') return 'none';
   if (isIpad()) return 'ipad';
   return safariMajor() >= 26 ? 'ios26' : 'classic';
@@ -29,9 +32,11 @@ function subscribe(cb: () => void) {
   window.addEventListener(EVENT, cb);
   window.addEventListener('storage', cb);
   window.addEventListener('popstate', cb);
+  const offInstall = subscribeInstall(cb);
   // 화면 이동(포스터 페이지 등)도 다시 확인
   const timer = setInterval(cb, 1000);
   return () => {
+    offInstall();
     window.removeEventListener(EVENT, cb);
     window.removeEventListener('storage', cb);
     window.removeEventListener('popstate', cb);
@@ -110,7 +115,21 @@ export function IosInstallSheet() {
           ✕
         </button>
         <p className="pr-8 font-black">📱 051 BOX를 앱으로 설치해요</p>
-        {mode === 'kakao' ? (
+        {mode === 'android' ? (
+          <>
+            <p className="mt-1 text-sm text-muted">버튼 하나로 홈 화면에 설치하고, 앱처럼 바로 열 수 있어요.</p>
+            <button
+              type="button"
+              className="btn btn-primary mt-3 h-12 w-full text-base"
+              onClick={async () => {
+                if (await promptInstall()) close();
+              }}
+            >
+              📲 앱 설치
+            </button>
+            <p className="mt-2 text-xs text-muted">💡 설치한 앱에서 알림도 받을 수 있어요</p>
+          </>
+        ) : mode === 'kakao' ? (
           <>
             <p className="mt-1 text-sm text-muted">카카오톡 안에서는 설치할 수 없어요. {isIos() ? '사파리' : '크롬'}로 열면 바로 설치할 수 있어요.</p>
             <button type="button" className="btn btn-primary mt-3 h-12 w-full text-base" onClick={openInBrowser}>
@@ -131,7 +150,7 @@ export function IosInstallSheet() {
           </>
         )}
       </div>
-      {!atTop && mode !== 'kakao' && (
+      {!atTop && mode !== 'kakao' && mode !== 'android' && (
         <div className={`flex ${arrowPos}`}>
           <Arrow />
         </div>

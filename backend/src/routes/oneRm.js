@@ -37,6 +37,18 @@ oneRmRouter.get('/', async (req, res) => {
     };
   }
 
+  // 포디움(1~3위)에 세울 캐릭터 모습
+  const podiumIds = [
+    ...new Set(Object.values(rankings).flatMap((g) => [g.all, g.M, g.F].flatMap((list) => list.slice(0, 3).map((r) => r.user_id)))),
+  ];
+  if (podiumIds.length) {
+    const avatars = unwrap(await req.sb.from('profiles').select('id, avatar').in('id', podiumIds.slice(0, 500)));
+    const byId = new Map(avatars.map((a) => [a.id, a.avatar]));
+    for (const g of Object.values(rankings)) {
+      for (const list of [g.all, g.M, g.F]) for (const r of list.slice(0, 3)) r.avatar = byId.get(r.user_id) ?? {};
+    }
+  }
+
   res.json({
     records: unwrap(mine).map(clean),
     rankings,

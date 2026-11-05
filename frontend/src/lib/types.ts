@@ -95,6 +95,7 @@ export type RankRow = {
   achieved_on: string;
   nickname: string;
   gender: Gender | null;
+  avatar?: Partial<Avatar>; // 1~3위만 (시상대 캐릭터)
 };
 
 export type FeedItem = {

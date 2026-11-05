@@ -4,6 +4,7 @@ import { useRef, useState, useSyncExternalStore } from 'react';
 import { ActionPad } from '@/components/ActionPad';
 import { AvatarView } from '@/components/AvatarView';
 import { ChatPanel } from '@/components/ChatPanel';
+import { Podium } from '@/components/Podium';
 import { BoxSpace, type BoxSpaceHandle } from '@/game/BoxSpace';
 import { AVATAR_OPTIONS, type Avatar } from '@/lib/constants';
 import type { ChatMessage, Profile } from '@/lib/types';
@@ -25,7 +26,7 @@ function samples(): Partial<Avatar>[] {
 
 export function DevPreview() {
   const [opened, setOpened] = useState("");
-  const [view, setView] = useState<'space' | 'avatars'>('space');
+  const [view, setView] = useState<'space' | 'avatars' | 'podium'>('space');
   const space = useRef<BoxSpaceHandle | null>(null);
   // 채팅 미리보기: 다른 회원 메시지 8개, 그중 5개는 이미 읽음
   const [msgs, setMsgs] = useState<ChatMessage[]>(() =>
@@ -43,8 +44,20 @@ export function DevPreview() {
       <div className="flex gap-2 p-2">
         <button type="button" className="btn btn-sm" onClick={() => setView('space')}>공간</button>
         <button type="button" className="btn btn-sm" onClick={() => setView('avatars')}>캐릭터</button>
+        <button type="button" className="btn btn-sm" onClick={() => setView('podium')}>포디움</button>
       </div>
-      {view === 'space' ? (
+      {view === 'podium' ? (
+        <div className="mx-auto w-full max-w-md p-4">
+          <Podium
+            myId="u2"
+            rows={samples().slice(0, 3).map((a, i) => ({
+              user_id: `u${i + 1}`, movement: 'back_squat', is_custom: false, unit: 'lb' as const,
+              weight_lb: [315, 285, 275][i], time_sec: null, achieved_on: '2026-11-05',
+              nickname: ['김코치', '미리보기', '박회원'][i], gender: 'M' as const, avatar: a,
+            }))}
+          />
+        </div>
+      ) : view === 'space' ? (
         <div className="relative min-h-0 flex-1">
           <p id="opened" className="absolute z-10 ml-40 mt-2 rounded bg-white px-2 text-xs">열림: {opened}</p>
           <BoxSpace profile={DEMO} handleRef={space} onOpen={(b) => setOpened(`${b} @ ${new Date().toLocaleTimeString()}`)} />

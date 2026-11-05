@@ -7,6 +7,7 @@ import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { api } from '@/lib/api';
 import { MOVEMENTS, NAMED_WODS, movementLabel, type MovementKey, type NamedWodKey } from '@/lib/constants';
 import { RecordValue } from '@/components/RecordValue';
+import { Podium } from '@/components/Podium';
 import { formatDateLabel, kstToday } from '@/lib/format';
 import Link from 'next/link';
 import type { Gender, Me, OneRmRecord, RankGroups, RecordUnit } from '@/lib/types';
@@ -366,15 +367,20 @@ function Rankings({ me, rankings }: { me: Me; rankings: Record<string, RankGroup
       {ranking.length === 0 ? (
         <p className="card p-4 text-sm text-muted">아직 이 종목 기록이 없어요</p>
       ) : (
-        <ol className="card divide-y-2 divide-dashed divide-ink/15">
-          {ranking.map((r, i) => (
-            <li key={r.user_id} className={`flex items-center gap-3 px-4 py-2.5 ${r.user_id === me.profile.id ? 'bg-yellow/25' : ''}`}>
-              <span className="w-7 text-center font-black">{['🥇', '🥈', '🥉'][i] ?? i + 1}</span>
-              <span className="flex-1 truncate font-bold">{r.nickname}</span>
-              <RecordValue unit={r.unit} weightLb={r.weight_lb} timeSec={r.time_sec} />
-            </li>
-          ))}
-        </ol>
+        <>
+          <Podium rows={ranking.slice(0, 3)} myId={me.profile.id} />
+          {ranking.length > 3 && (
+            <ol className="card divide-y-2 divide-dashed divide-ink/15" start={4}>
+              {ranking.slice(3).map((r, i) => (
+                <li key={r.user_id} className={`flex items-center gap-3 px-4 py-2.5 ${r.user_id === me.profile.id ? 'bg-yellow/25' : ''}`}>
+                  <span className="w-7 text-center font-black">{i + 4}</span>
+                  <span className="flex-1 truncate font-bold">{r.nickname}</span>
+                  <RecordValue unit={r.unit} weightLb={r.weight_lb} timeSec={r.time_sec} />
+                </li>
+              ))}
+            </ol>
+          )}
+        </>
       )}
     </section>
   );

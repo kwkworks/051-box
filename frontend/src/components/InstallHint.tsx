@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
+import { canInstall, promptInstall, subscribeInstall } from '@/lib/installPrompt';
 import { detectInstallEnv, isIos, type InstallEnv } from '@/lib/installEnv';
 
-type InstallEvent = Event & { prompt: () => Promise<void> };
 
 type Env = InstallEnv;
 const detect = detectInstallEnv;
@@ -38,18 +38,9 @@ function ShareIcon() {
 // 홈 화면에 앱으로 설치하는 방법을 기기·브라우저에 맞춰 안내한다 (이미 설치해서 열었으면 숨김)
 export function InstallHint() {
   const [env] = useState<Env>(detect);
-  const [prompt, setPrompt] = useState<InstallEvent | null>(null);
+  // 안드로이드 크롬은 설치 창을 바로 띄울 수 있다 (앱 전체에서 같은 설치 이벤트를 공유)
+  const installable = useSyncExternalStore(subscribeInstall, canInstall, () => false);
   const [copied, setCopied] = useState(false);
-
-  // 안드로이드 크롬은 설치 창을 바로 띄울 수 있다
-  useEffect(() => {
-    const onPrompt = (e: Event) => {
-      e.preventDefault();
-      setPrompt(e as InstallEvent);
-    };
-    window.addEventListener('beforeinstallprompt', onPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', onPrompt);
-  }, []);
 
   const copyLink = async () => {
     try {
@@ -123,8 +114,8 @@ export function InstallHint() {
       )}
 
       {(env === 'android' || env === 'desktop') &&
-        (prompt ? (
-          <button type="button" className="btn btn-primary h-12 text-base" onClick={() => prompt.prompt()}>
+        (installable ? (
+          <button type="button" className="btn btn-primary h-12 text-base" onClick={() => promptInstall()}>
             ⬇️ 홈 화면에 051 BOX 설치
           </button>
         ) : (
