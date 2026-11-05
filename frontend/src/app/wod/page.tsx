@@ -6,6 +6,7 @@ import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { api } from '@/lib/api';
 import { MOVEMENTS, movementLabel, type MovementKey } from '@/lib/constants';
 import { fmtLb, formatDateLabel, kstToday, lbToKg, percentWeight, shiftDate } from '@/lib/format';
+import { shrinkImage } from '@/lib/shrinkImage';
 import type { Lift, Me, Wod, WodPhoto } from '@/lib/types';
 import { useLoad } from '@/lib/useLoad';
 
@@ -264,22 +265,27 @@ function Photos({ wodId, photos, isAdmin, onChange }: { wodId: string; photos: W
   const orderValid = !!order && order.length === photos.length && photos.every((p) => order.includes(p.id));
   const shown = orderValid ? order!.map((id) => photos.find((p) => p.id === id)!) : photos;
 
-  // 여러 장을 골라 한 장씩 차례로 올린다 (실패한 사진은 건너뛰고 알려줌)
+  // 여러 장을 골라 한 장씩 줄여서 차례로 올린다 (실패한 사진은 건너뛰고 알려줌)
   const uploadMany = async (files: File[]) => {
-    const ok = files.filter((f) => f.size <= 5 * 1024 * 1024).slice(0, 20);
-    const tooBig = files.length - files.filter((f) => f.size <= 5 * 1024 * 1024).length;
+    const list = files.slice(0, 20);
     setError(null);
-    setUploading({ done: 0, total: ok.length });
+    setUploading({ done: 0, total: list.length });
     let failed = 0;
-    for (const [i, file] of ok.entries()) {
+    let tooBig = 0;
+    for (const [i, original] of list.entries()) {
       try {
-        const form = new FormData();
-        form.append('photo', file);
-        await api.upload(`/wods/${wodId}/photos`, form);
+        const file = await shrinkImage(original);
+        if (file.size > 5 * 1024 * 1024) {
+          tooBig += 1;
+        } else {
+          const form = new FormData();
+          form.append('photo', file);
+          await api.upload(`/wods/${wodId}/photos`, form);
+        }
       } catch {
         failed += 1;
       }
-      setUploading({ done: i + 1, total: ok.length });
+      setUploading({ done: i + 1, total: list.length });
     }
     setUploading(null);
     const problems = [tooBig ? `5MB가 넘는 사진 ${tooBig}장` : '', failed ? `올리지 못한 사진 ${failed}장` : ''].filter(Boolean);

@@ -44,6 +44,7 @@ function Admin({ me }: { me: Me }) {
             </span>
           </Link>
           <AdminPowers />
+          <Usage />
           <Members myId={me.profile.id} />
         </>
       )}
@@ -231,6 +232,53 @@ function AdminPowers() {
           </li>
         ))}
       </ul>
+    </details>
+  );
+}
+
+// 무료 플랜 한도 대비 사용량 (DB 500MB, 파일 1GB). 80%를 넘으면 경고 색으로 보여준다.
+const MB = 1024 * 1024;
+function UsageBar({ label, used, limit, note }: { label: string; used: number; limit: number; note?: string }) {
+  const pct = Math.min(100, (used / limit) * 100);
+  const warn = pct >= 80;
+  return (
+    <div>
+      <div className="flex justify-between text-sm">
+        <span className="font-bold">{label}</span>
+        <span className={warn ? 'font-black text-[var(--burgundy)]' : 'text-muted'}>
+          {(used / MB).toFixed(used < 10 * MB ? 1 : 0)}MB / {limit / MB >= 1024 ? `${limit / MB / 1024}GB` : `${limit / MB}MB`} ({pct.toFixed(0)}%)
+        </span>
+      </div>
+      <div className="mt-1 h-3 overflow-hidden rounded-full border-2 border-ink bg-white" role="meter" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
+        <div className={`h-full ${warn ? 'bg-[var(--burgundy)]' : 'bg-[#E8B923]'}`} style={{ width: `${pct}%` }} />
+      </div>
+      {note && <p className="mt-1 text-xs text-muted">{note}</p>}
+    </div>
+  );
+}
+
+function Usage() {
+  const { data, error, loading } = useLoad(
+    () => api.get<{ usage: { db_bytes: number; storage_bytes: number; photo_count: number } }>('/admin/usage'),
+    'usage',
+  );
+  return (
+    <details className="card mb-4 p-4">
+      <summary className="cursor-pointer font-black">📦 저장 공간 (무료 플랜 한도)</summary>
+      <div className="mt-3 flex flex-col gap-3">
+        {loading && <p className="text-sm text-muted">불러오는 중이에요…</p>}
+        {error && <ErrorBox message={error} />}
+        {data && (
+          <>
+            <UsageBar label="데이터베이스" used={data.usage.db_bytes} limit={500 * MB} note="회원, 기록, 채팅, WOD 글" />
+            <UsageBar label="사진 저장 공간" used={data.usage.storage_bytes} limit={1024 * MB} note={`기록 사진 ${data.usage.photo_count}장`} />
+            {(data.usage.db_bytes >= 400 * MB || data.usage.storage_bytes >= 800 * MB) && (
+              <p className="text-sm font-bold text-[var(--burgundy)]">한도의 80%를 넘었어요. 오래된 사진을 정리하거나 유료 플랜을 검토해 주세요.</p>
+            )}
+            <p className="text-xs text-muted">데이터베이스는 매일 새벽 4시에 자동 백업돼요 (사진 파일은 제외).</p>
+          </>
+        )}
+      </div>
     </details>
   );
 }

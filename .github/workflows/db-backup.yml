@@ -1,0 +1,64 @@
+# 매일 새벽 Supabase 데이터베이스를 통째로 백업한다 (무료 플랜에는 자동 백업이 없음).
+# 백업 파일은 비밀번호(BACKUP_PASSPHRASE)로 암호화해서 GitHub Actions에 30일 보관한다.
+# 필요한 GitHub 비밀값 (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL     Supabase 대시보드 → Connect → Session pooler 주소 (비밀번호 포함)
+#   BACKUP_PASSPHRASE   백업 파일 암호 (16자 이상, 잊어버리면 복원할 수 없음)
+# 복원 방법: docs/backup.md
+name: DB 백업
+
+on:
+  schedule:
+    - cron: '0 19 * * *' # 매일 04:00 (한국 시간)
+  workflow_dispatch: # Actions 화면에서 "Run workflow"로 바로 실행
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 비밀값 확인
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$DB_URL" ]; then echo "::error::SUPABASE_DB_URL 비밀값이 없어요 (docs/backup.md 참고)"; exit 1; fi
+          if [ ${#PASS} -lt 16 ]; then echo "::error::BACKUP_PASSPHRASE는 16자 이상이어야 해요"; exit 1; fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: 데이터베이스 내보내기
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          mkdir -p backup
+          supabase db dump --db-url "$DB_URL" -f backup/roles.sql --role-only
+          supabase db dump --db-url "$DB_URL" -f backup/schema.sql
+          supabase db dump --db-url "$DB_URL" -f backup/data.sql --use-copy --data-only
+          ls -l backup
+
+      - name: 암호화
+        env:
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          name="051box-db-$(TZ=Asia/Seoul date +%Y%m%d-%H%M)"
+          tar -czf "$name.tar.gz" -C backup .
+          printf '%s' "$PASS" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 -o "$name.tar.gz.gpg" "$name.tar.gz"
+          rm -rf backup "$name.tar.gz"
+          echo "NAME=$name" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}
+          path: ${{ env.NAME }}.tar.gz.gpg
+          retention-days: 30
+          if-no-files-found: error

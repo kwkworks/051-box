@@ -244,6 +244,13 @@ begin
   (77, '회원이 기록 사진 순서 변경', 'ok:0', pg_temp.run_as(a, 'update public.wod_photos set sort_order = 1'));
   delete from public.push_subscriptions where endpoint like 'https://push.example.invalid/rls-test%';
 
+  -- ---- 0012: 용량 보기 (관리자만)
+  insert into rls_results values
+  (78, '회원이 앱 용량 조회', 'err', pg_temp.run_as(a, 'select public.admin_usage()')),
+  (79, '비로그인으로 앱 용량 조회', 'err', pg_temp.run_as(null, 'select public.admin_usage()')),
+  (80, '관리자가 앱 용량 조회', 'ok:1', pg_temp.run_as(d, 'select public.admin_usage()'));
+  delete from public.push_subscriptions where endpoint like 'https://push.example.invalid/rls-test%';
+
   -- 도배 방지: 10초 안에 5개를 이미 보냈으면 6번째는 거부
   -- 앞 테스트에서 관리자가 보낸 메시지를 지우고, 정확히 5개를 채운 뒤 6번째를 시도한다
   delete from public.chat_messages where user_id = d and body like 'rls-test%';

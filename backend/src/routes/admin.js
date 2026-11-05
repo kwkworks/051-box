@@ -17,6 +17,12 @@ adminRouter.get('/members', async (req, res) => {
   res.json({ members });
 });
 
+// 무료 플랜 용량 사용량 (DB, 파일)
+adminRouter.get('/usage', async (req, res) => {
+  const usage = unwrap(await req.sb.rpc('admin_usage'));
+  res.json({ usage });
+});
+
 // 가입 승인 / 역할 변경. 자기 자신은 바꿀 수 없다(DB 트리거도 막음).
 adminRouter.patch('/members/:id', async (req, res) => {
   const id = uuid.parse(req.params.id);
