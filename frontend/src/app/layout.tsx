@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { AuthProvider } from '@/components/AuthProvider';
 import { BadgeClear } from '@/components/BadgeClear';
 import { IosInstallSheet } from '@/components/IosInstallSheet';
+import { OrientationLock } from '@/components/OrientationLock';
 import { UpdateNotice } from '@/components/UpdateNotice';
 import { WakeOverlay } from '@/components/WakeOverlay';
 import './globals.css';
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           <IosInstallSheet />
           <UpdateNotice />
           <BadgeClear />
+          <OrientationLock />
         </AuthProvider>
       </body>
     </html>
