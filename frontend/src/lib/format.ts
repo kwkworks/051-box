@@ -35,6 +35,11 @@ export function localInputToIso(value: string): string {
   return new Date(`${value}:00+09:00`).toISOString();
 }
 
+// ISO 문자열을 <input type="datetime-local"> 값(한국 시간, YYYY-MM-DDTHH:mm)으로
+export function isoToLocalInput(iso: string): string {
+  return new Date(new Date(iso).getTime() + 9 * 3600 * 1000).toISOString().slice(0, 16);
+}
+
 // 1RM × % 정확한 값 (소수점 둘째 자리까지, 반올림은 회원이 직접)
 export function percentWeight(oneRm: number, percent: number): number {
   return Math.round(oneRm * percent) / 100;

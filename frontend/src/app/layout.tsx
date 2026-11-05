@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { AuthProvider } from '@/components/AuthProvider';
+import { BadgeClear } from '@/components/BadgeClear';
 import { IosInstallSheet } from '@/components/IosInstallSheet';
 import { UpdateNotice } from '@/components/UpdateNotice';
 import { WakeOverlay } from '@/components/WakeOverlay';
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           <WakeOverlay />
           <IosInstallSheet />
           <UpdateNotice />
+          <BadgeClear />
         </AuthProvider>
       </body>
     </html>

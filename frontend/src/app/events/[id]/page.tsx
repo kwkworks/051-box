@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AvatarView } from '@/components/AvatarView';
 import { BoardShell } from '@/components/BoardShell';
+import { EventForm } from '@/components/EventForm';
 import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { api } from '@/lib/api';
 import { EVENT_KINDS } from '@/lib/constants';
@@ -21,6 +22,7 @@ function Detail() {
   const { data, error, loading, reload } = useLoad(() => api.get<{ event: EventDetail }>(`/events/${id}`), id);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
   const ev = data?.event;
 
   const toggleJoin = async () => {
@@ -56,7 +58,18 @@ function Detail() {
     <BoardShell title={ev ? EVENT_KINDS[ev.kind] : '일정'} subtitle={ev?.title}>
       {loading && !ev && <Loading />}
       {error && <ErrorBox message={error} onRetry={reload} />}
-      {ev && (
+      {ev && editing && (
+        <EventForm
+          kind={ev.kind}
+          initial={ev}
+          onDone={() => {
+            setEditing(false);
+            reload();
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      )}
+      {ev && !editing && (
         <>
           <article className="card p-4">
             <h2 className="text-xl font-black">{ev.title}</h2>
@@ -104,9 +117,14 @@ function Detail() {
           </section>
 
           {ev.can_manage && (
-            <button type="button" className="btn btn-danger mt-6 w-full" onClick={remove}>
-              일정 삭제
-            </button>
+            <div className="mt-6 grid grid-cols-2 gap-2">
+              <button type="button" className="btn btn-dark" onClick={() => setEditing(true)}>
+                ✏️ 내용 수정
+              </button>
+              <button type="button" className="btn btn-danger" onClick={remove}>
+                일정 삭제
+              </button>
+            </div>
           )}
         </>
       )}

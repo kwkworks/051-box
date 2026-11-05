@@ -85,9 +85,7 @@ const httpsUrl = z
   .url({ protocol: /^https$/ })
   .max(500);
 
-export const eventSchema = z
-  .strictObject({
-    kind: z.enum(['competition', 'event', 'gathering']),
+const eventFields = {
     title: requiredText(80),
     description: text(3000).default(''),
     starts_at: z.iso.datetime({ offset: true }),
@@ -95,11 +93,16 @@ export const eventSchema = z
     link_url: httpsUrl.nullable().default(null),
     signup_deadline: z.iso.datetime({ offset: true }).nullable().default(null),
     capacity: z.number().int().min(1).max(500).nullable().default(null),
-  })
-  .refine((v) => !v.signup_deadline || new Date(v.signup_deadline) <= new Date(v.starts_at), {
-    message: '신청 마감은 시작 시간보다 앞이어야 해요',
-    path: ['signup_deadline'],
-  });
+};
+const deadlineBeforeStart = [
+  (v) => !v.signup_deadline || new Date(v.signup_deadline) <= new Date(v.starts_at),
+  { message: '신청 마감은 시작 시간보다 앞이어야 해요', path: ['signup_deadline'] },
+];
+export const eventSchema = z
+  .strictObject({ kind: z.enum(['competition', 'event', 'gathering']), ...eventFields })
+  .refine(...deadlineBeforeStart);
+// 수정: 종류(대회/이벤트/모임)는 바꿀 수 없고 나머지 내용만 고친다
+export const eventUpdateSchema = z.strictObject(eventFields).refine(...deadlineBeforeStart);
 
 export const oneRmSchema = z
   .strictObject({

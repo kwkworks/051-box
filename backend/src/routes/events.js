@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { sendPushLater } from '../push.js';
 import { z } from 'zod';
-import { HttpError, unwrap } from '../errors.js';
-import { eventSchema, uuid } from '../schemas.js';
+import { HttpError, fromDbError, unwrap } from '../errors.js';
+import { eventSchema, eventUpdateSchema, uuid } from '../schemas.js';
 
 export const eventsRouter = Router();
 
@@ -72,6 +72,25 @@ eventsRouter.post('/', async (req, res) => {
     url: `/events/${event.id}`,
   });
   res.status(201).json({ event });
+});
+
+// 수정: 만든 사람 또는 관리자만 (DB RLS가 같은 규칙을 강제). 종류는 바꿀 수 없다.
+eventsRouter.patch('/:id', async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  const body = eventUpdateSchema.parse(req.body);
+  if (body.capacity !== null) {
+    const { count, error } = await req.sb
+      .from('event_participants')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('event_id', id);
+    if (error) throw fromDbError(error);
+    if ((count ?? 0) > body.capacity) {
+      throw new HttpError(400, `이미 ${count}명이 신청했어요. 정원은 ${count}명 이상으로 정해주세요`);
+    }
+  }
+  const updated = unwrap(await req.sb.from('events').update(body).eq('id', id).select(COLUMNS));
+  if (!updated.length) throw new HttpError(403, '수정할 권한이 없거나 삭제된 일정이에요');
+  res.json({ event: updated[0] });
 });
 
 eventsRouter.delete('/:id', async (req, res) => {
