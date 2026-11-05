@@ -9,7 +9,7 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: '/',
     scope: '/',
     display: 'standalone',
-    orientation: 'portrait', // 설치한 앱은 세로 고정 (안드로이드). 아이폰은 RotateNotice가 안내
+    orientation: 'portrait', // 설치한 앱은 세로 고정 (안드로이드에서 적용, 아이폰은 지원하지 않음)
     background_color: '#26262a',
     theme_color: '#7a2e3a',
     lang: 'ko',

@@ -121,10 +121,3 @@ textarea.input {
   font-weight: 700;
   background: #fff;
 }
-
-/* 홈 화면 앱을 휴대폰에서 가로로 돌리면 세로 안내 (아이폰은 방향 고정이 안 돼서) */
-@media (display-mode: standalone) and (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
-  .rotate-notice {
-    display: flex;
-  }
-}

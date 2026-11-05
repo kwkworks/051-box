@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next';
 import { AuthProvider } from '@/components/AuthProvider';
 import { IosInstallSheet } from '@/components/IosInstallSheet';
 import { UpdateNotice } from '@/components/UpdateNotice';
-import { RotateNotice } from '@/components/RotateNotice';
 import { WakeOverlay } from '@/components/WakeOverlay';
 import './globals.css';
 
@@ -29,7 +28,6 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           <WakeOverlay />
           <IosInstallSheet />
           <UpdateNotice />
-          <RotateNotice />
         </AuthProvider>
       </body>
     </html>
