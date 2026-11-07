@@ -34,7 +34,8 @@ create trigger a_force_created_at before insert or update on public.event_partic
   for each row execute function public.force_created_at();
 
 -- 정원을 이미 신청한 인원보다 적게 줄이지 못하게 (앱을 거치지 않는 수정도 막는다)
-create or replace function public.check_event_capacity()
+-- 주의: 처음엔 기존 참가 신청 함수와 같은 이름(check_event_capacity)으로 만들어 덮어쓰는 실수가 있었다 → 0014에서 바로잡음
+create or replace function public.check_event_capacity_shrink()
 returns trigger
 language plpgsql
 security definer
@@ -52,8 +53,8 @@ begin
   return new;
 end;
 $$;
-revoke all on function public.check_event_capacity() from public, anon, authenticated;
+revoke all on function public.check_event_capacity_shrink() from public, anon, authenticated;
 
 drop trigger if exists events_capacity_check on public.events;
 create trigger events_capacity_check before update on public.events
-  for each row execute function public.check_event_capacity();
+  for each row execute function public.check_event_capacity_shrink();
