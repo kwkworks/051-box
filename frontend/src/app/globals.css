@@ -93,6 +93,16 @@ body {
   background: #fff;
   font-size: 15px;
 }
+/* 아이폰은 16px보다 작은 입력칸을 누르면 화면을 확대하고, 홈 화면 앱에서는 확대가 풀리지 않아
+   화면이 밀린 채로 남는다. 아이폰(iOS)에서만 입력칸 글자를 16px로 맞춘다. */
+@supports (-webkit-touch-callout: none) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 .input:focus {
   outline: 3px solid var(--yellow);
   outline-offset: 1px;

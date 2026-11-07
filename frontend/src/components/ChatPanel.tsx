@@ -329,6 +329,12 @@ export const ChatPanel = forwardRef<
             onKeyDown={(e) => {
               if (e.key === 'Escape') (e.target as HTMLInputElement).blur();
             }}
+            onBlur={() => {
+              // 아이폰은 키보드가 내려간 뒤에도 화면을 위로 밀어 둔 채 남길 때가 있다 → 제자리로
+              setTimeout(() => {
+                if (window.scrollY !== 0 || window.scrollX !== 0) window.scrollTo(0, 0);
+              }, 50);
+            }}
             placeholder="Enter를 눌러 채팅 (최대 200자)"
             aria-label="채팅 메시지"
           />
