@@ -1,7 +1,7 @@
 -- =====================================================================
 -- 051 BOX 보안(RLS) 자동 테스트
 -- SQL Editor에서 실행한다. 실제 사용자 권한으로 "막혀야 하는 요청"을 보내고 결과를 표로 보여준다.
--- 필요: 관리자 1명(admin) + 승인된 회원 1명(member). 승인 대기 계정과 기록 테스트용 회원은 테스트 중에 임시로 만들고 지운다.
+-- 필요: 관리자 1명(admin) + 승인된 회원 1명(member). 승인 대기 계정과 기록 테스트용 회원안은 테스트 중에 임시로 만들고 지운다.
 -- 1RM·기록 테스트는 임시 회원으로만 해서 실제 회원의 기록은 건드리지 않는다.
 -- 테스트로 만든 데이터는 마지막에 모두 삭제한다.
 -- =====================================================================
@@ -47,6 +47,7 @@ declare
   rm_pr uuid;  -- 회원의 PR 기록
   dm2 uuid;    -- 회원이 접속한 뒤 관리자가 쓴 채팅
   rm_first uuid;
+  g_cap uuid;  -- 정원 줄이기 테스트용 모임
   w_past uuid;
   w_future uuid;
   anon_id uuid := gen_random_uuid();
@@ -271,6 +272,21 @@ begin
   (28, '1RM 기록 삭제 시 PR 글도 자동 삭제', 'ok:0',
    r || ' → 남은 PR 글 ' || (select count(*) from public.activities where one_rm_id = rm_pr)::text);
   update rls_results set actual = 'ok:' || split_part(actual, '남은 PR 글 ', 2) where no = 28;
+
+  -- ---- 0013: 등록 시각은 DB가 정한다 + 정원은 신청 인원 아래로 못 줄인다
+  r := pg_temp.run_as(m, 'insert into public.one_rm_records (movement, is_custom, weight_lb, created_at) values (''rls-test created'', true, 10, ''2020-01-01'')');
+  insert into rls_results values
+  (81, '회원이 등록 시각을 과거로 넣기 (하루 제한 우회)', 'ok:1',
+   'ok:' || (select count(*) from public.one_rm_records where user_id = m and movement = 'rls-test created' and created_at >= public.kst_today_start())::text);
+  insert into public.events (kind, title, starts_at, capacity, created_by)
+    values ('gathering', 'rls-test 정원 줄이기', now() + interval '1 day', 5, m) returning id into g_cap;
+  insert into public.event_participants (event_id, user_id) values (g_cap, a), (g_cap, m);
+  insert into rls_results values
+  (82, '모임 만든 사람이 정원을 신청 인원보다 적게 수정', 'err', pg_temp.run_as(m, format('update public.events set capacity = 1 where id = %L', g_cap)));
+  r := pg_temp.run_as(m, format('update public.events set created_at = ''2020-01-01'' where id = %L', g_cap));
+  insert into rls_results values
+  (83, '모임 만든 사람이 등록 시각 바꾸기', 'ok:1',
+   'ok:' || (select count(*) from public.events where id = g_cap and created_at >= public.kst_today_start())::text);
 
   -- 테스트 데이터 정리
   delete from realtime.messages where event = 'rls-test';

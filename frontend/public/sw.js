@@ -12,8 +12,14 @@ self.addEventListener('push', (event) => {
   }
   const title = typeof data.title === 'string' ? data.title.slice(0, 80) : '051 BOX';
   const body = typeof data.body === 'string' ? data.body.slice(0, 200) : '';
-  // 이 사이트 안의 경로만 연다
-  const url = typeof data.url === 'string' && data.url.startsWith('/') && !data.url.startsWith('//') ? data.url : '/';
+  // 이 사이트 안의 경로만 연다 (/\다른사이트 같은 우회도 막기 위해 주소를 풀어서 출처를 비교)
+  let url = '/';
+  if (typeof data.url === 'string' && data.url.startsWith('/')) {
+    try {
+      const u = new URL(data.url, self.location.origin);
+      if (u.origin === self.location.origin) url = u.pathname + u.search + u.hash;
+    } catch {}
+  }
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
@@ -27,7 +33,11 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  let url = new URL('/', self.location.origin).href;
+  try {
+    const u = new URL(event.notification.data?.url || '/', self.location.origin);
+    if (u.origin === self.location.origin) url = u.href;
+  } catch {}
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
       for (const w of wins) {
