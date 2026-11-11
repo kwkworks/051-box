@@ -288,6 +288,18 @@ begin
   (83, '모임 만든 사람이 등록 시각 바꾸기', 'ok:1',
    'ok:' || (select count(*) from public.events where id = g_cap and created_at >= public.kst_today_start())::text);
 
+  -- ---- 0015: 회원 탈퇴 + 가입 요청 알림
+  insert into rls_results values
+  (84, '비로그인으로 탈퇴 함수 실행', 'err', pg_temp.run_as(null, 'select public.delete_my_account()')),
+  (85, '관리자 계정 탈퇴', 'err', pg_temp.run_as(d, 'select public.delete_my_account()')),
+  (86, '회원이 가입 알림 대상 요청 (틀린 비밀값)', 'err', pg_temp.run_as(a, format('select * from public.push_claim_signup(''wrong'', %L, ''rls-test'')', c))),
+  (87, '비로그인으로 가입 알림 대상 요청 (틀린 비밀값)', 'err', pg_temp.run_as(null, format('select * from public.push_claim_signup(''wrong'', %L, ''rls-test'')', c)));
+  -- 마지막: 임시 회원 m이 스스로 탈퇴 → 계정과 기록이 모두 사라지는지
+  r := pg_temp.run_as(m, 'select public.delete_my_account()');
+  insert into rls_results values
+  (88, '회원 본인 탈퇴 (계정·기록 함께 삭제)', 'ok:0',
+   case when r like 'ok:%' then 'ok:' || ((select count(*) from public.profiles where id = m) + (select count(*) from public.one_rm_records where user_id = m))::text else r end);
+
   -- 테스트 데이터 정리
   delete from realtime.messages where event = 'rls-test';
   delete from public.chat_messages where body like 'rls-test%';

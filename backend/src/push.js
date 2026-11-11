@@ -73,6 +73,19 @@ export function sendPushLater(kind, ref, actorId, payload) {
   sendPush(kind, ref, actorId, payload).catch((e) => console.warn('[push]', e?.message));
 }
 
+// 새 가입 요청 → "가입 요청 알림"을 켠 관리자 기기에만. ref가 같으면 한 번만 보낸다
+export function sendSignupPushLater(userId, ref, nickname) {
+  if (!enabled) return;
+  (async () => {
+    const { data, error } = await sb.rpc('push_claim_signup', { p_secret: config.pushSecret, p_user: userId, p_ref: ref });
+    if (error) {
+      console.warn('[push] 가입 알림 대상을 불러오지 못했어요', error.code);
+      return;
+    }
+    await deliver(data, { title: '🙋 새 가입 요청', body: `${nickname ?? '새 회원'}님이 가입 승인을 기다려요`, url: '/admin' });
+  })().catch((e) => console.warn('[push]', e?.message));
+}
+
 export async function sendTestPush(userId) {
   if (!enabled) return 0;
   const { data, error } = await sb.rpc('push_targets_for_user', { p_secret: config.pushSecret, p_user: userId });

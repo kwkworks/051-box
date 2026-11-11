@@ -6,13 +6,14 @@ import { api } from '@/lib/api';
 import { disablePush, enablePush, pushState, type PushState } from '@/lib/push';
 import type { NotifyPrefs, Profile } from '@/lib/types';
 
-const KINDS: { key: keyof NotifyPrefs; label: string; hint: string }[] = [
+const KINDS: { key: keyof NotifyPrefs; label: string; hint: string; adminOnly?: boolean }[] = [
   { key: 'wod', label: '📋 내일 WOD 공개', hint: '매일 오후 8시 30분' },
   { key: 'notices', label: '📢 공지사항', hint: '새 공지가 올라오면' },
   { key: 'competition', label: '🏆 대회·이벤트', hint: '새 대회·이벤트가 올라오면' },
   { key: 'gathering', label: '🍻 회원 모임', hint: '새 모임이 올라오면' },
+  { key: 'signup', label: '🙋 가입 승인 요청 (관리자)', hint: '새 회원이 가입을 신청하면', adminOnly: true },
 ];
-const DEFAULT_PREFS: NotifyPrefs = { wod: true, notices: true, competition: true, gathering: true };
+const DEFAULT_PREFS: NotifyPrefs = { wod: true, notices: true, competition: true, gathering: true, signup: true };
 
 const STATE_TEXT: Record<PushState, string> = {
   unsupported: '이 브라우저는 알림을 받을 수 없어요. 크롬이나 사파리(홈 화면 앱)에서 열어 주세요.',
@@ -85,7 +86,7 @@ export function NotificationSettings({ profile }: { profile: Profile }) {
       <div>
         <p className="mb-1 text-xs font-bold text-muted">받을 알림 (내 모든 기기 공통)</p>
         <ul className="flex flex-col divide-y-2 divide-dashed divide-ink/15">
-          {KINDS.map((k) => (
+          {KINDS.filter((k) => !k.adminOnly || profile.role === 'admin').map((k) => (
             <li key={k.key} className="flex items-center gap-3 py-2">
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-bold">{k.label}</span>

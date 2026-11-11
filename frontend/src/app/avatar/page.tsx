@@ -6,6 +6,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { AvatarView } from '@/components/AvatarView';
 import { BoardShell } from '@/components/BoardShell';
 import { Guard } from '@/components/Guard';
+import { WithdrawSection } from '@/components/WithdrawSection';
 import type { Dir } from '@/game/avatar';
 import { api } from '@/lib/api';
 import {
@@ -179,6 +180,7 @@ function Editor({ me }: { me: Me }) {
           })}
         </section>
       </div>
+      <WithdrawSection profile={me.profile} />
     </BoardShell>
   );
 }

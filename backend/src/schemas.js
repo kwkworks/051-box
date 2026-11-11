@@ -52,7 +52,13 @@ export const meUpdateSchema = z
     gender: z.enum(['M', 'F']).nullable().optional(), // 박스 순위 남/여 구분 (선택 안 함 = null)
     // 푸시 알림 종류별 켜기/끄기
     notify_prefs: z
-      .strictObject({ wod: z.boolean(), notices: z.boolean(), competition: z.boolean(), gathering: z.boolean() })
+      .strictObject({
+        wod: z.boolean(),
+        notices: z.boolean(),
+        competition: z.boolean(),
+        gathering: z.boolean(),
+        signup: z.boolean().optional(), // 관리자: 가입 요청 알림
+      })
       .optional(),
   })
   .refine(

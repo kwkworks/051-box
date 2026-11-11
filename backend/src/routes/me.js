@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireMember } from '../auth.js';
 import { HttpError, fromDbError, unwrap } from '../errors.js';
 import { meUpdateSchema } from '../schemas.js';
+import { sendSignupPushLater } from '../push.js';
 
 export const meRouter = Router();
 
@@ -9,6 +10,8 @@ export const meRouter = Router();
 meRouter.get('/', async (req, res) => {
   const { profile, sb, userId } = req;
   const base = { profile };
+  // 처음 가입한 사람(승인 대기)이 들어오면 관리자에게 한 번 알린다 (같은 사람은 DB가 중복을 막음)
+  if (profile.role === 'pending') sendSignupPushLater(userId, userId, profile.nickname);
   if (!['member', 'admin'].includes(profile.role)) {
     return res.json({ ...base, streak: 0, checkedInToday: false, bestLifts: {} });
   }
@@ -48,7 +51,15 @@ meRouter.patch('/', async (req, res) => {
 // 가입이 거절된 사람이 다시 신청 (거절 → 승인 대기). DB 함수가 거절 상태일 때만 허용한다
 meRouter.post('/reapply', async (req, res) => {
   const role = unwrap(await req.sb.rpc('reapply_membership'));
+  // 다시 신청도 관리자에게 알린다 (하루 한 번까지)
+  sendSignupPushLater(req.userId, `${req.userId}:re:${new Date().toISOString().slice(0, 10)}`, req.profile.nickname);
   res.json({ role });
+});
+
+// 회원 탈퇴: 계정과 모든 기록 삭제 (되돌릴 수 없음). 관리자 계정은 DB 함수가 막는다
+meRouter.delete('/', async (req, res) => {
+  unwrap(await req.sb.rpc('delete_my_account'));
+  res.status(204).end();
 });
 
 // 오늘 출석 체크. 날짜는 DB가 한국 시간 기준으로 정한다(클라이언트 값 사용 안 함).
