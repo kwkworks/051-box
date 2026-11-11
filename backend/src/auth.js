@@ -18,7 +18,14 @@ export async function requireAuth(req, res, next) {
   const token = match[1];
 
   const sb = createUserClient(token);
-  const { data, error } = await sb.auth.getClaims(token);
+  let data;
+  let error;
+  try {
+    ({ data, error } = await sb.auth.getClaims(token));
+  } catch {
+    // 형식이 깨진 토큰은 라이브러리가 예외를 던진다 → 서버 오류(500)가 아니라 로그인 필요(401)
+    throw new HttpError(401, '로그인이 만료되었습니다. 다시 로그인해주세요');
+  }
   // 인증 서버 키를 못 받아오는 등 네트워크 문제는 "로그인 만료"가 아니다 → 잠시 후 다시 시도하게 한다
   if (error && (error.name === 'AuthRetryableFetchError' || (typeof error.status === 'number' && error.status >= 500))) {
     throw new HttpError(503, '로그인 확인이 잠시 지연되고 있어요. 잠시 후 다시 시도해주세요');
