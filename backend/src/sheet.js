@@ -135,13 +135,49 @@ function toMovement(name) {
   return MOVEMENT_ALIASES[key] ?? MOVEMENT_ALIASES[key.replace(/ /g, '')] ?? null;
 }
 
+// 스트렝스 글에서 종목 찾기 ("Back Squat 5-5-3" → ['back_squat']). 긴 이름부터 찾아서
+// "Power Clean" 안의 "Clean"처럼 겹치는 이름은 한 번만 센다. 영어 이름은 단어 단위로만 찾는다.
+export function findMovements(text) {
+  let rest = ` ${normalizeSymbols(text).toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ')} `;
+  const names = [...Object.entries(MOVEMENT_ALIASES), ...MOVEMENTS.map((m) => [m.replace(/_/g, ' '), m])].sort(
+    (a, b) => b[0].length - a[0].length,
+  );
+  const found = [];
+  for (const [name, movement] of names) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = /^[a-z0-9 &]+$/.test(name) ? new RegExp(`(?<![a-z])${escaped}(?![a-z])`, 'g') : new RegExp(escaped, 'g');
+    if (re.test(rest)) {
+      if (!found.includes(movement)) found.push(movement);
+      rest = rest.replace(re, ' ');
+    }
+  }
+  return found;
+}
+
 // "백스쿼트 70,75,80 / 데드리프트 60,65" → [{movement, percents}]
-export function parseLifts(cell) {
+// 퍼센트만 적은 경우("65~68%")는 그날 스트렝스 글에 종목이 하나뿐이면 그 종목으로 계산한다
+export function parseLifts(cell, strengthText = '') {
   const lifts = [];
   const warnings = [];
   for (const part of cell.split(/[\n/;|]+/)) {
     const text = normalizeSymbols(part).trim();
     if (!text) continue;
+    if (/^[\d\s,%.~-]+$/.test(text)) {
+      const percents = parsePercents(text);
+      const inStrength = findMovements(strengthText);
+      if (percents.length && inStrength.length === 1) {
+        lifts.push({ movement: inStrength[0], percents });
+      } else if (!percents.length) {
+        warnings.push(`강도 "${text.slice(0, 30)}"를 이해하지 못해 건너뛰었어요`);
+      } else {
+        warnings.push(
+          inStrength.length
+            ? `강도 "${text.slice(0, 30)}": 스트렝스에 종목이 여러 개예요. 강도 칸에 종목을 함께 적어주세요 (예: 백스쿼트 ${text.slice(0, 20)})`
+            : `강도 "${text.slice(0, 30)}": 스트렝스에서 종목을 찾지 못했어요. 강도 칸에 종목을 함께 적어주세요 (예: 백스쿼트 ${text.slice(0, 20)})`,
+        );
+      }
+      continue;
+    }
     const m = text.match(/^([^\d:]+?)\s*:?\s*([\d\s,%.~\-–—]+)$/);
     const movement = m && toMovement(m[1]);
     const percents = m ? parsePercents(m[2]) : [];
@@ -217,7 +253,7 @@ export function rowsToWods(rows, { from, to }) {
       title = `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 (${WEEKDAYS[d.getUTCDay()]}) WOD`;
     }
     const content = parts.join('\n\n').slice(0, 4000);
-    const { lifts, warnings } = parseLifts(rawLifts);
+    const { lifts, warnings } = parseLifts(rawLifts, cell(r, col.strength) || cell(r, col.content));
     for (const w of warnings) skipped.push({ row: rowNo, reason: w });
     wods.push({ wod_date: date, title, content, lifts });
   }
