@@ -277,7 +277,8 @@ export function BoxSpace({
     const tapAt = (e: PointerEvent) => {
       const { wx, wy } = toWorld(e);
       const target = objectAt(wx, wy);
-      if (target && isNear(target, me.x, me.y)) {
+      // 게시판 키오스크도 다른 구조물처럼 멀리서 눌러도 바로 열린다 (걸어가지 않아도 됨)
+      if (target) {
         callbacks.current.onOpen(target);
         return;
       }
