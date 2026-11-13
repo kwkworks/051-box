@@ -30,6 +30,8 @@ export function authorizeUrl(state) {
     client_id: config.naverClientId,
     redirect_uri: config.naverRedirectUri,
     state,
+    // 이미 동의한 적이 있어도 동의 화면을 다시 띄운다 (카페 글쓰기 권한이 빠진 채 연결되는 것 방지)
+    auth_type: 'reprompt',
   });
   return `https://nid.naver.com/oauth2.0/authorize?${q}`;
 }
