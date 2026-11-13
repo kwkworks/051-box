@@ -23,13 +23,13 @@ function Admin({ me }: { me: Me }) {
   const tabs = [
     ['members', '회원 관리'],
     ['holidays', '휴무일'],
-    ['sheet', '구글 시트 WOD'],
+    ['sheet', '시트 WOD'], // 좁은 화면·큰 글씨에서도 한 줄 (구글 시트에서 WOD 가져오기)
   ] as const;
   return (
     <BoardShell title="🔑 관리자" subtitle="가입 승인 · 회원 기록 · 휴무일 · 구글 시트 WOD">
       <div className="mb-4 grid grid-cols-3 gap-2" role="tablist">
         {tabs.map(([key, label]) => (
-          <button key={key} type="button" role="tab" aria-selected={tab === key} className={`btn ${tab === key ? 'btn-primary' : ''}`} onClick={() => setTab(key)}>
+          <button key={key} type="button" role="tab" aria-selected={tab === key} className={`btn px-1.5 leading-tight ${tab === key ? 'btn-primary' : ''}`} onClick={() => setTab(key)}>
             {label}
           </button>
         ))}
@@ -575,11 +575,12 @@ function ChatLock() {
   };
   return (
     <div className={`card mb-6 flex items-center justify-between gap-3 p-4 ${data?.locked ? 'border-[var(--danger)]' : ''}`}>
-      <div>
+      <div className="min-w-0 flex-1">
         <p className="font-black">💬 박스 채팅 {data?.locked ? '🔒 잠김' : '열림'}</p>
         <p className="text-xs text-muted">잠그면 회원은 채팅을 보낼 수 없어요. 관리자는 잠금 중에도 쓸 수 있어요.</p>
       </div>
-      <button type="button" className={`btn btn-sm ${data?.locked ? 'btn-primary' : 'btn-danger'}`} disabled={busy || !data} onClick={toggle}>
+      {/* 글자를 크게 설정한 휴대폰에서도 버튼 글자가 두 줄로 꺾이지 않게 */}
+      <button type="button" className={`btn btn-sm shrink-0 whitespace-nowrap ${data?.locked ? 'btn-primary' : 'btn-danger'}`} disabled={busy || !data} onClick={toggle}>
         {data?.locked ? '잠금 해제' : '채팅 잠그기'}
       </button>
     </div>
