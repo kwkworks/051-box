@@ -60,9 +60,7 @@ function Notices({ me }: { me: Me }) {
                           // 앱과 카페 삭제는 서로 이어지지 않는다 (네이버가 외부 삭제·삭제 알림을 지원하지 않음)
                           const cafe = safeHttpsUrl(n.cafe_url);
                           const msg = cafe
-                            ? '앱에서 이 공지를 삭제할까요?
-
-네이버 카페에 올라간 글은 지워지지 않아요. 카페 글은 카페에서 따로 지워 주세요.'
+                            ? '앱에서 이 공지를 삭제할까요?\n\n네이버 카페에 올라간 글은 지워지지 않아요. 카페 글은 카페에서 따로 지워 주세요.'
                             : '이 공지를 삭제할까요?';
                           if (!confirm(msg)) return;
                           const ok = await api.del(`/notices/${n.id}`).then(
