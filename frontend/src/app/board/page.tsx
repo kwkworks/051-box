@@ -14,7 +14,7 @@ export default function BoardHubPage() {
   return <Guard need="member">{(me) => <Hub me={me} />}</Guard>;
 }
 
-const ORDER: BoardKey[] = ['wod', 'notices', 'competition', 'gathering', 'one-rm', 'wall'];
+const ORDER: BoardKey[] = ['wod', 'notices', 'competition', 'gathering', 'one-rm', 'wall', 'qna'];
 
 // 모든 기능을 이름과 설명으로 한눈에 모아둔 게시판
 function Hub({ me }: { me: Me }) {

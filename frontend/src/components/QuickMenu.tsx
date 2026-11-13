@@ -10,7 +10,7 @@ import { InviteButton } from './InviteButton';
 const ITEMS = [
   { href: '/', label: '박스 공간', icon: '🏠' },
   { href: BOARDS.hub.href, label: '게시판 (전체 보기)', icon: BOARDS.hub.icon },
-  ...(['wod', 'notices', 'competition', 'gathering', 'one-rm', 'wall'] as const).map((k) => ({
+  ...(['wod', 'notices', 'competition', 'gathering', 'one-rm', 'wall', 'qna'] as const).map((k) => ({
     href: BOARDS[k].href,
     label: BOARDS[k].label,
     icon: BOARDS[k].icon,

@@ -10,6 +10,7 @@ import { chatRouter } from './routes/chat.js';
 import { eventsRouter } from './routes/events.js';
 import { feedRouter } from './routes/feed.js';
 import { meRouter } from './routes/me.js';
+import { qnaRouter } from './routes/qna.js';
 import { noticesRouter } from './routes/notices.js';
 import { oneRmRouter } from './routes/oneRm.js';
 import { wodsRouter } from './routes/wods.js';
@@ -77,6 +78,7 @@ export function createApp() {
   app.use('/one-rm', requireMember, oneRmRouter);
   app.use('/feed', requireMember, feedRouter);
   app.use('/chat', requireMember, chatRouter);
+  app.use('/qna', requireMember, qnaRouter);
   app.use('/push', requireMember, pushRouter);
   app.use('/admin', requireAdmin, adminRouter);
 

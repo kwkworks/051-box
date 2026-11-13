@@ -67,6 +67,10 @@ export const meUpdateSchema = z
     '변경할 내용이 없습니다',
   );
 
+// Q&A 문의 / 답변
+export const qnaQuestionSchema = z.strictObject({ title: requiredText(80), body: requiredText(2000) });
+export const qnaAnswerSchema = z.strictObject({ answer: requiredText(2000).nullable() });
+
 const percentValue = z.number().int().min(30).max(120);
 
 export const wodSchema = z.strictObject({

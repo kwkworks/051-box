@@ -9,6 +9,7 @@ import { ChatPanel } from '@/components/ChatPanel';
 import { EventDetailView } from '@/components/EventDetailView';
 import { EventForm } from '@/components/EventForm';
 import { NotificationSettings } from '@/components/NotificationSettings';
+import { QnaItem } from '@/components/QnaItem';
 import { WallCard } from '@/components/WallCard';
 import { WodView } from '@/components/WodView';
 import { Podium } from '@/components/Podium';
@@ -33,7 +34,7 @@ function samples(): Partial<Avatar>[] {
 
 export function DevPreview() {
   const [opened, setOpened] = useState("");
-  const [view, setView] = useState<'space' | 'avatars' | 'podium' | 'forms' | 'wod' | 'event' | 'wall'>('space');
+  const [view, setView] = useState<'space' | 'avatars' | 'podium' | 'forms' | 'wod' | 'event' | 'wall' | 'qna'>('space');
   const space = useRef<BoxSpaceHandle | null>(null);
   // 채팅 미리보기: 다른 회원 메시지 8개, 그중 5개는 이미 읽음
   const [msgs, setMsgs] = useState<ChatMessage[]>(() =>
@@ -48,7 +49,8 @@ export function DevPreview() {
   const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
   return (
     <div className="flex h-dvh flex-col">
-      <div className="flex gap-2 p-2">
+      {/* 개발용 화면 전환 버튼 (좁은 화면에서도 화면 폭을 넘지 않게 줄바꿈) */}
+      <div className="flex flex-wrap gap-2 p-2">
         <button type="button" className="btn btn-sm" onClick={() => setView('space')}>공간</button>
         <button type="button" className="btn btn-sm" onClick={() => setView('avatars')}>캐릭터</button>
         <button type="button" className="btn btn-sm" onClick={() => setView('podium')}>포디움</button>
@@ -56,8 +58,29 @@ export function DevPreview() {
         <button type="button" className="btn btn-sm" onClick={() => setView('wod')}>WOD</button>
         <button type="button" className="btn btn-sm" onClick={() => setView('event')}>모임</button>
         <button type="button" className="btn btn-sm" onClick={() => setView('wall')}>벽</button>
+        <button type="button" className="btn btn-sm" onClick={() => setView('qna')}>Q&A</button>
       </div>
-      {view === 'wall' ? (
+      {view === 'qna' ? (
+        // Q&A 미리보기: 회원(내 문의) / 관리자(모든 문의, 답변 칸)
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 overflow-y-auto px-4 pb-10" data-view="qna">
+          {[false, true].map((admin) => (
+            <ul key={String(admin)} className="flex flex-col gap-3" data-admin={admin}>
+              {[
+                { id: 'q1', title: '휴회 신청은 어떻게 하나요? 다음 달에 해외 출장이 있어서 한 달 정도 쉬어야 할 것 같아요', body: '다음 달 1일부터 30일까지 쉬고 싶어요.\n방법 알려주세요!', answer: null },
+                { id: 'q2', title: '주차 가능한가요?', body: '차로 가도 되나요?', answer: '건물 뒤편 주차장에 2시간 무료 주차가 돼요. 데스크에서 주차 등록을 해 주세요.' },
+              ].map((d) => (
+                <QnaItem
+                  key={d.id}
+                  isAdmin={admin}
+                  onDelete={async () => {}}
+                  onAnswer={async () => {}}
+                  q={{ ...d, user_id: 'u1', nickname: '아주긴닉네임회원님', answered_at: d.answer ? '2026-11-13T04:00:00Z' : null, created_at: '2026-11-13T03:00:00Z', mine: !admin }}
+                />
+              ))}
+            </ul>
+          ))}
+        </div>
+      ) : view === 'wall' ? (
         // 명예의 벽 카드(축하 버튼) + 알림 설정(🎉 내 PR 축하, 관리자용 항목 포함)
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 overflow-y-auto px-4 pb-10" data-view="wall">
           {[

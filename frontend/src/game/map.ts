@@ -7,7 +7,7 @@ export const WORLD_H = ROWS * TILE;
 
 export const SPAWN = { x: 30.5 * TILE, y: 19.5 * TILE };
 
-export type BoardKey = 'hub' | 'wod' | 'notices' | 'competition' | 'gathering' | 'one-rm' | 'wall';
+export type BoardKey = 'hub' | 'wod' | 'notices' | 'competition' | 'gathering' | 'one-rm' | 'wall' | 'qna';
 export type ObjectKey = BoardKey;
 
 // 이름만 보고도 무엇인지 알 수 있게 짓는다
@@ -19,6 +19,7 @@ export const BOARDS: Record<BoardKey, { label: string; icon: string; href: strin
   gathering: { label: '회원 모임', icon: '🍻', href: '/events?kind=gathering', hint: '회식, 번개 모임' },
   'one-rm': { label: '1RM 기록', icon: '🏋️', href: '/one-rm', hint: '내 최고 기록과 박스 순위' },
   wall: { label: 'PR 명예의 벽', icon: '🎉', href: '/wall', hint: '회원들의 PR 축하' },
+  qna: { label: 'Q&A 문의', icon: '💬', href: '/qna', hint: '관리자에게 1:1 문의 (나와 관리자만 볼 수 있어요)' },
 };
 
 export const OBJECT_LABELS: Record<ObjectKey, string> = {

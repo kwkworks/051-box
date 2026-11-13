@@ -139,3 +139,16 @@ export type ChatState = {
 
 // 종목마다 전체 / 남자 / 여자 상위 10명
 export type RankGroups = { all: RankRow[]; M: RankRow[]; F: RankRow[] };
+
+// Q&A 문의 (쓴 사람 본인과 관리자만 볼 수 있음)
+export type QnaQuestion = {
+  id: string;
+  user_id: string;
+  nickname: string;
+  title: string;
+  body: string;
+  answer: string | null;
+  answered_at: string | null;
+  created_at: string;
+  mine: boolean;
+};

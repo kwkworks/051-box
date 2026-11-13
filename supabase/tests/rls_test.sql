@@ -50,6 +50,7 @@ declare
   g_cap uuid;  -- 정원 줄이기 테스트용 모임
   g_close uuid;  -- 신청 마감하기 테스트용 모임
   act_id uuid;   -- 축하 테스트용 명예의 벽 글
+  q_a uuid;      -- Q&A 테스트용 문의 (회원 a)
   w_past uuid;
   w_future uuid;
   anon_id uuid := gen_random_uuid();
@@ -331,6 +332,25 @@ begin
   insert into rls_results values
   (103, '회원이 축하 알림 대상 요청 (틀린 비밀값)', 'err', pg_temp.run_as(a, format('select * from public.push_claim_cheer(''wrong'', %L, %L)', act_id, a))),
   (104, '비로그인으로 축하 알림 대상 요청 (틀린 비밀값)', 'err', pg_temp.run_as(null, format('select * from public.push_claim_cheer(''wrong'', %L, %L)', act_id, a)));
+
+  -- 0019: Q&A 문의 (쓴 사람과 관리자만 보기, 답변은 관리자만)
+  insert into public.qna_questions (user_id, title, body) values (a, 'rls-test 문의', 'rls-test 내용') returning id into q_a;
+  insert into rls_results values
+  (105, '회원이 문의 작성', 'ok:1', pg_temp.run_as(a, 'insert into public.qna_questions (title, body) values (''rls-test 회원 문의'', ''내용'')')),
+  (106, '남의 이름으로 문의 작성', 'err', pg_temp.run_as(a, format('insert into public.qna_questions (user_id, title, body) values (%L, ''rls-test'', ''x'')', d))),
+  (107, '다른 회원이 남의 문의 조회', 'ok:0', pg_temp.run_as(m, format('select * from public.qna_questions where id = %L', q_a))),
+  (108, '비로그인으로 문의 조회', 'err', pg_temp.run_as(null, 'select * from public.qna_questions')),
+  (109, '승인 대기자가 문의 작성', 'err', pg_temp.run_as(c, 'insert into public.qna_questions (title, body) values (''rls-test'', ''x'')')),
+  (110, '작성자가 스스로 답변 달기', 'ok:0', pg_temp.run_as(a, format('update public.qna_questions set answer = ''셀프 답변'' where id = %L', q_a))),
+  (111, '작성자가 문의 제목 고치기', 'err', pg_temp.run_as(a, format('update public.qna_questions set title = ''바꿈'' where id = %L', q_a))),
+  (112, '관리자가 문의 조회', 'ok:1', pg_temp.run_as(d, format('select * from public.qna_questions where id = %L', q_a))),
+  (113, '관리자가 답변 달기', 'ok:1', pg_temp.run_as(d, format('update public.qna_questions set answer = ''rls-test 답변'' where id = %L', q_a)));
+  insert into rls_results values
+  (114, '답변 시각·답변자를 DB가 기록', 'ok:1',
+   'ok:' || (select count(*) from public.qna_questions where id = q_a and answered_by = d and answered_at is not null)::text),
+  (115, '다른 회원이 남의 문의 삭제', 'ok:0', pg_temp.run_as(m, format('delete from public.qna_questions where id = %L', q_a))),
+  (116, '작성자가 본인 문의 삭제', 'ok:1', pg_temp.run_as(a, format('delete from public.qna_questions where id = %L', q_a)));
+  delete from public.qna_questions where title like 'rls-test%';
 
   -- 마지막: 임시 회원 m이 스스로 탈퇴 → 계정과 기록이 모두 사라지는지
   r := pg_temp.run_as(m, 'select public.delete_my_account()');
