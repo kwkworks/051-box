@@ -57,6 +57,14 @@ export function safeHttpsUrl(url: string | null | undefined): string | null {
 }
 
 // 무게는 파운드(lb)로 기록하고 kg 환산값을 함께 보여준다
+// WOD 무게 표시용: 소수점 둘째 자리까지 반올림해서 항상 두 자리로 (예: 220.50)
+export function fixed2(n: number): string {
+  return (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2);
+}
+export function lbToKg2(lb: number): string {
+  return fixed2(lb * 0.45359237);
+}
+
 export function lbToKg(lb: number): number {
   return Math.round(lb * 0.45359237 * 10) / 10;
 }

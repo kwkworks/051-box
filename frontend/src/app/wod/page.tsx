@@ -3,9 +3,10 @@
 import { useState } from 'react';
 import { BoardShell } from '@/components/BoardShell';
 import { ErrorBox, Guard, Loading } from '@/components/Guard';
+import { WodView } from '@/components/WodView';
 import { api } from '@/lib/api';
-import { MOVEMENTS, movementLabel, type MovementKey } from '@/lib/constants';
-import { fmtLb, formatDateLabel, kstToday, lbToKg, percentWeight, shiftDate } from '@/lib/format';
+import { MOVEMENTS, type MovementKey } from '@/lib/constants';
+import { formatDateLabel, kstToday, shiftDate } from '@/lib/format';
 import { shrinkImage } from '@/lib/shrinkImage';
 import type { Lift, Me, Wod, WodPhoto } from '@/lib/types';
 import { useLoad } from '@/lib/useLoad';
@@ -96,66 +97,6 @@ function opensLabel(iso: string | undefined, today: string) {
   if (!iso) return '전날 오후 8시 30분';
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(iso));
   return `${day === today ? '오늘' : formatDateLabel(day)} 오후 8시 30분`;
-}
-
-// WOD 본문: [Strength], [Conditioning] 같은 구역 제목 줄은 굵게
-const SECTION_LINE = /^\s*\[[^\]\n]{1,30}\]\s*$/;
-function WodContent({ text }: { text: string }) {
-  return (
-    <div className="whitespace-pre-wrap break-words px-4 py-4 text-[15px] leading-relaxed">
-      {text.split(/\r\n|\r|\n/).map((line, i) =>
-        SECTION_LINE.test(line) ? (
-          <p key={i} className={`font-black text-[var(--burgundy)] ${i ? 'mt-1' : ''}`}>
-            {line.trim()}
-          </p>
-        ) : (
-          <p key={i}>{line || ' '}</p>
-        ),
-      )}
-    </div>
-  );
-}
-
-function WodView({ wod, bestLifts }: { wod: Wod; bestLifts: Record<string, number> }) {
-  return (
-    <article className="card overflow-hidden">
-      <div className="border-b-2 border-ink bg-white px-4 py-3">
-        <h2 className="text-xl font-black text-[#C2453A]">{wod.title}</h2>
-      </div>
-      {wod.content && <WodContent text={wod.content} />}
-      {wod.lifts.length > 0 && (
-        <div className="border-t-2 border-dashed border-ink/30 bg-[var(--bg)] px-4 py-4">
-          <h3 className="mb-2 text-sm font-black">🏋️ 내 무게 (1RM 기준 정확한 값)</h3>
-          <div className="flex flex-col gap-3">
-            {wod.lifts.map((lift, i) => {
-              const best = bestLifts[lift.movement];
-              return (
-                <div key={i}>
-                  <p className="text-sm font-bold">
-                    {movementLabel(lift.movement)}
-                    {best ? <span className="ml-2 text-muted">1RM {fmtLb(best)} ({lbToKg(best)} kg)</span> : null}
-                  </p>
-                  {best ? (
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      {lift.percents.map((p, j) => (
-                        <span key={j} className="chip bg-yellow">
-                          {p}% → {fmtLb(percentWeight(best, p))} <span className="font-normal">({lbToKg(percentWeight(best, p))} kg)</span>
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-1 text-xs text-muted">
-                      {lift.percents.map((p) => `${p}%`).join(' · ')} — 1RM 게시판에 기록하면 무게가 자동 계산돼요
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </article>
-  );
 }
 
 function WodEditor({ date, wod, onDone }: { date: string; wod: Wod | null; onDone: () => void }) {

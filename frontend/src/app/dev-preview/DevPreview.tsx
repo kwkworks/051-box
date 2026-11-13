@@ -5,10 +5,11 @@ import { ActionPad } from '@/components/ActionPad';
 import { AvatarView } from '@/components/AvatarView';
 import { ChatPanel } from '@/components/ChatPanel';
 import { EventForm } from '@/components/EventForm';
+import { WodView } from '@/components/WodView';
 import { Podium } from '@/components/Podium';
 import { BoxSpace, type BoxSpaceHandle } from '@/game/BoxSpace';
 import { AVATAR_OPTIONS, type Avatar } from '@/lib/constants';
-import type { ChatMessage, Profile } from '@/lib/types';
+import type { ChatMessage, Profile, Wod } from '@/lib/types';
 
 const DEMO: Profile = {
   id: '00000000-0000-0000-0000-000000000000',
@@ -27,7 +28,7 @@ function samples(): Partial<Avatar>[] {
 
 export function DevPreview() {
   const [opened, setOpened] = useState("");
-  const [view, setView] = useState<'space' | 'avatars' | 'podium' | 'forms'>('space');
+  const [view, setView] = useState<'space' | 'avatars' | 'podium' | 'forms' | 'wod'>('space');
   const space = useRef<BoxSpaceHandle | null>(null);
   // 채팅 미리보기: 다른 회원 메시지 8개, 그중 5개는 이미 읽음
   const [msgs, setMsgs] = useState<ChatMessage[]>(() =>
@@ -47,8 +48,24 @@ export function DevPreview() {
         <button type="button" className="btn btn-sm" onClick={() => setView('avatars')}>캐릭터</button>
         <button type="button" className="btn btn-sm" onClick={() => setView('podium')}>포디움</button>
         <button type="button" className="btn btn-sm" onClick={() => setView('forms')}>입력칸</button>
+        <button type="button" className="btn btn-sm" onClick={() => setView('wod')}>WOD</button>
       </div>
-      {view === 'forms' ? (
+      {view === 'wod' ? (
+        // WOD 무게 계산 미리보기: 왼쪽은 1RM 있음(백스쿼트 315 lb), 오른쪽은 1RM 없음
+        <div className="mx-auto grid w-full max-w-3xl gap-4 overflow-y-auto px-4 pb-10 sm:grid-cols-2">
+          {([{ back_squat: 315 }, {}] as Record<string, number>[]).map((best, i) => (
+            <WodView
+              key={i}
+              bestLifts={best}
+              wod={{
+                id: 'demo', wod_date: '2026-11-13', title: 'Heavy Day',
+                content: '[Strength]\nBack Squat\n5-5-3 @70%, 75%, 80%\n\n[Conditioning]\nAMRAP 12\n10 Wall Balls\n10 Box Jumps',
+                lifts: [{ movement: 'back_squat', percents: [70, 75, 80] }, { movement: 'deadlift', percents: [60, 65] }],
+              } as Wod}
+            />
+          ))}
+        </div>
+      ) : view === 'forms' ? (
         // 좁은 화면에서 입력칸이 넘치지 않는지 보는 미리보기 (모임 만들기 양식 + 날짜 칸)
         <div className="mx-auto w-full max-w-3xl overflow-y-auto px-4 pb-10">
           <EventForm kind="gathering" onDone={() => {}} />
