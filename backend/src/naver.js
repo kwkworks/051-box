@@ -155,7 +155,6 @@ export function wodCafePost(wod) {
     lines.push('', '[강도]');
     for (const l of lifts) lines.push(`${LABELS[l.movement] ?? l.movement} ${(l.percents ?? []).map(percentText).join(', ')}`);
   }
-  lines.push('', '내 1RM 기준 무게는 051 BOX 앱에서 확인하세요');
   return { subject, body: lines.join('\n') };
 }
 
