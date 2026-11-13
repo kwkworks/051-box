@@ -57,9 +57,23 @@ function Notices({ me }: { me: Me }) {
                         type="button"
                         className="btn btn-sm btn-danger"
                         onClick={async () => {
-                          if (!confirm('이 공지를 삭제할까요?')) return;
-                          await api.del(`/notices/${n.id}`).catch((e) => alert(e.message));
+                          // 앱과 카페 삭제는 서로 이어지지 않는다 (네이버가 외부 삭제·삭제 알림을 지원하지 않음)
+                          const cafe = safeHttpsUrl(n.cafe_url);
+                          const msg = cafe
+                            ? '앱에서 이 공지를 삭제할까요?
+
+네이버 카페에 올라간 글은 지워지지 않아요. 카페 글은 카페에서 따로 지워 주세요.'
+                            : '이 공지를 삭제할까요?';
+                          if (!confirm(msg)) return;
+                          const ok = await api.del(`/notices/${n.id}`).then(
+                            () => true,
+                            (e) => {
+                              alert(e.message);
+                              return false;
+                            },
+                          );
                           reload();
+                          if (ok && cafe && confirm('카페 글도 지우러 갈까요? (카페 글이 새 창으로 열려요)')) window.open(cafe, '_blank', 'noopener');
                         }}
                       >
                         삭제
