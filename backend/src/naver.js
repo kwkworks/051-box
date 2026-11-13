@@ -109,9 +109,12 @@ export async function postToCafe(menuKey, subject, bodyText) {
   const data = await res.json().catch(() => ({}));
   const articleId = data?.message?.result?.articleId;
   if (!res.ok || !articleId) {
-    const reason = data?.message?.error?.msg ?? data?.errorMessage ?? res.status;
-    console.warn('[naver] 카페 글쓰기 실패', res.status, reason);
-    throw new Error('카페에 올리지 못했어요. 카페 글쓰기 권한과 네이버 연결 상태를 확인해 주세요');
+    // 네이버가 알려 준 이유(코드·문구)를 관리자에게 그대로 보여준다 (토큰 같은 비밀 값은 들어 있지 않음)
+    const err = data?.message?.error ?? {};
+    const code = err.code ?? data?.errorCode ?? '';
+    const reason = String(err.msg ?? err.message ?? data?.errorMessage ?? `HTTP ${res.status}`).slice(0, 120);
+    console.warn('[naver] 카페 글쓰기 실패', res.status, code, reason);
+    throw new Error(`네이버가 거절했어요 (${res.status}${code ? ` · ${code}` : ''}: ${reason})`);
   }
   return `${CAFE_URL_BASE}/${articleId}`;
 }
