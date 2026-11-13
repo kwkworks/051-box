@@ -9,7 +9,8 @@ feedRouter.get('/', async (req, res) => {
   const rows = unwrap(
     await req.sb
       .from('activities')
-      .select('id, kind, payload, created_at, user_id, profiles(nickname, avatar)')
+      // 글쓴이는 activities.user_id로 바로 연결 (축하 표를 거치는 길과 헷갈리지 않게 열 이름으로 지정)
+      .select('id, kind, payload, created_at, user_id, profiles!user_id(nickname, avatar)')
       .gte('created_at', `${new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date())}T00:00:00+09:00`)
       .order('created_at', { ascending: false })
       .limit(100),
