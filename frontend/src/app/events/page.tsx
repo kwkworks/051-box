@@ -89,7 +89,7 @@ function Events({ me }: { me: Me }) {
 
 function EventCard({ ev, now, past }: { ev: BoxEvent; now: number; past: boolean }) {
   const deadline = ev.signup_deadline ? new Date(ev.signup_deadline).getTime() : null;
-  const closed = deadline !== null && deadline < now;
+  const closed = Boolean(ev.closed_at) || (deadline !== null && deadline < now);
   const full = ev.capacity !== null && (ev.participant_count ?? 0) >= ev.capacity;
   const soon = deadline !== null && !closed && deadline - now < 3 * 86400000;
   return (

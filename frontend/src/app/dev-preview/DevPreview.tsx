@@ -4,6 +4,7 @@ import { useRef, useState, useSyncExternalStore } from 'react';
 import { ActionPad } from '@/components/ActionPad';
 import { AvatarView } from '@/components/AvatarView';
 import { ChatPanel } from '@/components/ChatPanel';
+import { EventDetailView } from '@/components/EventDetailView';
 import { EventForm } from '@/components/EventForm';
 import { WodView } from '@/components/WodView';
 import { Podium } from '@/components/Podium';
@@ -28,7 +29,7 @@ function samples(): Partial<Avatar>[] {
 
 export function DevPreview() {
   const [opened, setOpened] = useState("");
-  const [view, setView] = useState<'space' | 'avatars' | 'podium' | 'forms' | 'wod'>('space');
+  const [view, setView] = useState<'space' | 'avatars' | 'podium' | 'forms' | 'wod' | 'event'>('space');
   const space = useRef<BoxSpaceHandle | null>(null);
   // 채팅 미리보기: 다른 회원 메시지 8개, 그중 5개는 이미 읽음
   const [msgs, setMsgs] = useState<ChatMessage[]>(() =>
@@ -49,8 +50,38 @@ export function DevPreview() {
         <button type="button" className="btn btn-sm" onClick={() => setView('podium')}>포디움</button>
         <button type="button" className="btn btn-sm" onClick={() => setView('forms')}>입력칸</button>
         <button type="button" className="btn btn-sm" onClick={() => setView('wod')}>WOD</button>
+        <button type="button" className="btn btn-sm" onClick={() => setView('event')}>모임</button>
       </div>
-      {view === 'wod' ? (
+      {view === 'event' ? (
+        // 모임 상세 미리보기: 만든 사람(열림) / 만든 사람(마감됨) / 일반 회원
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 overflow-y-auto px-4 pb-10">
+          {[
+            { can_manage: true, closed_at: null, label: 'creator-open' },
+            { can_manage: true, closed_at: '2026-11-13T02:00:00Z', label: 'creator-closed' },
+            { can_manage: false, closed_at: null, label: 'member' },
+          ].map((c) => (
+            <div key={c.label} data-case={c.label}>
+              <EventDetailView
+                now={Date.parse('2026-11-13T03:00:00Z')}
+                busy={false}
+                actionError={null}
+                onToggleJoin={() => {}}
+                onToggleClose={() => {}}
+                onEdit={() => {}}
+                onRemove={() => {}}
+                ev={{
+                  id: c.label, kind: 'gathering', title: '금요일 회식 🍖', description: '참가비 2만원',
+                  starts_at: '2026-11-14T10:00:00Z', location: '박스 앞 고깃집', link_url: null,
+                  signup_deadline: '2026-11-14T03:00:00Z', capacity: 10, closed_at: c.closed_at,
+                  created_by: 'u1', created_at: '2026-11-12T00:00:00Z', joined: false, can_manage: c.can_manage,
+                  creator: { nickname: '김코치' },
+                  participants: [1, 2, 3, 4].map((n) => ({ user_id: `p${n}`, nickname: `회원${n}`, avatar: {}, created_at: '2026-11-12T00:00:00Z' })),
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      ) : view === 'wod' ? (
         // WOD 무게 계산 미리보기: 왼쪽은 1RM 있음(백스쿼트 315 lb), 오른쪽은 1RM 없음
         <div className="mx-auto grid w-full max-w-3xl gap-4 overflow-y-auto px-4 pb-10 sm:grid-cols-2">
           {([{ back_squat: 315 }, {}] as Record<string, number>[]).map((best, i) => (
