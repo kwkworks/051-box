@@ -19,6 +19,7 @@ const ITEMS = [
 ];
 
 // 공간을 돌아다니지 않고 게시판으로 바로 가는 메뉴
+// 글자색을 '가 본 링크(visited)'에도 똑같이 지정한다: 휴대폰 다크 모드가 가 본 링크를 회색으로 바꾸지 않게
 export function QuickMenu() {
   const [open, setOpen] = useState(false);
   const { me, signOut } = useAuth();
@@ -35,7 +36,7 @@ export function QuickMenu() {
               key={item.href}
               href={item.href}
               onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold hover:bg-[var(--bg)]"
+              className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-ink visited:text-ink hover:bg-[var(--bg)]"
             >
               <span aria-hidden>{item.icon}</span>
               {item.label}
@@ -45,7 +46,7 @@ export function QuickMenu() {
             <Link
               href="/admin"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-[var(--burgundy)] hover:bg-[var(--bg)]"
+              className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-burgundy visited:text-burgundy hover:bg-[var(--bg)]"
             >
               <span aria-hidden>🔑</span>
               관리자
