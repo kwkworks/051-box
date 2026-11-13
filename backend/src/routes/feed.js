@@ -9,18 +9,39 @@ feedRouter.get('/', async (req, res) => {
   const rows = unwrap(
     await req.sb
       .from('activities')
-      .select('id, kind, payload, created_at, user_id, profiles(nickname, avatar), activity_likes(user_id)')
+      .select('id, kind, payload, created_at, user_id, profiles(nickname, avatar)')
       .gte('created_at', `${new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date())}T00:00:00+09:00`)
       .order('created_at', { ascending: false })
       .limit(100),
   );
+
+  // 축하해요 🎉는 따로 불러온다 (표 사이 연결 정보에 기대지 않음).
+  // 불러오지 못해도 명예의 벽은 그대로 보여주고 축하 수만 0으로 둔다.
+  const counts = new Map();
+  const mine = new Set();
+  if (rows.length) {
+    const { data: likes, error } = await req.sb
+      .from('activity_likes')
+      .select('activity_id, user_id')
+      .in('activity_id', rows.map((r) => r.id))
+      .limit(5000);
+    if (error) {
+      console.warn('[feed] 축하 수를 불러오지 못했어요', error.code);
+    } else {
+      for (const l of likes) {
+        counts.set(l.activity_id, (counts.get(l.activity_id) ?? 0) + 1);
+        if (l.user_id === req.userId) mine.add(l.activity_id);
+      }
+    }
+  }
+
   res.json({
-    items: rows.map(({ profiles, activity_likes, ...a }) => ({
+    items: rows.map(({ profiles, ...a }) => ({
       ...a,
       nickname: profiles?.nickname ?? '알 수 없음',
       avatar: profiles?.avatar ?? {},
-      like_count: activity_likes?.length ?? 0,
-      liked: (activity_likes ?? []).some((l) => l.user_id === req.userId),
+      like_count: counts.get(a.id) ?? 0,
+      liked: mine.has(a.id),
     })),
   });
 });
