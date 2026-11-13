@@ -5,7 +5,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { BoardShell } from '@/components/BoardShell';
 import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { api } from '@/lib/api';
-import { MOVEMENTS, NAMED_WODS, movementLabel, type MovementKey, type NamedWodKey } from '@/lib/constants';
+import { MOVEMENTS, NAMED_WODS, matchesSearch, movementLabel, type MovementKey, type NamedWodKey } from '@/lib/constants';
 import { RecordValue } from '@/components/RecordValue';
 import { Podium } from '@/components/Podium';
 import { formatDateLabel, kstToday } from '@/lib/format';
@@ -217,7 +217,7 @@ function MyRecords({ me, records, onRemove }: { me: Me; records: OneRmRecord[]; 
   const q = query.trim().toLowerCase();
   const shown = groups
     .filter((g) => (kind === 'all' ? true : kind === 'lift' ? g.unit === 'lb' && !g.isCustom : kind === 'wod' ? g.unit === 'time' && !g.isCustom : g.isCustom))
-    .filter((g) => !q || g.label.toLowerCase().includes(q) || g.key.toLowerCase().includes(q))
+    .filter((g) => matchesSearch(q, g.key, g.label, g.isCustom))
     .sort((a, b) =>
       sort === 'name' ? a.label.localeCompare(b.label, 'ko') : sort === 'count' ? b.records.length - a.records.length : b.lastOn.localeCompare(a.lastOn),
     );

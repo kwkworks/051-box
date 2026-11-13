@@ -38,6 +38,47 @@ export const NAMED_WODS = {
 
 export type NamedWodKey = keyof typeof NAMED_WODS;
 
+// 1RM 검색용 다른 이름: 네임드 WOD는 한글로, 리프트는 영어로도 찾을 수 있게
+const SEARCH_ALIASES: Record<string, string[]> = {
+  fran: ['프란'],
+  grace: ['그레이스'],
+  isabel: ['이사벨', '이자벨'],
+  helen: ['헬렌'],
+  diane: ['다이앤', '다이안'],
+  elizabeth: ['엘리자베스'],
+  annie: ['애니'],
+  jackie: ['재키', '잭키'],
+  karen: ['캐런', '카렌'],
+  nancy: ['낸시'],
+  kelly: ['켈리'],
+  amanda: ['아만다'],
+  murph: ['머프'],
+  dt: ['디티'],
+  jt: ['제이티'],
+  back_squat: ['back squat', '백 스쿼트'],
+  front_squat: ['front squat'],
+  overhead_squat: ['overhead squat', 'ohs'],
+  deadlift: ['deadlift', 'dl'],
+  clean: ['clean', '스쿼트클린', 'squat clean'],
+  power_clean: ['power clean'],
+  clean_and_jerk: ['clean and jerk', 'clean & jerk', '클린앤드저크', '용상'],
+  snatch: ['snatch', '스쿼트스내치', 'squat snatch', '인상'],
+  power_snatch: ['power snatch'],
+  push_press: ['push press', '푸쉬프레스'],
+  strict_press: ['strict press', 'shoulder press', '숄더프레스'],
+  bench_press: ['bench press'],
+  thruster: ['thruster', '스러스터', '쓰러스터'],
+};
+
+// 검색어가 이 종목에 맞는지 (대소문자·띄어쓰기 무시, 화면 이름·내부 이름·다른 이름 모두)
+export function matchesSearch(query: string, key: string, label: string, isCustom = false): boolean {
+  const norm = (t: string) => t.toLowerCase().replace(/[\s_]+/g, '');
+  const q = norm(query);
+  if (!q) return true;
+  const names = [label, key, ...(isCustom ? [] : (SEARCH_ALIASES[key] ?? []))];
+  return names.some((n) => norm(n).includes(q));
+}
+
 export function movementLabel(movement: string, isCustom = false) {
   if (isCustom) return movement;
   return MOVEMENTS[movement as MovementKey] ?? NAMED_WODS[movement as NamedWodKey] ?? movement;
