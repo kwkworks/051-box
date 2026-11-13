@@ -48,6 +48,7 @@ declare
   dm2 uuid;    -- 회원이 접속한 뒤 관리자가 쓴 채팅
   rm_first uuid;
   g_cap uuid;  -- 정원 줄이기 테스트용 모임
+  g_close uuid;  -- 신청 마감하기 테스트용 모임
   w_past uuid;
   w_future uuid;
   anon_id uuid := gen_random_uuid();
@@ -299,6 +300,19 @@ begin
   (89, '일반 회원이 모임 만들기', 'ok:1', pg_temp.run_as(a, 'insert into public.events (kind, title, starts_at) values (''gathering'', ''rls-test 회원 모임'', now() + interval ''1 day'') returning id')),
   (90, '일반 회원이 대회 만들기', 'err', pg_temp.run_as(a, 'insert into public.events (kind, title, starts_at) values (''competition'', ''rls-test 회원 대회'', now() + interval ''1 day'') returning id'));
   delete from public.events where title in ('rls-test 회원 모임', 'rls-test 회원 대회');
+
+  -- 신청 마감하기 / 다시 신청 받기 (서버와 같은 방식: 마감 시각을 지금으로 / 지우기)
+  insert into public.events (kind, title, starts_at, created_by)
+    values ('gathering', 'rls-test 마감하기', now() + interval '2 days', m) returning id into g_close;
+  insert into rls_results values
+  (91, '다른 회원이 남의 모임 마감하기', 'ok:0', pg_temp.run_as(a, format('update public.events set signup_deadline = now() - interval ''1 second'' where id = %L', g_close))),
+  (92, '모임 만든 사람이 신청 마감하기', 'ok:1', pg_temp.run_as(m, format('update public.events set signup_deadline = now() - interval ''1 second'' where id = %L', g_close)));
+  -- run_as 안의 now()는 같은 트랜잭션 시각이라, 확실히 지난 시각으로 맞춘다
+  update public.events set signup_deadline = now() - interval '1 minute' where id = g_close;
+  insert into rls_results values
+  (93, '마감한 모임에 신청', 'err', pg_temp.run_as(a, format('insert into public.event_participants (event_id) values (%L)', g_close))),
+  (94, '모임 만든 사람이 다시 신청 받기', 'ok:1', pg_temp.run_as(m, format('update public.events set signup_deadline = null where id = %L', g_close))),
+  (95, '다시 받은 모임에 신청', 'ok:1', pg_temp.run_as(a, format('insert into public.event_participants (event_id) values (%L)', g_close)));
 
   -- 마지막: 임시 회원 m이 스스로 탈퇴 → 계정과 기록이 모두 사라지는지
   r := pg_temp.run_as(m, 'select public.delete_my_account()');

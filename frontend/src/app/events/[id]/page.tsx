@@ -41,6 +41,26 @@ function Detail() {
     }
   };
 
+  // 신청 마감하기 / 다시 신청 받기 (만든 사람·관리자). 이미 신청한 사람은 그대로 남는다
+  const toggleClose = async (closeNow: boolean) => {
+    if (!ev) return;
+    const msg = closeNow
+      ? '지금 신청을 마감할까요? 이미 신청한 사람은 그대로 남고, 새로 신청할 수 없어요.'
+      : '다시 신청을 받을까요? 신청 마감일이 지워져요. (필요하면 내용 수정에서 새 마감일을 정하세요)';
+    if (!confirm(msg)) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      if (closeNow) await api.post(`/events/${ev.id}/close`);
+      else await api.del(`/events/${ev.id}/close`);
+      await reload();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : '처리하지 못했어요');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const remove = async () => {
     if (!ev || !confirm('이 일정을 삭제할까요? 참가 신청도 함께 사라져요.')) return;
     try {
@@ -119,8 +139,18 @@ function Detail() {
             )}
           </section>
 
+          {ev.can_manage && !ended && (
+            <button
+              type="button"
+              className={`btn mt-6 h-11 w-full ${closed ? '' : 'btn-primary'}`}
+              disabled={busy}
+              onClick={() => toggleClose(!closed)}
+            >
+              {closed ? '🔓 다시 신청 받기' : '🔒 신청 마감하기'}
+            </button>
+          )}
           {ev.can_manage && (
-            <div className="mt-6 grid grid-cols-2 gap-2">
+            <div className={`${ended ? 'mt-6' : 'mt-2'} grid grid-cols-2 gap-2`}>
               <button type="button" className="btn btn-dark" onClick={() => setEditing(true)}>
                 ✏️ 내용 수정
               </button>

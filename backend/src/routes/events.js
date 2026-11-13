@@ -93,6 +93,24 @@ eventsRouter.patch('/:id', async (req, res) => {
   res.json({ event: updated[0] });
 });
 
+// 신청 마감하기: 신청 마감 시각을 지금으로 (정원이 덜 찼거나 마감일 전이어도). DB가 마감 뒤 신청을 막는다.
+// 만든 사람 또는 관리자만 (DB RLS가 같은 규칙을 강제)
+eventsRouter.post('/:id/close', async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  const deadline = new Date(Date.now() - 1000).toISOString();
+  const updated = unwrap(await req.sb.from('events').update({ signup_deadline: deadline }).eq('id', id).select(COLUMNS));
+  if (!updated.length) throw new HttpError(403, '마감할 권한이 없거나 삭제된 일정이에요');
+  res.json({ event: updated[0] });
+});
+
+// 다시 신청 받기: 마감 시각을 지운다 (필요하면 '내용 수정'에서 새 마감일을 정한다)
+eventsRouter.delete('/:id/close', async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  const updated = unwrap(await req.sb.from('events').update({ signup_deadline: null }).eq('id', id).select(COLUMNS));
+  if (!updated.length) throw new HttpError(403, '수정할 권한이 없거나 삭제된 일정이에요');
+  res.json({ event: updated[0] });
+});
+
 eventsRouter.delete('/:id', async (req, res) => {
   const id = uuid.parse(req.params.id);
   const deleted = unwrap(await req.sb.from('events').delete().eq('id', id).select('id'));
