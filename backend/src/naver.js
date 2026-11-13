@@ -159,7 +159,7 @@ export function wodCafePost(wod) {
       const next = lines.findIndex((l, i) => i > start && section.test(l));
       let end = next < 0 ? lines.length : next;
       while (end > start + 1 && !lines[end - 1].trim()) end -= 1;
-      lines.splice(end, 0, ...block);
+      lines.splice(end, 0, '', ...block); // 동작과 [강도] 사이 한 줄 띄움
     } else {
       lines.push('', ...block);
     }
