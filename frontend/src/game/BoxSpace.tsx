@@ -8,7 +8,7 @@ import type { ChatMessage, Profile } from '@/lib/types';
 import { SPRITE_H, drawAvatar, type Dir, type Pose } from './avatar';
 import {
   OBJECT_LABELS, SPAWN, WORLD_H, WORLD_W, collides, drawObjectHint, drawStaticMap, findPath, isNear,
-  nameAt, nearbyBoard, objectAt, type ObjectKey,
+  nameAt, nearbyBoard, objectAt, shortcutAt, type ObjectKey,
 } from './map';
 
 type Player = {
@@ -282,6 +282,12 @@ export function BoxSpace({
         return;
       }
       if (!target) {
+        // 데스크·포스터·화이트보드·상장 벽·바벨 랙은 누르면 바로 해당 게시판으로
+        const shortcut = shortcutAt(wx, wy);
+        if (shortcut) {
+          callbacks.current.onOpen(shortcut);
+          return;
+        }
         const named = nameAt(wx, wy);
         if (named) flash = { text: named.name, x: named.x, y: named.y, until: performance.now() + 1800 };
       }
@@ -315,7 +321,7 @@ export function BoxSpace({
     };
     const onHover = (e: PointerEvent) => {
       const { wx, wy } = toWorld(e);
-      canvas.style.cursor = objectAt(wx, wy) ? 'pointer' : 'default';
+      canvas.style.cursor = objectAt(wx, wy) || shortcutAt(wx, wy) ? 'pointer' : 'default';
     };
     canvas.addEventListener('pointerdown', onPointer);
     canvas.addEventListener('pointermove', onHover);

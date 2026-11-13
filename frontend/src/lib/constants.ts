@@ -38,6 +38,14 @@ export const NAMED_WODS = {
 
 export type NamedWodKey = keyof typeof NAMED_WODS;
 
+// 선택 목록 순서: 리프트는 가나다순, 네임드 WOD는 ABC순
+export const MOVEMENT_KEYS_SORTED = (Object.keys(MOVEMENTS) as MovementKey[]).sort((a, b) =>
+  MOVEMENTS[a].localeCompare(MOVEMENTS[b], 'ko'),
+);
+export const NAMED_WOD_KEYS_SORTED = (Object.keys(NAMED_WODS) as NamedWodKey[]).sort((a, b) =>
+  NAMED_WODS[a].localeCompare(NAMED_WODS[b], 'en', { sensitivity: 'base' }),
+);
+
 // 1RM 검색용 다른 이름: 네임드 WOD는 한글로, 리프트는 영어로도 찾을 수 있게
 const SEARCH_ALIASES: Record<string, string[]> = {
   fran: ['프란'],

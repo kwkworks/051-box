@@ -2,6 +2,8 @@
 
 import { useRef, useState, useSyncExternalStore } from 'react';
 import { ActionPad } from '@/components/ActionPad';
+import { BgmControl } from '@/components/BgmControl';
+import { QuickMenu } from '@/components/QuickMenu';
 import { AvatarView } from '@/components/AvatarView';
 import { ChatPanel } from '@/components/ChatPanel';
 import { EventDetailView } from '@/components/EventDetailView';
@@ -141,8 +143,13 @@ export function DevPreview() {
             <button type="button" className="h-9 w-9" onClick={() => space.current?.zoomBy(1)}>＋</button>
             <button type="button" className="h-9 w-9" onClick={() => space.current?.zoomBy(-1)}>－</button>
           </div>
-          <div className="absolute bottom-3 right-3 z-20">
+          {/* 실제 박스 화면처럼 액션·메뉴·배경음악을 함께 둬서 팝업이 하나만 열리는지 본다 */}
+          <div className="absolute bottom-3 right-3 z-20 flex items-end gap-2">
             <ActionPad pose="stand" running={false} onAct={(a) => space.current?.act(a)} />
+            <QuickMenu />
+          </div>
+          <div className="absolute left-3 top-12 z-30">
+            <BgmControl />
           </div>
         </div>
       ) : (

@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useDismiss } from '@/lib/useDismiss';
 import { BOARDS } from '@/game/map';
 import { useAuth } from './AuthProvider';
 import { InviteButton } from './InviteButton';
@@ -23,19 +24,7 @@ export function QuickMenu() {
   const { me, signOut } = useAuth();
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: PointerEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    window.addEventListener('pointerdown', close);
-    window.addEventListener('keydown', esc);
-    return () => {
-      window.removeEventListener('pointerdown', close);
-      window.removeEventListener('keydown', esc);
-    };
-  }, [open]);
+  useDismiss(open, useCallback(() => setOpen(false), []), ref);
 
   return (
     <div ref={ref} className="relative">

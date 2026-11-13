@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useDismiss } from '@/lib/useDismiss';
 import type { Pose } from '@/game/avatar';
 import type { Action } from '@/game/BoxSpace';
 
@@ -22,10 +23,12 @@ export function ActionPad({
   onAct: (action: Action) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useDismiss(open, useCallback(() => setOpen(false), []), ref);
   const active = (a: Action) => (a === 'run' ? running : a === pose);
 
   return (
-    <div className="pointer-events-auto relative">
+    <div ref={ref} className="pointer-events-auto relative">
       {open && (
         <div className="card absolute bottom-14 right-0 grid w-48 grid-cols-2 gap-1.5 bg-white/85 p-1.5 backdrop-blur-sm" role="menu" aria-label="액션">
           {ACTIONS.map((a) => (

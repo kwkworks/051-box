@@ -5,7 +5,7 @@ import { BoardShell } from '@/components/BoardShell';
 import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { WodView } from '@/components/WodView';
 import { api } from '@/lib/api';
-import { MOVEMENTS, type MovementKey } from '@/lib/constants';
+import { MOVEMENTS, MOVEMENT_KEYS_SORTED } from '@/lib/constants';
 import { formatDateLabel, kstToday, shiftDate } from '@/lib/format';
 import { parsePercents, percentLabel } from '@/lib/percents';
 import { shrinkImage } from '@/lib/shrinkImage';
@@ -156,7 +156,7 @@ function WodEditor({ date, wod, onDone }: { date: string; wod: Wod | null; onDon
               value={lift.movement}
               onChange={(e) => setLifts(lifts.map((l, j) => (j === i ? { ...l, movement: e.target.value } : l)))}
             >
-              {(Object.keys(MOVEMENTS) as MovementKey[]).map((m) => (
+              {MOVEMENT_KEYS_SORTED.map((m) => (
                 <option key={m} value={m}>{MOVEMENTS[m]}</option>
               ))}
             </select>

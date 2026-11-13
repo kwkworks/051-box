@@ -5,7 +5,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { BoardShell } from '@/components/BoardShell';
 import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { api } from '@/lib/api';
-import { MOVEMENTS, NAMED_WODS, matchesSearch, movementLabel, type MovementKey, type NamedWodKey } from '@/lib/constants';
+import { MOVEMENTS, MOVEMENT_KEYS_SORTED, NAMED_WODS, NAMED_WOD_KEYS_SORTED, matchesSearch, movementLabel } from '@/lib/constants';
 import { RecordValue } from '@/components/RecordValue';
 import { Podium } from '@/components/Podium';
 import { formatDateLabel, kstToday } from '@/lib/format';
@@ -92,8 +92,8 @@ function OneRm({ me }: { me: Me }) {
         <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="기록 종류">
           {(
             [
-              ['lb', '🏋️ 무게 (lb)'],
-              ['time', '⏱ 네임드 WOD (시간)'],
+              ['lb', '🏋️ 무게'],
+              ['time', '⏱ 네임드 WOD'],
             ] as const
           ).map(([u, label]) => (
             <button
@@ -101,22 +101,24 @@ function OneRm({ me }: { me: Me }) {
               type="button"
               role="radio"
               aria-checked={unit === u}
-              className={`btn ${unit === u ? 'btn-primary' : ''}`}
+              className={`btn whitespace-nowrap px-2 ${unit === u ? 'btn-primary' : ''}`}
               onClick={() => switchUnit(u)}
             >
               {label}
             </button>
           ))}
         </div>
+        {/* 좁은 화면에서 버튼이 두 줄이 되지 않게 단위 안내는 버튼 밖에 둔다 */}
+        <p className="-mt-1 text-xs text-muted">{unit === 'lb' ? '무게는 파운드(lb)로 기록해요' : '네임드 WOD는 끝낸 시간으로 기록해요 (빠를수록 좋음)'}</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="rm-move">{unit === 'lb' ? '종목' : 'WOD'}</label>
             <select id="rm-move" className="input" value={movement} onChange={(e) => setMovement(e.target.value)}>
               {unit === 'lb'
-                ? (Object.keys(MOVEMENTS) as MovementKey[]).map((m) => (
+                ? MOVEMENT_KEYS_SORTED.map((m) => (
                     <option key={m} value={m}>{MOVEMENTS[m]}</option>
                   ))
-                : (Object.keys(NAMED_WODS) as NamedWodKey[]).map((m) => (
+                : NAMED_WOD_KEYS_SORTED.map((m) => (
                     <option key={m} value={m}>{NAMED_WODS[m]}</option>
                   ))}
               <option value={CUSTOM}>직접 입력…</option>

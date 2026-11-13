@@ -157,6 +157,20 @@ export function nameAt(wx: number, wy: number): { name: string; x: number; y: nu
   return o ? { name: o.name, x: (o.x + o.w / 2) * TILE, y: o.y * TILE } : null;
 }
 
+// 누르면 바로 해당 게시판이 열리는 구조물 (걸어가지 않아도 됨)
+const SHORTCUTS: (Box & { board: ObjectKey })[] = [
+  { x: 23, y: 16, w: 6, h: 3, board: 'notices' }, // 🛎 데스크 → 공지사항
+  { x: 23, y: 0, w: 5, h: 3, board: 'competition' }, // 🏆 대회 포스터 → 대회·이벤트
+  { x: 13, y: 3, w: 7, h: 2, board: 'wod' }, // 📝 RECORD 화이트보드 → 오늘의 WOD
+  { x: 2, y: 0, w: 6, h: 3, board: 'wall' }, // 🏅 상장 벽 → PR 명예의 벽
+  { x: 1, y: 11, w: 3, h: 6, board: 'one-rm' }, // 🏋️ 바벨·원판 랙 → 1RM 기록
+];
+
+export function shortcutAt(wx: number, wy: number): ObjectKey | null {
+  const o = SHORTCUTS.find((b) => wx >= b.x * TILE && wx <= (b.x + b.w) * TILE && wy >= b.y * TILE && wy <= (b.y + b.h) * TILE);
+  return o ? o.board : null;
+}
+
 // 특정 오브젝트에 손이 닿는 거리인지
 export function isNear(board: ObjectKey, x: number, y: number): boolean {
   const o = OBJECTS.find((b) => b.board === board);

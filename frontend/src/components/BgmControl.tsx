@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useDismiss } from '@/lib/useDismiss';
 import { getBgm, loadBgmSettings, saveBgmSettings, type BgmSettings } from '@/lib/bgm';
 
 // 박스 BGM 음량 조절 + 음소거. 설정은 이 기기에만 저장된다.
@@ -9,6 +10,9 @@ export function BgmControl() {
     typeof window === 'undefined' ? { volume: 0.4, muted: false } : loadBgmSettings(),
   );
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  // 팝업 바깥을 누르면 닫힌다 (스피커 버튼을 다시 누르지 않아도)
+  useDismiss(open, useCallback(() => setOpen(false), []), ref);
 
   // 첫 클릭이나 키 입력 때 음악 시작 (브라우저 자동재생 정책).
   // 화면을 떠나도 멈추지 않는다: 플레이어는 앱 전체에서 하나를 같이 쓴다.
@@ -34,7 +38,7 @@ export function BgmControl() {
   };
 
   return (
-    <div className="relative">
+    <div ref={ref} className="relative">
       <button
         type="button"
         className="btn btn-sm"
