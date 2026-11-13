@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { HttpError, unwrap } from '../errors.js';
 import { pushSubscribeSchema, pushUnsubscribeSchema } from '../schemas.js';
 import { pushEnabled, sendPushLater, sendTestPush, tomorrowWod } from '../push.js';
+import { autoPostWodToCafe } from '../naver.js';
 
 // ---- 로그인 없이 부르는 것: 매일 오후 8시 30분 예약 작업(Supabase pg_cron)이 호출
 // 누가 불러도 안전하다: 한국 시간 20:30~24:00에만, 내일 WOD가 있을 때만, 하루 한 번만(DB가 중복 차단) 보낸다
@@ -11,6 +12,8 @@ pushPublicRouter.post('/wod-release', async (req, res) => {
   const kst = new Date(Date.now() + 9 * 3600_000);
   const minutes = kst.getUTCHours() * 60 + kst.getUTCMinutes();
   if (minutes < 20 * 60 + 30) return res.json({ ok: false, reason: 'too-early' });
+  // 카페 WOD 게시판에도 (관리자가 켜 두었을 때만, 하루 한 번). 알림과 따로 뒤에서 처리
+  autoPostWodToCafe().catch((e) => console.warn('[naver] 카페 WOD 자동 등록 실패', e instanceof Error ? e.message : e));
   const wod = await tomorrowWod();
   if (!wod) return res.json({ ok: false, reason: 'no-wod' });
   sendPushLater('wod', wod.wod_date, null, {

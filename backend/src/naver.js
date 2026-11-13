@@ -4,9 +4,10 @@
 // 설정(NAVER_CLIENT_ID, NAVER_CLIENT_SECRET)이 없으면 이 기능만 꺼진다.
 import { createClient } from '@supabase/supabase-js';
 import { config } from './config.js';
+import { LABELS, percentText } from './labels.js';
 
 const CAFE_ID = '31088296'; // 크로스핏051 카페
-export const CAFE_MENUS = { notice: 9, competition: 50 }; // 공지사항, 대회 정보 공유
+export const CAFE_MENUS = { notice: 9, competition: 50, wod: 12, record: 13 }; // 공지사항, 대회 정보 공유, WOD, RECORD
 const CAFE_URL_BASE = 'https://cafe.naver.com/crossfit051';
 
 const sb = createClient(config.supabaseUrl, config.supabasePublishableKey, {
@@ -120,7 +121,7 @@ export async function postToCafe(menuKey, subject, bodyText) {
   const menuId = CAFE_MENUS[menuKey];
   if (!menuId) throw new Error('올릴 카페 게시판이 올바르지 않아요');
   const token = await accessToken();
-  const toHtml = (t) => `${escapeHtml(t).replace(/\r?\n/g, '<br>')}<br><br>(051 BOX 앱에서 작성된 공지입니다)`;
+  const toHtml = (t) => `${escapeHtml(t).replace(/\r?\n/g, '<br>')}<br><br>(051 BOX 앱에서 올린 글입니다)`;
   const first = config.naverCafeEncode === 'single' ? encSingle : encDouble;
   const second = first === encDouble ? encSingle : encDouble;
   const attempts = [
@@ -140,4 +141,35 @@ export async function postToCafe(menuKey, subject, bodyText) {
     if (r.status === 401) break; // 권한·인증 문제는 형식을 바꿔도 같다
   }
   throw new Error(`네이버가 거절했어요 (${last.status}${last.code ? ` · ${last.code}` : ''}: ${last.reason})`);
+}
+
+// ---- 오늘의 WOD → 카페 WOD 게시판
+// 제목은 카페에서 쓰던 모양 그대로: 2026_11_14 Workout of the Day
+export function wodCafePost(wod) {
+  const subject = `${String(wod.wod_date).replace(/-/g, '_')} Workout of the Day`;
+  const lines = [];
+  if (wod.title && !/WOD$/.test(wod.title)) lines.push(wod.title, '');
+  if (wod.content) lines.push(wod.content);
+  const lifts = Array.isArray(wod.lifts) ? wod.lifts : [];
+  if (lifts.length) {
+    lines.push('', '[강도]');
+    for (const l of lifts) lines.push(`${LABELS[l.movement] ?? l.movement} ${(l.percents ?? []).map(percentText).join(', ')}`);
+  }
+  lines.push('', '내 1RM 기준 무게는 051 BOX 앱에서 확인하세요');
+  return { subject, body: lines.join('\n') };
+}
+
+// 20:30 공개 때 부른다: 자동 등록이 켜져 있고 아직 안 올린 내일 WOD만 (하루 한 번)
+export async function autoPostWodToCafe() {
+  if (!naverEnabled()) return null;
+  const { data, error } = await sb.rpc('cafe_wod_pending', { p_secret: config.pushSecret });
+  if (error) throw new Error(`카페 WOD 대상을 불러오지 못했어요 (${error.code})`);
+  const wod = data?.[0];
+  if (!wod) return null;
+  const { subject, body } = wodCafePost(wod);
+  const url = await postToCafe('wod', subject, body);
+  const mark = await sb.rpc('cafe_wod_mark', { p_secret: config.pushSecret, p_date: wod.wod_date, p_url: url });
+  if (mark.error) console.warn('[naver] 카페 WOD 주소를 기록하지 못했어요', mark.error.code);
+  console.log('[naver] 카페 WOD 등록', wod.wod_date);
+  return url;
 }

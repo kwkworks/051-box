@@ -51,6 +51,7 @@ declare
   g_close uuid;  -- 신청 마감하기 테스트용 모임
   act_id uuid;   -- 축하 테스트용 명예의 벽 글
   q_a uuid;      -- Q&A 테스트용 문의 (회원 a)
+  autopost_before text; -- WOD 카페 자동 등록 설정 (테스트 후 되돌림)
   w_past uuid;
   w_future uuid;
   anon_id uuid := gen_random_uuid();
@@ -366,6 +367,23 @@ begin
   (126, '같은 카페 글을 두 번 가져오기', 'err', pg_temp.run_as(d, 'insert into public.notices (title, cafe_url) values (''rls-test 공지 2'', ''https://cafe.naver.com/crossfit051/999999999'')'));
   delete from public.notices where title like 'rls-test 공지%';
   delete from private.naver_oauth_states where admin_id = d and created_at >= now() - interval '1 minute';
+
+  -- 0022: WOD 카페 자동 등록 (서버 비밀값으로만, 설정은 관리자만, 카페 주소는 우리 카페 글만)
+  select value into autopost_before from public.app_settings where key = 'cafe_wod_autopost';
+  insert into rls_results values
+  (127, '비로그인으로 카페 WOD 대상 요청 (틀린 비밀값)', 'err', pg_temp.run_as(null, 'select * from public.cafe_wod_pending(''wrong'')')),
+  (128, '회원이 카페 WOD 대상 요청 (틀린 비밀값)', 'err', pg_temp.run_as(a, 'select * from public.cafe_wod_pending(''wrong'')')),
+  (129, '비로그인으로 카페 WOD 주소 기록 (틀린 비밀값)', 'err', pg_temp.run_as(null, format('select public.cafe_wod_mark(''wrong'', %L, ''https://cafe.naver.com/crossfit051/1'')', public.kst_today()))),
+  (130, '회원이 WOD 자동 등록 켜기', 'err', pg_temp.run_as(a, 'insert into public.app_settings (key, value) values (''cafe_wod_autopost'', ''true'') on conflict (key) do update set value = excluded.value')),
+  (131, '관리자가 WOD 자동 등록 켜기', 'ok:1', pg_temp.run_as(d, 'insert into public.app_settings (key, value) values (''cafe_wod_autopost'', ''true'') on conflict (key) do update set value = excluded.value')),
+  (132, '정해지지 않은 설정 이름 저장', 'err', pg_temp.run_as(d, 'insert into public.app_settings (key, value) values (''evil_setting'', ''x'')')),
+  (133, 'WOD에 다른 사이트 주소를 카페 주소로 저장', 'err', pg_temp.run_as(d, format('insert into public.wods (wod_date, title, cafe_url) values (%L, ''rls-test 카페'', ''https://evil.example/crossfit051/1'')', public.kst_today() - 299)));
+  if autopost_before is null then
+    delete from public.app_settings where key = 'cafe_wod_autopost';
+  else
+    update public.app_settings set value = autopost_before where key = 'cafe_wod_autopost';
+  end if;
+  delete from public.wods where title = 'rls-test 카페';
 
   -- 마지막: 임시 회원 m이 스스로 탈퇴 → 계정과 기록이 모두 사라지는지
   r := pg_temp.run_as(m, 'select public.delete_my_account()');

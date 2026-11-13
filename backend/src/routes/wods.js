@@ -4,6 +4,7 @@ import multer from 'multer';
 import { requireAdmin } from '../auth.js';
 import { HttpError, fromDbError, unwrap } from '../errors.js';
 import { isoDate, photoOrderSchema, uuid, wodSchema } from '../schemas.js';
+import { naverEnabled, postToCafe, wodCafePost } from '../naver.js';
 
 export const wodsRouter = Router();
 
@@ -39,7 +40,7 @@ wodsRouter.get('/', async (req, res) => {
     return res.json({ wod: null, photos: [], locked: true, opensAt: opensAt.toISOString() });
   }
   const wod = unwrap(
-    await req.sb.from('wods').select('id, wod_date, title, content, lifts, updated_at').eq('wod_date', date).maybeSingle(),
+    await req.sb.from('wods').select('id, wod_date, title, content, lifts, cafe_url, updated_at').eq('wod_date', date).maybeSingle(),
   );
   if (!wod) return res.json({ wod: null, photos: [], locked: false, opensAt: opensAt.toISOString(), released });
 
@@ -67,10 +68,28 @@ wodsRouter.put('/:date', requireAdmin, async (req, res) => {
     await req.sb
       .from('wods')
       .upsert({ ...body, wod_date }, { onConflict: 'wod_date' })
-      .select('id, wod_date, title, content, lifts, updated_at')
+      .select('id, wod_date, title, content, lifts, cafe_url, updated_at')
       .single(),
   );
   res.json({ wod });
+});
+
+// 관리자: 이 WOD를 지금 카페 WOD 게시판에 올리기 (자동 등록을 껐거나 놓쳤을 때). 한 WOD는 한 번만
+wodsRouter.post('/:date/cafe', requireAdmin, async (req, res) => {
+  const date = isoDate.parse(req.params.date);
+  if (!naverEnabled()) throw new HttpError(400, '네이버 카페 연동이 아직 설정되지 않았어요');
+  const wod = unwrap(await req.sb.from('wods').select('wod_date, title, content, lifts, cafe_url').eq('wod_date', date).maybeSingle());
+  if (!wod) throw new HttpError(404, '이 날짜의 WOD가 없어요');
+  if (wod.cafe_url) throw new HttpError(409, '이미 카페에 올린 WOD예요');
+  const { subject, body } = wodCafePost(wod);
+  let url;
+  try {
+    url = await postToCafe('wod', subject, body);
+  } catch (e) {
+    throw new HttpError(502, e instanceof Error ? e.message : '카페에 올리지 못했어요');
+  }
+  unwrap(await req.sb.from('wods').update({ cafe_url: url }).eq('wod_date', date));
+  res.json({ cafe_url: url });
 });
 
 wodsRouter.delete('/:id', requireAdmin, async (req, res) => {

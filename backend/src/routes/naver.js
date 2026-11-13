@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { HttpError, unwrap } from '../errors.js';
+import { z } from 'zod';
 import { authorizeUrl, connectWithCode, consumeState, disconnect, naverEnabled } from '../naver.js';
 import { config } from '../config.js';
 
@@ -29,7 +30,8 @@ export const naverAdminRouter = Router();
 naverAdminRouter.get('/', async (req, res) => {
   if (!naverEnabled()) return res.json({ enabled: false, connected: false });
   const status = unwrap(await req.sb.rpc('naver_status'));
-  res.json({ enabled: true, ...status });
+  const setting = unwrap(await req.sb.from('app_settings').select('value').eq('key', 'cafe_wod_autopost').maybeSingle());
+  res.json({ enabled: true, ...status, wod_autopost: setting?.value === 'true' });
 });
 
 naverAdminRouter.post('/connect', async (req, res) => {
@@ -42,4 +44,15 @@ naverAdminRouter.delete('/', async (req, res) => {
   if (!naverEnabled()) return res.status(204).end();
   await disconnect();
   res.status(204).end();
+});
+
+// WOD 카페 자동 등록 켜기/끄기 (매일 20:30 내일 WOD 공개 때)
+naverAdminRouter.put('/wod-autopost', async (req, res) => {
+  const { enabled } = z.strictObject({ enabled: z.boolean() }).parse(req.body);
+  unwrap(
+    await req.sb
+      .from('app_settings')
+      .upsert({ key: 'cafe_wod_autopost', value: String(enabled), updated_at: new Date().toISOString() }, { onConflict: 'key' }),
+  );
+  res.json({ wod_autopost: enabled });
 });

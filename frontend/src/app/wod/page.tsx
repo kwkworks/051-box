@@ -6,7 +6,7 @@ import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { WodView } from '@/components/WodView';
 import { api } from '@/lib/api';
 import { MOVEMENTS, MOVEMENT_KEYS_SORTED } from '@/lib/constants';
-import { formatDateLabel, kstToday, shiftDate } from '@/lib/format';
+import { formatDateLabel, kstToday, safeHttpsUrl, shiftDate } from '@/lib/format';
 import { parsePercents, percentLabel } from '@/lib/percents';
 import { shrinkImage } from '@/lib/shrinkImage';
 import type { Lift, Me, Wod, WodPhoto } from '@/lib/types';
@@ -72,6 +72,7 @@ function WodBoard({ me }: { me: Me }) {
                 </p>
               )}
               <WodView wod={data.wod} bestLifts={me.bestLifts} />
+              <WodCafeRow wod={data.wod} isAdmin={isAdmin} onPosted={reload} />
             </>
           ) : (
             <div className="card p-6 text-center text-muted">
@@ -98,6 +99,37 @@ function opensLabel(iso: string | undefined, today: string) {
   if (!iso) return '전날 오후 8시 30분';
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(iso));
   return `${day === today ? '오늘' : formatDateLabel(day)} 오후 8시 30분`;
+}
+
+// 네이버 카페 WOD 게시판: 올린 글이 있으면 "카페에서 보기", 관리자는 아직 안 올렸으면 "카페 WOD에 올리기"
+function WodCafeRow({ wod, isAdmin, onPosted }: { wod: Wod; isAdmin: boolean; onPosted: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const link = safeHttpsUrl(wod.cafe_url);
+  if (link) {
+    return (
+      <a href={link} target="_blank" rel="noopener noreferrer nofollow" className="btn btn-sm mt-3">
+        네이버 카페에서 보기 ↗
+      </a>
+    );
+  }
+  if (!isAdmin) return null;
+  const post = async () => {
+    if (!confirm('이 WOD를 네이버 카페 WOD 게시판에 올릴까요?')) return;
+    setBusy(true);
+    try {
+      await api.post(`/wods/${wod.wod_date}/cafe`);
+      onPosted();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '카페에 올리지 못했어요');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button type="button" className="btn btn-sm mt-3" disabled={busy} onClick={post}>
+      {busy ? '올리는 중…' : '🟢 카페 WOD 게시판에 올리기'}
+    </button>
+  );
 }
 
 function WodEditor({ date, wod, onDone }: { date: string; wod: Wod | null; onDone: () => void }) {

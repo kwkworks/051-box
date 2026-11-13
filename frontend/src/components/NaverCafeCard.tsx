@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import { useLoad } from '@/lib/useLoad';
 
-type Status = { enabled: boolean; connected: boolean; connected_at?: string; connected_by?: string | null };
+type Status = { enabled: boolean; connected: boolean; connected_at?: string; connected_by?: string | null; wod_autopost?: boolean };
 
 const RESULT_TEXT: Record<string, string> = {
   connected: '✅ 네이버 카페가 연결됐어요. 이제 공지를 쓸 때 카페에도 올릴 수 있어요.',
@@ -91,6 +91,35 @@ export function NaverCafeCard() {
             ? `✅ 연결됨${data.connected_by ? ` · ${data.connected_by}` : ''}${data.connected_at ? ` · ${formatDateTime(data.connected_at)}` : ''}`
             : '연결 안 됨 · 카페 운영자 네이버 계정으로 연결해 주세요'}
         </p>
+      )}
+      {data?.enabled && data.connected && (
+        <div className="mt-1 flex items-center gap-3 border-t-2 border-dashed border-ink/20 pt-2">
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-bold">📋 WOD 카페 자동 등록</span>
+            <span className="block text-xs text-muted">매일 저녁 8시 30분 내일 WOD가 공개될 때 카페 WOD 게시판에도 올려요</span>
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={Boolean(data.wod_autopost)}
+            aria-label="WOD 카페 자동 등록"
+            disabled={busy}
+            className={`relative h-7 w-12 shrink-0 rounded-full border-2 border-ink transition-colors ${data.wod_autopost ? 'bg-[var(--ok)]' : 'bg-white'}`}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await api.put('/admin/naver/wod-autopost', { enabled: !data.wod_autopost });
+                await reload();
+              } catch (e) {
+                setMsg(e instanceof Error ? e.message : '바꾸지 못했어요');
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full border-2 border-ink bg-white transition-all ${data.wod_autopost ? 'left-5' : 'left-0.5'}`} />
+          </button>
+        </div>
       )}
       {msg && (
         <p className="text-sm font-bold" role="status">

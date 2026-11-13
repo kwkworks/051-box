@@ -334,3 +334,8 @@
 - 환경변수: NAVER_CLIENT_ID, NAVER_CLIENT_SECRET (Render). 한글 인코딩은 두 번 (NAVER_CAFE_ENCODE=single로 바꿀 수 있음). RLS 테스트 117~126.
 - 0021 (2026-11-13): Supabase가 WHERE 없는 DELETE를 막아 네이버 '연결 끊기'가 서버 오류 → 조건(id = true) 추가. 연결 시 auth_type=reprompt로 동의 화면을 항상 다시 띄워 카페 권한 누락(024 Scope Status Invalid)을 막고, 연결된 상태에서도 '다시 연결' 버튼.
 - 카페 연동 확인 (2026-11-13): 앱 → 카페 동시 등록이 공지사항·대회 정보 공유 모두 성공. 삭제는 서로 이어지지 않는다 (네이버가 외부 삭제와 삭제 알림을 지원하지 않음) → 카페와 연결된 공지를 앱에서 지울 때 "카페 글은 따로 지워 주세요" 안내와 카페 글 바로 열기.
+
+## D58. 오늘의 WOD → 카페 WOD 게시판 (2026-11-13)
+- 관리자가 '📋 WOD 카페 자동 등록'을 켜 두면 매일 20:30 내일 WOD 공개(예약 작업) 때 카페 WOD 게시판(메뉴 12)에 "YYYY_MM_DD Workout of the Day" 제목으로 올린다. 내용: 스트렝스·본 와드·[강도] + 앱 안내.
+- wods.cafe_url로 하루 한 번만 (0022 cafe_wod_pending / cafe_wod_mark, PUSH_SECRET). 놓친 날은 WOD 화면의 '카페 WOD 게시판에 올리기'로 직접. 올린 WOD엔 '네이버 카페에서 보기'.
+- RLS 테스트 127~133. 다음: RECORD(기록 사진) → 카페 RECORD 게시판.

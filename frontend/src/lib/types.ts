@@ -36,6 +36,7 @@ export type Wod = {
   title: string;
   content: string;
   lifts: Lift[];
+  cafe_url?: string | null; // 네이버 카페 WOD 게시판에 올린 글
   updated_at: string;
 };
 
