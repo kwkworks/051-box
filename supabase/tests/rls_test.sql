@@ -359,7 +359,7 @@ begin
   (118, '관리자가 네이버 연결 시작', 'ok:1', pg_temp.run_as(d, 'select public.naver_state_create()')),
   (119, '비로그인으로 네이버 토큰 읽기 (틀린 비밀값)', 'err', pg_temp.run_as(null, 'select * from public.naver_token_get(''wrong'')')),
   (120, '관리자도 네이버 토큰 읽기 (틀린 비밀값)', 'err', pg_temp.run_as(d, 'select * from public.naver_token_get(''wrong'')')),
-  (121, '비로그인으로 연결 확인 위조 (틀린 비밀값)', 'err', pg_temp.run_as(null, 'select public.naver_state_consume(''wrong'', ''abc'')')),
+  (121, '비로그인으로 연결 확인 위조 (틀린 비밀값)', 'err', pg_temp.run_as(null, 'select public.naver_state_consume(''wrong'', ''abc'', ''abc'')')),
   (122, '회원이 네이버 연결 상태 보기', 'err', pg_temp.run_as(a, 'select public.naver_status()')),
   (123, '관리자가 네이버 연결 상태 보기', 'ok:1', pg_temp.run_as(d, 'select public.naver_status()')),
   (124, '다른 사이트 주소를 카페 주소로 저장', 'err', pg_temp.run_as(d, 'insert into public.notices (title, cafe_url) values (''rls-test 공지'', ''https://evil.example/crossfit051/1'')')),
@@ -389,6 +389,13 @@ begin
   insert into rls_results values
   (134, '기록 사진 카페 주소에 다른 사이트 저장', 'err', pg_temp.run_as(d, format('insert into public.wods (wod_date, title, record_cafe_url) values (%L, ''rls-test 기록'', ''https://evil.example/crossfit051/1'')', public.kst_today() - 298)));
   delete from public.wods where title = 'rls-test 기록';
+
+  -- 0024: 네이버 연결은 네이버 전용 비밀값으로만, 연결은 시작한 브라우저에서만
+  insert into rls_results values
+  (135, '비로그인으로 연결 시작 표시 위조 (틀린 비밀값)', 'err', pg_temp.run_as(null, 'select public.naver_state_start(''wrong'', ''abc'', repeat(''a'', 64))')),
+  (136, '브라우저 확인 없는 예전 연결 확인 함수 호출', 'err', pg_temp.run_as(null, 'select public.naver_state_consume(''wrong'', ''abc'')')),
+  (137, '비로그인으로 네이버 비밀값 확인 함수 직접 호출', 'err', pg_temp.run_as(null, 'select private.check_naver_secret(''wrong'')')),
+  (138, '관리자도 네이버 토큰 지우기 (틀린 비밀값)', 'err', pg_temp.run_as(d, 'select public.naver_token_clear(''wrong'')'));
 
   -- 마지막: 임시 회원 m이 스스로 탈퇴 → 계정과 기록이 모두 사라지는지
   r := pg_temp.run_as(m, 'select public.delete_my_account()');

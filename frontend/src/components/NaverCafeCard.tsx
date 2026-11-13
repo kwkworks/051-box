@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { env } from '@/lib/env';
 import { formatDateTime } from '@/lib/format';
 import { useLoad } from '@/lib/useLoad';
 
@@ -10,6 +11,7 @@ type Status = { enabled: boolean; connected: boolean; connected_at?: string; con
 const RESULT_TEXT: Record<string, string> = {
   connected: '✅ 네이버 카페가 연결됐어요. 이제 공지를 쓸 때 카페에도 올릴 수 있어요.',
   expired: '연결 시간이 지났어요 (10분). 다시 눌러 주세요.',
+  browser: '연결을 시작한 브라우저와 끝낸 브라우저가 달라요. 이 화면에서 "연결하기"를 다시 눌러 같은 창에서 마쳐 주세요.',
   fail: '연결하지 못했어요. 네이버 개발자 센터의 Callback URL과 테스터 계정을 확인한 뒤 다시 시도해 주세요.',
 };
 
@@ -37,8 +39,8 @@ export function NaverCafeCard() {
     setMsg(null);
     try {
       const { url } = await api.post<{ url: string }>('/admin/naver/connect');
-      // 네이버 로그인 화면으로 (네이버 공식 주소만)
-      if (!url.startsWith('https://nid.naver.com/')) throw new Error('연결 주소가 올바르지 않아요');
+      // 우리 서버의 연결 시작 주소만 연다 (거기서 이 브라우저 표시를 남기고 네이버 로그인으로 넘어간다)
+      if (!url.startsWith(`${env.apiUrl}/naver/start?`)) throw new Error('연결 주소가 올바르지 않아요');
       window.location.assign(url);
     } catch (e) {
       setMsg(e instanceof Error ? e.message : '연결을 시작하지 못했어요');

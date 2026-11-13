@@ -14,7 +14,8 @@ const sb = createClient(config.supabaseUrl, config.supabasePublishableKey, {
   auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
 });
 
-export const naverEnabled = () => Boolean(config.naverClientId && config.naverClientSecret && config.pushSecret);
+export const naverEnabled = () =>
+  Boolean(config.naverClientId && config.naverClientSecret && config.naverSecret && config.pushSecret);
 
 // 카페 글 주소를 한 가지 모양으로 (https://cafe.naver.com/crossfit051/6118). 우리 카페 글이 아니면 null
 export function normalizeCafeUrl(input) {
@@ -56,7 +57,7 @@ export async function connectWithCode(code, state, adminId) {
 async function saveToken(access, refresh, expiresIn, by) {
   const expiresAt = new Date(Date.now() + (Number(expiresIn) || 3600) * 1000).toISOString();
   const { error } = await sb.rpc('naver_token_save', {
-    p_secret: config.pushSecret,
+    p_secret: config.naverSecret,
     p_access: access,
     p_refresh: refresh,
     p_expires_at: expiresAt,
@@ -65,20 +66,28 @@ async function saveToken(access, refresh, expiresIn, by) {
   if (error) throw new Error(`네이버 연결 정보를 저장하지 못했어요 (${error.code})`);
 }
 
-export async function consumeState(state) {
-  const { data, error } = await sb.rpc('naver_state_consume', { p_secret: config.pushSecret, p_state: state });
+// 연결을 시작한 브라우저 표시(해시)를 state에 한 번만 묶는다. 이미 묶였거나 만료됐으면 false
+export async function startState(state, browserHash) {
+  const { data, error } = await sb.rpc('naver_state_start', { p_secret: config.naverSecret, p_state: state, p_browser_hash: browserHash });
+  if (error) throw new Error(`연결 시작 실패 (${error.code})`);
+  return data === true;
+}
+
+// 네이버에서 돌아왔을 때: state와 브라우저 표시가 모두 맞아야 관리자 id (한 번만)
+export async function consumeState(state, browserHash) {
+  const { data, error } = await sb.rpc('naver_state_consume', { p_secret: config.naverSecret, p_state: state, p_browser_hash: browserHash });
   if (error) throw new Error(`연결 확인 실패 (${error.code})`);
   return data; // 관리자 id 또는 null
 }
 
 export async function disconnect() {
-  const { error } = await sb.rpc('naver_token_clear', { p_secret: config.pushSecret });
+  const { error } = await sb.rpc('naver_token_clear', { p_secret: config.naverSecret });
   if (error) throw new Error(`연결을 끊지 못했어요 (${error.code})`);
 }
 
 // 유효한 access token (만료 5분 전이면 새로 받는다)
 async function accessToken() {
-  const { data, error } = await sb.rpc('naver_token_get', { p_secret: config.pushSecret });
+  const { data, error } = await sb.rpc('naver_token_get', { p_secret: config.naverSecret });
   if (error) throw new Error(`네이버 연결 정보를 읽지 못했어요 (${error.code})`);
   const row = data?.[0];
   if (!row) throw new Error('네이버 카페가 연결되어 있지 않아요. 관리자 화면에서 먼저 연결해 주세요');

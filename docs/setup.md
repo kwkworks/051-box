@@ -90,3 +90,15 @@ claude mcp add --scope project --transport http supabase "https://mcp.supabase.c
 6. 앱: 게시판 → 🔔 알림 설정 → 이 기기에서 알림 받기 → 테스트 알림
 
 키를 바꿀 때는 2~4를 같은 값으로 다시 하고, 회원들은 알림을 한 번 껐다 켜야 한다 (기존 구독은 예전 공개 키에 묶여 있음).
+
+## 네이버 연결 전용 비밀값 (2026-11-13, 0024)
+네이버 연결 정보(토큰)는 알림용 `PUSH_SECRET`이 아니라 네이버 전용 `NAVER_SECRET`으로만 읽고 쓴다. 비밀값 원문은 Render에만 넣고, Supabase에는 해시만 넣는다.
+
+1. 내 컴퓨터에서 값과 해시를 한 번에 만든다:
+   `node -e "const c=require('crypto');const s=c.randomBytes(32).toString('hex');console.log('NAVER_SECRET:',s);console.log('hash:',c.createHash('sha256').update(s).digest('hex'))"`
+2. Render 환경변수에 `NAVER_SECRET` = 1의 `NAVER_SECRET` 값
+3. Supabase SQL: `supabase/migrations/0024_naver_secret_browser_bind.sql` 실행
+4. Supabase SQL: `insert into private.settings (key, value) values ('naver_secret_sha256', '<1의 hash 값>') on conflict (key) do update set value = excluded.value;`
+5. 새 서버 코드 배포 → 관리자 화면에서 네이버 카페 "다시 연결"로 확인
+
+연결은 "연결하기"를 누른 그 브라우저(창)에서만 끝난다. 다른 기기나 창에서 네이버 로그인을 마치면 "브라우저가 달라요" 안내가 나온다.
