@@ -43,7 +43,7 @@ function Qna({ me }: { me: Me }) {
   const waiting = (data?.questions ?? []).filter((q) => !q.answer).length;
 
   return (
-    <BoardShell title="💬 Q&A 문의" subtitle={isAdmin ? '회원 문의를 확인하고 답변해요' : '관리자에게 1:1 문의 (나와 관리자만 볼 수 있어요)'}>
+    <BoardShell title="💬 Q&A 문의" subtitle={isAdmin ? '회원 문의를 확인하고 답변해요' : '관리자와 1:1 비공개 문의'}>
       {!isAdmin && !writing && (
         <button type="button" className="btn btn-dark mb-4 w-full" onClick={() => setWriting(true)}>
           + 문의 남기기

@@ -19,7 +19,7 @@ export const BOARDS: Record<BoardKey, { label: string; icon: string; href: strin
   gathering: { label: '회원 모임', icon: '🍻', href: '/events?kind=gathering', hint: '회식, 번개 모임' },
   'one-rm': { label: '1RM 기록', icon: '🏋️', href: '/one-rm', hint: '내 최고 기록과 박스 순위' },
   wall: { label: 'PR 명예의 벽', icon: '🎉', href: '/wall', hint: '회원들의 PR 축하' },
-  qna: { label: 'Q&A 문의', icon: '💬', href: '/qna', hint: '관리자에게 1:1 문의 (나와 관리자만 볼 수 있어요)' },
+  qna: { label: 'Q&A 문의', icon: '💬', href: '/qna', hint: '관리자와 1:1 비공개 문의' },
 };
 
 export const OBJECT_LABELS: Record<ObjectKey, string> = {
