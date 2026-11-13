@@ -206,9 +206,9 @@ export const ChatPanel = forwardRef<
     if (stickBottom.current && latest && Date.parse(latest) > readTime) onRead?.(latest);
   };
 
-  // 접은 화면에서는 최근 3개 (읽던 곳 구분선이 그 안에 있으면 함께 보여준다)
-  const start = open ? 0 : Math.max(0, messages.length - 3);
-  const visible = messages.slice(start);
+  // 작은 화면(기록 닫힘)에서도 오늘 대화 전체를 넣어 두고, 칸 높이만 작게 해서 위로 스크롤해 볼 수 있게 한다
+  const start = 0;
+  const visible = messages;
 
   const submit = async () => {
     const value = text.trim();
@@ -279,14 +279,17 @@ export const ChatPanel = forwardRef<
         <span className="min-w-0 flex-1 truncate font-bold">
           💬 오늘의 박스 채팅 <span className="hidden font-normal text-white/60 sm:inline">(0시부터)</span>
         </span>
-        <button type="button" className="shrink-0 rounded px-2 py-1 font-bold hover:bg-white/10" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+        <button type="button" className="shrink-0 rounded px-2 py-1 font-bold hover:bg-white/10" onClick={() => {
+            scrollTo.current = 'bottom';
+            setOpen((v) => !v);
+          }} aria-expanded={open}>
           {open ? '기록 ▾' : '기록 ▴'}
         </button>
         <button type="button" className="shrink-0 rounded px-2 py-1 font-bold hover:bg-white/10" onClick={() => setMin(true)} aria-label="채팅 접기" title="접기">
           ✕
         </button>
       </div>
-      <div ref={listRef} onScroll={onScroll} className={`relative overflow-y-auto px-3 ${open ? 'max-h-[35vh]' : 'max-h-20 sm:max-h-24'}`} aria-live="polite">
+      <div ref={listRef} onScroll={onScroll} className={`relative touch-pan-y overflow-y-auto overscroll-contain px-3 ${open ? 'max-h-[35vh]' : 'max-h-20 sm:max-h-24'}`} aria-live="polite">
         {visible.length === 0 && <p className="py-1 text-xs text-white/60">아직 대화가 없어요. 먼저 인사해보세요!</p>}
         {visible.map((m, i) => {
           const idx = start + i;

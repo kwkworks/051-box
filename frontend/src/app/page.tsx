@@ -12,6 +12,7 @@ import { QuickMenu } from '@/components/QuickMenu';
 import { BoxSpace, type ActionState, type BoxSpaceHandle } from '@/game/BoxSpace';
 import { BOARDS, type ObjectKey } from '@/game/map';
 import { api } from '@/lib/api';
+import { useLockPageScroll } from '@/lib/useLockPageScroll';
 import type { ChatMessage, ChatState, Me } from '@/lib/types';
 
 export default function HomePage() {
@@ -22,6 +23,7 @@ function Space({ me }: { me: Me }) {
   const router = useRouter();
   const { setMe } = useAuth();
   const spaceRef = useRef<BoxSpaceHandle | null>(null);
+  useLockPageScroll(); // 아이폰에서 화면 전체가 끌려 움직이지 않게
   const chatInputRef = useRef<ChatPanelHandle>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [readAt, setReadAt] = useState<string | null>(null); // 지금까지 읽은 곳 (서버에도 저장)
@@ -135,7 +137,7 @@ function Space({ me }: { me: Me }) {
   const open = (target: ObjectKey) => router.push(BOARDS[target].href);
 
   return (
-    <div className="flex h-dvh flex-col bg-[#121214]">
+    <div className="flex h-dvh flex-col overflow-hidden overscroll-none bg-[#121214]">
       <header className="z-10 flex items-center gap-2 border-b-2 border-black bg-[var(--burgundy)] px-3 py-2 text-white">
         <Link href="/avatar" className="truncate text-sm font-extrabold" title="캐릭터 꾸미기">
           {me.profile.nickname}
