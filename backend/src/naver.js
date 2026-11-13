@@ -147,15 +147,24 @@ export async function postToCafe(menuKey, subject, bodyText) {
 // 제목은 카페에서 쓰던 모양 그대로: 2026_11_14 Workout of the Day
 export function wodCafePost(wod) {
   const subject = `${String(wod.wod_date).replace(/-/g, '_')} Workout of the Day`;
-  const lines = [];
-  if (wod.title && !/WOD$/.test(wod.title)) lines.push(wod.title, '');
-  if (wod.content) lines.push(wod.content);
+  const head = wod.title && !/WOD$/.test(wod.title) ? [wod.title, ''] : [];
+  const lines = wod.content ? String(wod.content).split(/\r\n|\r|\n/) : [];
   const lifts = Array.isArray(wod.lifts) ? wod.lifts : [];
   if (lifts.length) {
-    lines.push('', '[강도]');
-    for (const l of lifts) lines.push(`${LABELS[l.movement] ?? l.movement} ${(l.percents ?? []).map(percentText).join(', ')}`);
+    const block = ['[강도]', ...lifts.map((l) => `${LABELS[l.movement] ?? l.movement} ${(l.percents ?? []).map(percentText).join(', ')}`)];
+    // [Strength] 구역 끝(다음 [구역] 제목 바로 앞, 빈 줄 앞)에 넣는다. [Strength]가 없으면 맨 끝
+    const section = /^\s*\[[^\]]{1,30}\]\s*$/;
+    const start = lines.findIndex((l) => /^\s*\[\s*(strength|스트렝스)[^\]]*\]\s*$/i.test(l));
+    if (start >= 0) {
+      const next = lines.findIndex((l, i) => i > start && section.test(l));
+      let end = next < 0 ? lines.length : next;
+      while (end > start + 1 && !lines[end - 1].trim()) end -= 1;
+      lines.splice(end, 0, ...block);
+    } else {
+      lines.push('', ...block);
+    }
   }
-  return { subject, body: lines.join('\n') };
+  return { subject, body: [...head, ...lines].join('\n') };
 }
 
 // 20:30 공개 때 부른다: 자동 등록이 켜져 있고 아직 안 올린 내일 WOD만 (하루 한 번)
