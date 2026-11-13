@@ -117,11 +117,12 @@ async function tryPost(token, menuId, subject, content, enc) {
 
 // 카페에 글 올리기 → 카페 글 주소.
 // 형식 문제(999)면 안전한 형식으로 바꿔 자동으로 다시 시도한다: ① 기본 ② 이모지 뺌 ③ 한 번만 인코딩
-export async function postToCafe(menuKey, subject, bodyText) {
+export async function postToCafe(menuKey, subject, bodyText, { html = false } = {}) {
   const menuId = CAFE_MENUS[menuKey];
   if (!menuId) throw new Error('올릴 카페 게시판이 올바르지 않아요');
   const token = await accessToken();
-  const toHtml = (t) => `${escapeHtml(t).replace(/\r?\n/g, '<br>')}<br><br>(051 BOX 앱에서 올린 글입니다)`;
+  // html: 이미 HTML로 만든 본문 (WOD처럼 굵은 제목이 필요한 글). 아니면 글자를 안전하게 바꾸고 줄바꿈만
+  const toHtml = (t) => `${html ? t : escapeHtml(t).replace(/\r?\n/g, '<br>')}<br><br>(051 BOX 앱에서 올린 글입니다)`;
   const first = config.naverCafeEncode === 'single' ? encSingle : encDouble;
   const second = first === encDouble ? encSingle : encDouble;
   const attempts = [
@@ -151,7 +152,7 @@ export function wodCafePost(wod) {
   const lines = wod.content ? String(wod.content).split(/\r\n|\r|\n/) : [];
   const lifts = Array.isArray(wod.lifts) ? wod.lifts : [];
   if (lifts.length) {
-    const block = ['[강도]', ...lifts.map((l) => `${LABELS[l.movement] ?? l.movement} ${(l.percents ?? []).map(percentText).join(', ')}`)];
+    const block = lifts.map((l) => `강도: ${LABELS[l.movement] ?? l.movement} ${(l.percents ?? []).map(percentText).join(', ')}`);
     // [Strength] 구역 끝(다음 [구역] 제목 바로 앞, 빈 줄 앞)에 넣는다. [Strength]가 없으면 맨 끝
     const section = /^\s*\[[^\]]{1,30}\]\s*$/;
     const start = lines.findIndex((l) => /^\s*\[\s*(strength|스트렝스)[^\]]*\]\s*$/i.test(l));
@@ -164,7 +165,18 @@ export function wodCafePost(wod) {
       lines.push('', ...block);
     }
   }
-  return { subject, body: [...head, ...lines].join('\n') };
+  const all = [...head, ...lines];
+  // 카페 글: [Strength] → 굵은 Strength (대괄호 없이, 카페에서 직접 쓰던 모양). 나머지 글자는 안전하게 바꾼다
+  // 제목 줄 다음에는 카페 글처럼 한 줄 띄운다 (이미 빈 줄이면 그대로)
+  const html = all
+    .map((l, i) => {
+      const m = l.match(/^\s*\[([^\]]{1,30})\]\s*$/);
+      if (!m) return escapeHtml(l);
+      const gap = all[i + 1] !== undefined && all[i + 1].trim() ? '<br>' : '';
+      return `<b>${escapeHtml(m[1].trim())}</b>${gap}`;
+    })
+    .join('<br>');
+  return { subject, body: all.join('\n'), html };
 }
 
 // 20:30 공개 때 부른다: 자동 등록이 켜져 있고 아직 안 올린 내일 WOD만 (하루 한 번)
@@ -174,8 +186,8 @@ export async function autoPostWodToCafe() {
   if (error) throw new Error(`카페 WOD 대상을 불러오지 못했어요 (${error.code})`);
   const wod = data?.[0];
   if (!wod) return null;
-  const { subject, body } = wodCafePost(wod);
-  const url = await postToCafe('wod', subject, body);
+  const { subject, html } = wodCafePost(wod);
+  const url = await postToCafe('wod', subject, html, { html: true });
   const mark = await sb.rpc('cafe_wod_mark', { p_secret: config.pushSecret, p_date: wod.wod_date, p_url: url });
   if (mark.error) console.warn('[naver] 카페 WOD 주소를 기록하지 못했어요', mark.error.code);
   console.log('[naver] 카페 WOD 등록', wod.wod_date);

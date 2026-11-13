@@ -82,10 +82,10 @@ wodsRouter.post('/:date/cafe', requireAdmin, async (req, res) => {
   const wod = unwrap(await req.sb.from('wods').select('wod_date, title, content, lifts, cafe_url').eq('wod_date', date).maybeSingle());
   if (!wod) throw new HttpError(404, '이 날짜의 WOD가 없어요');
   if (wod.cafe_url) throw new HttpError(409, '이미 카페에 올린 WOD예요');
-  const { subject, body } = wodCafePost(wod);
+  const { subject, html } = wodCafePost(wod);
   let url;
   try {
-    url = await postToCafe('wod', subject, body);
+    url = await postToCafe('wod', subject, html, { html: true });
   } catch (e) {
     throw new HttpError(502, e instanceof Error ? e.message : '카페에 올리지 못했어요');
   }
