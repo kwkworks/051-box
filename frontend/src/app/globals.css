@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* hover: 진짜 마우스가 있는 기기에서만. 휴대폰(터치)에서 누른 메뉴·버튼이 회색으로 남지 않게 */
+@custom-variant hover {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @slot;
+    }
+  }
+}
+
 /* 크로스핏051 박스 색: 흰 벽, 검은 매트, 버건디/노랑 띠 */
 :root {
   --bg: #f3f0ea;

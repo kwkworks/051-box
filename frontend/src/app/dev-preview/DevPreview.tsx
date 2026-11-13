@@ -198,7 +198,7 @@ export function DevPreview() {
             <ActionPad pose="stand" running={false} onAct={(a) => space.current?.act(a)} />
             <QuickMenu />
           </div>
-          <div className="absolute left-3 top-12 z-30">
+          <div className="absolute left-3 top-12 z-20">
             <BgmControl />
           </div>
         </div>
