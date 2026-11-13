@@ -68,14 +68,17 @@ export function NaverCafeCard() {
           <p className="text-xs text-muted">연결하면 공지를 쓸 때 카페 &apos;공지사항&apos;·&apos;대회 정보 공유&apos;에도 함께 올릴 수 있어요.</p>
         </div>
         {data?.enabled && (
-          <button
-            type="button"
-            className={`btn btn-sm shrink-0 whitespace-nowrap ${data.connected ? '' : 'btn-primary'}`}
-            disabled={busy}
-            onClick={data.connected ? disconnect : connect}
-          >
-            {busy ? '처리 중…' : data.connected ? '연결 끊기' : '연결하기'}
-          </button>
+          <div className="flex shrink-0 flex-col gap-1.5">
+            {/* 연결된 상태에서도 다시 연결할 수 있다 (네이버 권한을 새로 받을 때) */}
+            <button type="button" className={`btn btn-sm whitespace-nowrap ${data.connected ? '' : 'btn-primary'}`} disabled={busy} onClick={connect}>
+              {busy ? '처리 중…' : data.connected ? '다시 연결' : '연결하기'}
+            </button>
+            {data.connected && (
+              <button type="button" className="btn btn-sm whitespace-nowrap" disabled={busy} onClick={disconnect}>
+                연결 끊기
+              </button>
+            )}
+          </div>
         )}
       </div>
       {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
