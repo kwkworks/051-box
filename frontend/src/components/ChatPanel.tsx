@@ -3,17 +3,18 @@
 import { Fragment, forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState } from 'react';
 import type { ChatMessage } from '@/lib/types';
 
-const POS_KEY = 'box-chat-pos';
+// 위치는 화면 아래쪽 기준(b)으로 저장한다: 기록을 열면 위로 늘어나고, 닫으면 원래 자리로 돌아온다
+const POS_KEY = 'box-chat-pos2';
 const MIN_KEY = 'box-chat-min';
 
-type Pos = { x: number; y: number };
+type Pos = { x: number; b: number };
 
 export type ChatPanelHandle = { focus: () => void };
 
 function readPos(): Pos | null {
   try {
     const p = JSON.parse(localStorage.getItem(POS_KEY) ?? 'null');
-    if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) return { x: p.x, y: p.y };
+    if (p && Number.isFinite(p.x) && Number.isFinite(p.b)) return { x: p.x, b: p.b };
   } catch {}
   return null;
 }
@@ -54,10 +55,12 @@ export const ChatPanel = forwardRef<
   const [sending, setSending] = useState(false);
   const [minimized, setMinimized] = useState(readMinimized);
   const [pos, setPos] = useState<Pos | null>(readPos);
+  // 사용자가 옮겨 둔 자리 (화면에 맞춰 잠시 당겨져도 이 자리를 기억한다)
+  const savedPos = useRef<Pos | null>(pos);
   const listRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const drag = useRef<{ px: number; py: number; x: number; y: number; moved: boolean; last?: Pos } | null>(null);
+  const drag = useRef<{ px: number; py: number; x: number; b: number; moved: boolean; last?: Pos } | null>(null);
   const markerRef = useRef<HTMLDivElement>(null);
   const stickBottom = useRef(true); // 맨 아래를 보고 있으면 새 메시지가 와도 계속 맨 아래
   const scrollTo = useRef<'marker' | 'bottom' | null>('marker');
@@ -98,8 +101,8 @@ export const ChatPanel = forwardRef<
     const parent = el?.offsetParent as HTMLElement | null;
     if (!el || !parent) return p;
     const maxX = Math.max(4, parent.clientWidth - el.offsetWidth - 4);
-    const maxY = Math.max(4, parent.clientHeight - el.offsetHeight - 4);
-    return { x: Math.min(maxX, Math.max(4, p.x)), y: Math.min(maxY, Math.max(4, p.y)) };
+    const maxB = Math.max(4, parent.clientHeight - el.offsetHeight - 4);
+    return { x: Math.min(maxX, Math.max(4, p.x)), b: Math.min(maxB, Math.max(4, p.b)) };
   };
 
   // 창 크기나 패널 크기가 바뀌면 다시 화면 안으로
@@ -107,12 +110,15 @@ export const ChatPanel = forwardRef<
     const el = boxRef.current;
     const parent = el?.offsetParent as HTMLElement | null;
     if (!el || !parent) return;
+    // 원래 정한 자리(saved)를 기준으로 맞춘다 → 기록을 닫아 작아지면 원래 자리로 돌아온다
     const fit = () =>
       setPos((p) => {
-        if (!p) return p;
-        const c = clamp(p);
-        return c.x === p.x && c.y === p.y ? p : c;
+        const want = savedPos.current ?? p;
+        if (!want) return p;
+        const c = clamp(want);
+        return p && c.x === p.x && c.b === p.b ? p : c;
       });
+    fit(); // 그리기 전에 한 번 바로 맞춘다 (ResizeObserver는 화면이 그려질 때까지 늦게 올 수 있다)
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     ro.observe(parent);
@@ -123,7 +129,8 @@ export const ChatPanel = forwardRef<
     const el = boxRef.current;
     if (!el) return;
     e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { px: e.clientX, py: e.clientY, x: el.offsetLeft, y: el.offsetTop, moved: false };
+    const parentH = (el.offsetParent as HTMLElement | null)?.clientHeight ?? 0;
+    drag.current = { px: e.clientX, py: e.clientY, x: el.offsetLeft, b: parentH - el.offsetTop - el.offsetHeight, moved: false };
   };
   const onDragMove = (e: React.PointerEvent) => {
     const d = drag.current;
@@ -132,25 +139,27 @@ export const ChatPanel = forwardRef<
     const dy = e.clientY - d.py;
     if (!d.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
     d.moved = true;
-    d.last = clamp({ x: d.x + dx, y: d.y + dy });
+    d.last = clamp({ x: d.x + dx, b: d.b - dy });
     setPos(d.last);
   };
   const onDragEnd = () => {
     const d = drag.current;
     drag.current = null;
     if (!d?.moved || !d.last) return;
+    savedPos.current = d.last;
     try {
       localStorage.setItem(POS_KEY, JSON.stringify(d.last));
     } catch {}
   };
   const resetPos = () => {
+    savedPos.current = null;
     setPos(null);
     try {
       localStorage.removeItem(POS_KEY);
     } catch {}
   };
 
-  const placement: React.CSSProperties = pos ? { left: pos.x, top: pos.y } : { left: 12, bottom: 12 };
+  const placement: React.CSSProperties = pos ? { left: pos.x, bottom: pos.b } : { left: 12, bottom: 12 };
   const handleProps = {
     onPointerDown: onDragStart,
     onPointerMove: onDragMove,
