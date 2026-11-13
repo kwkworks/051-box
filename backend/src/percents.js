@@ -2,8 +2,18 @@
 //  - 범위: "60~65", "60-65", "60% - 65%", "60%~65%", "60%65%"(% 뒤에 바로 숫자)
 //  - 따로따로: 쉼표나 띄어쓰기로 나눈 값 ("60, 65", "60 65")
 //  - 30~120 사이 정수만, 최대 10개. 거꾸로 적은 범위(65~60)는 바로잡는다.
+// 휴대폰·한글 자판에서 들어오는 비슷한 기호를 표준 기호로 바꾼다
+//  물결: ～ 〜 ∼ ˜ → ~ / 줄표: ‐ ‑ ‒ – — ― − ﹣ － → - / 전각 ％ → % / 전각 숫자 ０-９ → 0-9
+export function normalizeSymbols(text) {
+  return String(text)
+    .replace(/[～〜∼˜]/g, '~')
+    .replace(/[‐-―−﹣－]/g, '-')
+    .replace(/％/g, '%')
+    .replace(/[０-９]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 0xfee0));
+}
+
 export function parsePercents(text) {
-  const normalized = String(text)
+  const normalized = normalizeSymbols(text)
     .replace(/(\d)%(?=\d)/g, '$1~') // 60%65% → 60~65 (% 뒤에 바로 숫자)
     .replace(/%/g, '') // 남은 % 기호는 지운다 (60% - 65% → 60 - 65)
     .replace(/\s*[~\-–—]\s*/g, '~'); // 60 - 65, 60~65, 60–65 → 60~65

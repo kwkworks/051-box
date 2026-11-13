@@ -38,7 +38,8 @@ export function createApp() {
   app.use(express.json({ limit: '50kb' }));
 
   // 핑(외부 모니터)과 "서버 깨우기"용. 인증 없이 상태만 알려준다.
-  app.get('/health', (req, res) => res.json({ ok: true }));
+  // version: Render가 넣어 주는 배포 커밋 앞 7자리 (새 코드가 배포됐는지 확인용, 비밀 아님)
+  app.get('/health', (req, res) => res.json({ ok: true, version: (process.env.RENDER_GIT_COMMIT ?? 'dev').slice(0, 7) }));
 
   const tooMany = { error: '요청이 너무 많아요. 잠시 후 다시 시도해주세요' };
   // 1) 로그인 전 IP 기준: 같은 박스 와이파이를 여러 회원이 함께 써도 막히지 않게 넉넉히 (무차별 요청만 차단)
