@@ -294,6 +294,12 @@ begin
   (85, '관리자 계정 탈퇴', 'err', pg_temp.run_as(d, 'select public.delete_my_account()')),
   (86, '회원이 가입 알림 대상 요청 (틀린 비밀값)', 'err', pg_temp.run_as(a, format('select * from public.push_claim_signup(''wrong'', %L, ''rls-test'')', c))),
   (87, '비로그인으로 가입 알림 대상 요청 (틀린 비밀값)', 'err', pg_temp.run_as(null, format('select * from public.push_claim_signup(''wrong'', %L, ''rls-test'')', c)));
+  -- 일반 회원이 앱과 같은 방식(저장 후 결과 돌려받기)으로 모임 만들기
+  insert into rls_results values
+  (89, '일반 회원이 모임 만들기', 'ok:1', pg_temp.run_as(a, 'insert into public.events (kind, title, starts_at) values (''gathering'', ''rls-test 회원 모임'', now() + interval ''1 day'') returning id')),
+  (90, '일반 회원이 대회 만들기', 'err', pg_temp.run_as(a, 'insert into public.events (kind, title, starts_at) values (''competition'', ''rls-test 회원 대회'', now() + interval ''1 day'') returning id'));
+  delete from public.events where title in ('rls-test 회원 모임', 'rls-test 회원 대회');
+
   -- 마지막: 임시 회원 m이 스스로 탈퇴 → 계정과 기록이 모두 사라지는지
   r := pg_temp.run_as(m, 'select public.delete_my_account()');
   insert into rls_results values

@@ -4,6 +4,7 @@ import { useRef, useState, useSyncExternalStore } from 'react';
 import { ActionPad } from '@/components/ActionPad';
 import { AvatarView } from '@/components/AvatarView';
 import { ChatPanel } from '@/components/ChatPanel';
+import { EventForm } from '@/components/EventForm';
 import { Podium } from '@/components/Podium';
 import { BoxSpace, type BoxSpaceHandle } from '@/game/BoxSpace';
 import { AVATAR_OPTIONS, type Avatar } from '@/lib/constants';
@@ -26,7 +27,7 @@ function samples(): Partial<Avatar>[] {
 
 export function DevPreview() {
   const [opened, setOpened] = useState("");
-  const [view, setView] = useState<'space' | 'avatars' | 'podium'>('space');
+  const [view, setView] = useState<'space' | 'avatars' | 'podium' | 'forms'>('space');
   const space = useRef<BoxSpaceHandle | null>(null);
   // 채팅 미리보기: 다른 회원 메시지 8개, 그중 5개는 이미 읽음
   const [msgs, setMsgs] = useState<ChatMessage[]>(() =>
@@ -45,8 +46,21 @@ export function DevPreview() {
         <button type="button" className="btn btn-sm" onClick={() => setView('space')}>공간</button>
         <button type="button" className="btn btn-sm" onClick={() => setView('avatars')}>캐릭터</button>
         <button type="button" className="btn btn-sm" onClick={() => setView('podium')}>포디움</button>
+        <button type="button" className="btn btn-sm" onClick={() => setView('forms')}>입력칸</button>
       </div>
-      {view === 'podium' ? (
+      {view === 'forms' ? (
+        // 좁은 화면에서 입력칸이 넘치지 않는지 보는 미리보기 (모임 만들기 양식 + 날짜 칸)
+        <div className="mx-auto w-full max-w-3xl overflow-y-auto px-4 pb-10">
+          <EventForm kind="gathering" onDone={() => {}} />
+          <div className="card flex flex-col gap-2 p-4">
+            <input type="date" className="input" aria-label="날짜" />
+            <div className="flex gap-2">
+              <input type="date" className="input" aria-label="날짜 2" />
+              <button type="button" className="btn">추가</button>
+            </div>
+          </div>
+        </div>
+      ) : view === 'podium' ? (
         <div className="mx-auto w-full max-w-md p-4">
           <Podium
             myId="u2"
