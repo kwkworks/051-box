@@ -86,6 +86,19 @@ export function sendSignupPushLater(userId, ref, nickname) {
   })().catch((e) => console.warn('[push]', e?.message));
 }
 
+// 축하해요 🎉 → PR 글 주인에게 (자기 글·중복·알림 끈 사람은 DB 함수가 걸러낸다)
+export function sendCheerPushLater(activityId, likerId, payload) {
+  if (!enabled) return;
+  (async () => {
+    const { data, error } = await sb.rpc('push_claim_cheer', { p_secret: config.pushSecret, p_activity: activityId, p_liker: likerId });
+    if (error) {
+      console.warn('[push] 축하 알림 대상을 불러오지 못했어요', error.code);
+      return;
+    }
+    await deliver(data, payload);
+  })().catch((e) => console.warn('[push]', e?.message));
+}
+
 export async function sendTestPush(userId) {
   if (!enabled) return 0;
   const { data, error } = await sb.rpc('push_targets_for_user', { p_secret: config.pushSecret, p_user: userId });

@@ -11,9 +11,10 @@ const KINDS: { key: keyof NotifyPrefs; label: string; hint: string; adminOnly?: 
   { key: 'notices', label: '📢 공지사항', hint: '새 공지가 올라오면' },
   { key: 'competition', label: '🏆 대회·이벤트', hint: '새 대회·이벤트가 올라오면' },
   { key: 'gathering', label: '🍻 회원 모임', hint: '새 모임이 올라오면' },
+  { key: 'cheer', label: '🎉 내 PR 축하', hint: '누군가 명예의 벽에서 내 기록을 축하하면' },
   { key: 'signup', label: '🙋 가입 승인 요청 (관리자)', hint: '새 회원이 가입을 신청하면', adminOnly: true },
 ];
-const DEFAULT_PREFS: NotifyPrefs = { wod: true, notices: true, competition: true, gathering: true, signup: true };
+const DEFAULT_PREFS: NotifyPrefs = { wod: true, notices: true, competition: true, gathering: true, cheer: true, signup: true };
 
 const STATE_TEXT: Record<PushState, string> = {
   unsupported: '이 브라우저는 알림을 받을 수 없어요. 크롬이나 사파리(홈 화면 앱)에서 열어 주세요.',

@@ -14,7 +14,7 @@ export type Profile = {
 };
 
 // 푸시 알림 종류별 켜기/끄기
-export type NotifyPrefs = { wod: boolean; notices: boolean; competition: boolean; gathering: boolean; signup: boolean };
+export type NotifyPrefs = { wod: boolean; notices: boolean; competition: boolean; gathering: boolean; cheer: boolean; signup: boolean };
 
 export type Gender = 'M' | 'F';
 

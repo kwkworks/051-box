@@ -1,6 +1,16 @@
 import { Router } from 'express';
 import { fromDbError, unwrap } from '../errors.js';
 import { uuid } from '../schemas.js';
+import { sendCheerPushLater } from '../push.js';
+
+// 알림 문구용 종목 이름 (프론트 lib/constants.ts와 같은 이름)
+const LABELS = {
+  back_squat: '백스쿼트', front_squat: '프론트스쿼트', overhead_squat: '오버헤드스쿼트', deadlift: '데드리프트',
+  clean: '클린', power_clean: '파워클린', clean_and_jerk: '클린앤저크', snatch: '스내치', power_snatch: '파워스내치',
+  push_press: '푸시프레스', strict_press: '스트릭트프레스', bench_press: '벤치프레스', thruster: '쓰러스터',
+  fran: 'Fran', grace: 'Grace', isabel: 'Isabel', helen: 'Helen', diane: 'Diane', elizabeth: 'Elizabeth', annie: 'Annie',
+  jackie: 'Jackie', karen: 'Karen', nancy: 'Nancy', kelly: 'Kelly', amanda: 'Amanda', murph: 'Murph', dt: 'DT', jt: 'JT',
+};
 
 export const feedRouter = Router();
 
@@ -53,6 +63,23 @@ feedRouter.post('/:id/like', async (req, res) => {
   const { error } = await req.sb.from('activity_likes').insert({ activity_id });
   if (error && error.code !== '23505') throw fromDbError(error); // 이미 누른 경우는 그대로 성공
   res.status(201).json({ liked: true });
+
+  // 응답을 보낸 뒤 글 주인에게 알림 (자기 글이면 보내지 않음, 같은 축하는 한 번만)
+  if (error) return;
+  try {
+    const { data: act } = await req.sb.from('activities').select('user_id, payload').eq('id', activity_id).maybeSingle();
+    if (act && act.user_id !== req.userId) {
+      const p = act.payload ?? {};
+      const what = p.is_custom ? p.movement : (LABELS[p.movement] ?? p.movement ?? '');
+      sendCheerPushLater(activity_id, req.userId, {
+        title: '🎉 축하가 도착했어요',
+        body: `${req.profile.nickname}님이 ${what ? `${what} ` : ''}기록을 축하했어요`,
+        url: '/wall',
+      });
+    }
+  } catch (e) {
+    console.warn('[feed] 축하 알림을 준비하지 못했어요', e?.message); // 응답은 이미 보냈다
+  }
 });
 
 feedRouter.delete('/:id/like', async (req, res) => {

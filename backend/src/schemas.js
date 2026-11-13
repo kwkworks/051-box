@@ -58,6 +58,7 @@ export const meUpdateSchema = z
         competition: z.boolean(),
         gathering: z.boolean(),
         signup: z.boolean().optional(), // 관리자: 가입 요청 알림
+        cheer: z.boolean().optional(), // 내 PR 축하 알림
       })
       .optional(),
   })

@@ -327,6 +327,11 @@ begin
   (101, '승인 대기자가 축하해요', 'err', pg_temp.run_as(c, format('insert into public.activity_likes (activity_id) values (%L)', act_id))),
   (102, '회원 본인 축하 취소', 'ok:1', pg_temp.run_as(a, format('delete from public.activity_likes where activity_id = %L and user_id = %L', act_id, a)));
 
+  -- 0018: 축하 알림 대상은 서버 비밀값이 있어야만 받을 수 있다
+  insert into rls_results values
+  (103, '회원이 축하 알림 대상 요청 (틀린 비밀값)', 'err', pg_temp.run_as(a, format('select * from public.push_claim_cheer(''wrong'', %L, %L)', act_id, a))),
+  (104, '비로그인으로 축하 알림 대상 요청 (틀린 비밀값)', 'err', pg_temp.run_as(null, format('select * from public.push_claim_cheer(''wrong'', %L, %L)', act_id, a)));
+
   -- 마지막: 임시 회원 m이 스스로 탈퇴 → 계정과 기록이 모두 사라지는지
   r := pg_temp.run_as(m, 'select public.delete_my_account()');
   insert into rls_results values

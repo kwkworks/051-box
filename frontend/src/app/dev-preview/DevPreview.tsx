@@ -8,11 +8,13 @@ import { AvatarView } from '@/components/AvatarView';
 import { ChatPanel } from '@/components/ChatPanel';
 import { EventDetailView } from '@/components/EventDetailView';
 import { EventForm } from '@/components/EventForm';
+import { NotificationSettings } from '@/components/NotificationSettings';
+import { WallCard } from '@/components/WallCard';
 import { WodView } from '@/components/WodView';
 import { Podium } from '@/components/Podium';
 import { BoxSpace, type BoxSpaceHandle } from '@/game/BoxSpace';
 import { AVATAR_OPTIONS, type Avatar } from '@/lib/constants';
-import type { ChatMessage, Profile, Wod } from '@/lib/types';
+import type { ChatMessage, FeedItem, Profile, Wod } from '@/lib/types';
 
 const DEMO: Profile = {
   id: '00000000-0000-0000-0000-000000000000',
@@ -31,7 +33,7 @@ function samples(): Partial<Avatar>[] {
 
 export function DevPreview() {
   const [opened, setOpened] = useState("");
-  const [view, setView] = useState<'space' | 'avatars' | 'podium' | 'forms' | 'wod' | 'event'>('space');
+  const [view, setView] = useState<'space' | 'avatars' | 'podium' | 'forms' | 'wod' | 'event' | 'wall'>('space');
   const space = useRef<BoxSpaceHandle | null>(null);
   // 채팅 미리보기: 다른 회원 메시지 8개, 그중 5개는 이미 읽음
   const [msgs, setMsgs] = useState<ChatMessage[]>(() =>
@@ -53,8 +55,29 @@ export function DevPreview() {
         <button type="button" className="btn btn-sm" onClick={() => setView('forms')}>입력칸</button>
         <button type="button" className="btn btn-sm" onClick={() => setView('wod')}>WOD</button>
         <button type="button" className="btn btn-sm" onClick={() => setView('event')}>모임</button>
+        <button type="button" className="btn btn-sm" onClick={() => setView('wall')}>벽</button>
       </div>
-      {view === 'event' ? (
+      {view === 'wall' ? (
+        // 명예의 벽 카드(축하 버튼) + 알림 설정(🎉 내 PR 축하, 관리자용 항목 포함)
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 overflow-y-auto px-4 pb-10" data-view="wall">
+          {[
+            { id: 'w1', nickname: '룰루', movement: 'clean_and_jerk', weight_lb: 215, prev_lb: null, liked: false, count: 0 },
+            { id: 'w2', nickname: '아주긴닉네임회원님', movement: 'overhead_squat', weight_lb: 1205.5, prev_lb: 1100, liked: true, count: 128 },
+            { id: 'w3', nickname: '코치', movement: 'murph', time_sec: 2523, prev_sec: 2600, unit: 'time', liked: false, count: 7 },
+          ].map((d) => (
+            <WallCard
+              key={d.id}
+              item={{
+                id: d.id, kind: 'pr', created_at: '2026-11-13T03:00:00Z', user_id: 'u', nickname: d.nickname, avatar: {},
+                payload: { movement: d.movement, is_custom: false, unit: (d.unit ?? 'lb') as 'lb' | 'time', weight_lb: d.weight_lb, prev_lb: d.prev_lb, time_sec: d.time_sec, prev_sec: d.prev_sec },
+              } as FeedItem}
+              cheer={{ liked: d.liked, count: d.count }}
+              onCheer={() => {}}
+            />
+          ))}
+          <NotificationSettings profile={{ ...DEMO, role: 'admin', notify_prefs: {} }} />
+        </div>
+      ) : view === 'event' ? (
         // 모임 상세 미리보기: 만든 사람(열림) / 만든 사람(마감됨) / 일반 회원
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 overflow-y-auto px-4 pb-10">
           {[
