@@ -1,7 +1,7 @@
 // 크로스핏051 박스를 탑뷰 픽셀 맵으로 옮긴다. 모든 그림은 코드로 그린다.
-export const TILE = 32;
-export const COLS = 34;
-export const ROWS = 22;
+const TILE = 32;
+const COLS = 34;
+const ROWS = 22;
 export const WORLD_W = COLS * TILE;
 export const WORLD_H = ROWS * TILE;
 
@@ -120,7 +120,7 @@ RIG_POSTS.forEach(([x, y]) => block({ x, y, w: 1, h: 1 }));
 STATIONS.forEach(block);
 [...MACHINES, ...PILLARS, ...BOXES, COOLER].forEach(block);
 
-export function isSolidAt(px: number, py: number): boolean {
+function isSolidAt(px: number, py: number): boolean {
   const tx = Math.floor(px / TILE);
   const ty = Math.floor(py / TILE);
   if (tx < 0 || ty < 0 || tx >= COLS || ty >= ROWS) return true;

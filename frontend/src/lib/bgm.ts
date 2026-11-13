@@ -40,7 +40,7 @@ const LEAD = [
   69, 0, 72, 0, 77, 0, 76, 0, 74, 72, 74, 0, 76, 0, 0, 0,
 ];
 
-export class Bgm {
+class Bgm {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noise: AudioBuffer | null = null;

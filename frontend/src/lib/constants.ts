@@ -15,7 +15,7 @@ export const MOVEMENTS = {
   thruster: '쓰러스터',
 } as const;
 
-export type MovementKey = keyof typeof MOVEMENTS;
+type MovementKey = keyof typeof MOVEMENTS;
 
 // 네임드 WOD (시간 기록, 짧을수록 좋음). 백엔드·DB 목록과 같게 유지한다.
 export const NAMED_WODS = {
@@ -36,7 +36,7 @@ export const NAMED_WODS = {
   jt: 'JT (Hero)',
 } as const;
 
-export type NamedWodKey = keyof typeof NAMED_WODS;
+type NamedWodKey = keyof typeof NAMED_WODS;
 
 // 선택 목록 순서: 리프트는 가나다순, 네임드 WOD는 ABC순
 export const MOVEMENT_KEYS_SORTED = (Object.keys(MOVEMENTS) as MovementKey[]).sort((a, b) =>
@@ -120,7 +120,7 @@ export const AVATAR_OPTIONS = {
 
 export type Avatar = { [K in keyof typeof AVATAR_OPTIONS]: (typeof AVATAR_OPTIONS)[K][number] };
 
-export const DEFAULT_AVATAR: Avatar = {
+const DEFAULT_AVATAR: Avatar = {
   skin: 's2',
   eyes: 'round',
   brows: 'normal',

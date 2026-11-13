@@ -7,7 +7,7 @@ import { config } from './config.js';
 import { LABELS, percentText } from './labels.js';
 
 const CAFE_ID = '31088296'; // 크로스핏051 카페
-export const CAFE_MENUS = { notice: 9, competition: 50, wod: 12, record: 13 }; // 공지사항, 대회 정보 공유, WOD, RECORD
+const CAFE_MENUS = { notice: 9, competition: 50, wod: 12, record: 13 }; // 공지사항, 대회 정보 공유, WOD, RECORD
 const CAFE_URL_BASE = 'https://cafe.naver.com/crossfit051';
 
 const sb = createClient(config.supabaseUrl, config.supabasePublishableKey, {
@@ -180,8 +180,27 @@ export function wodCafePost(wod) {
 }
 
 // 20:30 공개 때 부른다: 자동 등록이 켜져 있고 아직 안 올린 내일 WOD만 (하루 한 번)
-export async function autoPostWodToCafe() {
-  if (!naverEnabled()) return null;
+// 카페 글쓰기는 한 번에 하나씩만 한다. 같은 요청이 동시에 여러 번 와도(버튼 연타, 예약 작업 중복 호출)
+// 앞의 글쓰기가 끝나고 주소가 기록된 뒤에 다음 것이 "이미 올렸는지"를 다시 확인하므로 카페에 두 번 올라가지 않는다.
+let cafeChain = Promise.resolve();
+export function serialCafe(fn) {
+  const run = cafeChain.then(fn, fn);
+  cafeChain = run.catch(() => {});
+  return run;
+}
+
+let autoRun = null; // 자동 등록이 이미 진행 중이면 그 결과를 같이 기다린다
+export function autoPostWodToCafe() {
+  if (!naverEnabled()) return Promise.resolve(null);
+  if (!autoRun) {
+    autoRun = serialCafe(autoPostOnce).finally(() => {
+      autoRun = null;
+    });
+  }
+  return autoRun;
+}
+
+async function autoPostOnce() {
   const { data, error } = await sb.rpc('cafe_wod_pending', { p_secret: config.pushSecret });
   if (error) throw new Error(`카페 WOD 대상을 불러오지 못했어요 (${error.code})`);
   const wod = data?.[0];

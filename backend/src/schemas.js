@@ -7,12 +7,12 @@ export const MOVEMENTS = [
 ];
 
 // 네임드 WOD (시간 기록, 짧을수록 좋음). DB 제약(0007)과 프론트 목록과 같게 유지한다.
-export const NAMED_WODS = [
+const NAMED_WODS = [
   'fran', 'grace', 'isabel', 'helen', 'diane', 'elizabeth', 'annie', 'jackie', 'karen',
   'nancy', 'kelly', 'amanda', 'murph', 'dt', 'jt',
 ];
 
-export const AVATAR_OPTIONS = {
+const AVATAR_OPTIONS = {
   skin: ['s1', 's2', 's3', 's4', 's5', 's6'],
   eyes: ['round', 'smile', 'sharp', 'sleepy', 'sparkle'],
   brows: ['normal', 'thick', 'angry', 'none'],
@@ -32,7 +32,7 @@ export const AVATAR_OPTIONS = {
 };
 
 // 허용 목록에 있는 값만 저장한다 (임의 JSON 저장 차단)
-export const avatarSchema = z.strictObject(
+const avatarSchema = z.strictObject(
   Object.fromEntries(Object.entries(AVATAR_OPTIONS).map(([key, values]) => [key, z.enum(values)])),
 );
 
@@ -96,7 +96,7 @@ export const wodSchema = z.strictObject({
     .default([]),
 });
 
-export const noticeSchema = z.strictObject({
+const noticeSchema = z.strictObject({
   title: requiredText(100),
   body: text(5000).default(''),
   pinned: z.boolean().default(false),

@@ -7,7 +7,7 @@ import type { Percent } from './types';
 //  - 30~120 사이 정수만, 최대 10개. 거꾸로 적은 범위(65~60)는 바로잡는다.
 // 휴대폰·한글 자판에서 들어오는 비슷한 기호를 표준 기호로 바꾼다
 //  물결: ～ 〜 ∼ ˜ → ~ / 줄표: ‐ ‑ ‒ – — ― − ﹣ － → - / 전각 ％ → % / 전각 숫자 ０-９ → 0-9
-export function normalizeSymbols(text: string): string {
+function normalizeSymbols(text: string): string {
   return String(text)
     .replace(/[～〜∼˜]/g, '~')
     .replace(/[‐-―−﹣－]/g, '-')

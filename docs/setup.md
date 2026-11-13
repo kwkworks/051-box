@@ -85,7 +85,7 @@ claude mcp add --scope project --transport http supabase "https://mcp.supabase.c
 1. 키 만들기 (내 컴퓨터): `npx web-push generate-vapid-keys` → Public/Private Key, `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` → PUSH_SECRET
 2. Render 환경변수: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`(이메일 또는 mailto:이메일), `PUSH_SECRET` → 로그에 `[push] 푸시 알림 준비 완료`
 3. Vercel 환경변수: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`(공개 키) → Redeploy
-4. Supabase SQL: `insert into private.settings (key, value) values ('push_secret_sha256', encode(extensions.digest('<PUSH_SECRET>', 'sha256'), 'hex')) on conflict (key) do update set value = excluded.value;` (해시만 저장)
+4. 해시는 내 컴퓨터에서 만든다 (비밀값 원문을 Supabase 화면에 붙여 넣지 않기: 쿼리 기록에 남을 수 있음): `node -e "console.log(require('crypto').createHash('sha256').update(process.argv[1]).digest('hex'))" <PUSH_SECRET>` → 나온 64자 해시만 Supabase SQL에 넣는다: `insert into private.settings (key, value) values ('push_secret_sha256', '<해시>') on conflict (key) do update set value = excluded.value;`
 5. Supabase SQL: `supabase/migrations/0011_wod_push_schedule.sql` (매일 20:25 깨우기 · 20:30 발송 · 20:35 예비)
 6. 앱: 게시판 → 🔔 알림 설정 → 이 기기에서 알림 받기 → 테스트 알림
 

@@ -5,7 +5,7 @@ import { COLORS, type Avatar } from '@/lib/constants';
 export type Dir = 'down' | 'up' | 'left' | 'right';
 export type Pose = 'stand' | 'sit' | 'dance';
 // 그릴 때만 쓰는 자세 (점프 중 공중 동작). 네트워크로 주고받지 않는다
-export type DrawPose = Pose | 'air';
+type DrawPose = Pose | 'air';
 
 type Rect = [x: number, y: number, w: number, h: number, color: string];
 

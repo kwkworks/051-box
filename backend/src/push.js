@@ -53,7 +53,7 @@ async function deliver(targets, payload) {
 }
 
 // kind: 'wod' | 'notices' | 'competition' | 'gathering', ref: 같은 알림 중복 방지용 (글 id, 날짜)
-export async function sendPush(kind, ref, actorId, payload) {
+async function sendPush(kind, ref, actorId, payload) {
   if (!enabled) return 0;
   const { data, error } = await sb.rpc('push_claim', {
     p_secret: config.pushSecret,

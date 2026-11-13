@@ -102,6 +102,38 @@ function opensLabel(iso: string | undefined, today: string) {
   return `${day === today ? '오늘' : formatDateLabel(day)} 오후 8시 30분`;
 }
 
+// 카페에 올린 글 링크. 관리자는 카페에서 글을 지운 뒤 "다시 올릴 수 있게"를 눌러 앱에 남은 주소를 지운다
+function CafeLinkRow({ link, label, isAdmin, resetPath, onReset }: { link: string; label: string; isAdmin: boolean; resetPath: string; onReset: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const reset = async () => {
+    if (!confirm(`카페에서 이 글을 먼저 지웠나요?
+
+앱에 남은 카페 주소만 지우고, 다시 올리기 버튼이 나타나요.
+(카페 글은 앱에서 지울 수 없어요. 아직 안 지웠다면 카페에서 먼저 지워 주세요)`)) return;
+    setBusy(true);
+    try {
+      await api.del(resetPath);
+      onReset();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '처리하지 못했어요');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <a href={link} target="_blank" rel="noopener noreferrer nofollow" className="btn btn-sm">
+        {label}
+      </a>
+      {isAdmin && (
+        <button type="button" className="btn btn-sm text-muted" disabled={busy} onClick={reset}>
+          {busy ? '처리 중…' : '카페 글을 지웠어요 (다시 올리기)'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // 네이버 카페 RECORD 게시판: 올린 글이 있으면 "카페에서 보기", 관리자는 사진이 있으면 제목 메모와 함께 올리기
 function RecordCafeRow({ wod, photoCount, isAdmin, onPosted }: { wod: Wod; photoCount: number; isAdmin: boolean; onPosted: () => void }) {
   const [note, setNote] = useState('');
@@ -109,9 +141,7 @@ function RecordCafeRow({ wod, photoCount, isAdmin, onPosted }: { wod: Wod; photo
   const link = safeHttpsUrl(wod.record_cafe_url);
   if (link) {
     return (
-      <a href={link} target="_blank" rel="noopener noreferrer nofollow" className="btn btn-sm mt-3">
-        기록 사진 카페에서 보기 ↗
-      </a>
+      <CafeLinkRow link={link} label="기록 사진 카페에서 보기 ↗" isAdmin={isAdmin} resetPath={`/wods/${wod.wod_date}/record-cafe`} onReset={onPosted} />
     );
   }
   if (!isAdmin || photoCount === 0) return null;
@@ -148,11 +178,7 @@ function WodCafeRow({ wod, isAdmin, onPosted }: { wod: Wod; isAdmin: boolean; on
   const [busy, setBusy] = useState(false);
   const link = safeHttpsUrl(wod.cafe_url);
   if (link) {
-    return (
-      <a href={link} target="_blank" rel="noopener noreferrer nofollow" className="btn btn-sm mt-3">
-        네이버 카페에서 보기 ↗
-      </a>
-    );
+    return <CafeLinkRow link={link} label="네이버 카페에서 보기 ↗" isAdmin={isAdmin} resetPath={`/wods/${wod.wod_date}/cafe`} onReset={onPosted} />;
   }
   if (!isAdmin) return null;
   const post = async () => {

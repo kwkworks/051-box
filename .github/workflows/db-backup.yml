@@ -31,9 +31,9 @@ jobs:
           if [ -z "$DB_URL" ]; then echo "::error::SUPABASE_DB_URL 비밀값이 없어요 (docs/backup.md 참고)"; exit 1; fi
           if [ ${#PASS} -lt 16 ]; then echo "::error::BACKUP_PASSPHRASE는 16자 이상이어야 해요"; exit 1; fi
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb  # v1.7.3 (고정: 남이 몰래 바꿀 수 없게)
         with:
-          version: latest
+          version: 3.1.0
 
       - name: 데이터베이스 내보내기
         env:
@@ -56,7 +56,7 @@ jobs:
           rm -rf backup "$name.tar.gz"
           echo "NAME=$name" >> "$GITHUB_ENV"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: ${{ env.NAME }}
           path: ${{ env.NAME }}.tar.gz.gpg

@@ -137,7 +137,7 @@ function toMovement(name) {
 
 // 스트렝스 글에서 종목 찾기 ("Back Squat 5-5-3" → ['back_squat']). 긴 이름부터 찾아서
 // "Power Clean" 안의 "Clean"처럼 겹치는 이름은 한 번만 센다. 영어 이름은 단어 단위로만 찾는다.
-export function findMovements(text) {
+function findMovements(text) {
   let rest = ` ${normalizeSymbols(text).toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ')} `;
   const names = [...Object.entries(MOVEMENT_ALIASES), ...MOVEMENTS.map((m) => [m.replace(/_/g, ' '), m])].sort(
     (a, b) => b[0].length - a[0].length,
@@ -158,7 +158,7 @@ export function findMovements(text) {
 }
 
 // '내용' 한 칸에 모두 적은 시트: [Strength] 줄부터 다음 [구역] 줄 전까지만 스트렝스로 본다. 없으면 빈 글
-export function strengthSection(content) {
+function strengthSection(content) {
   const lines = String(content ?? '').split(/\r\n|\r|\n/);
   const start = lines.findIndex((l) => /^\s*\[\s*(strength|스트렝스)[^\]]*\]\s*$/i.test(l));
   if (start < 0) return '';
@@ -168,7 +168,7 @@ export function strengthSection(content) {
 
 // "백스쿼트 70,75,80 / 데드리프트 60,65" → [{movement, percents}]
 // 퍼센트만 적은 경우("65~68%")는 그날 스트렝스 글에 종목이 하나뿐이면 그 종목으로 계산한다
-export function parseLifts(cell, strengthText = '') {
+function parseLifts(cell, strengthText = '') {
   const lifts = [];
   const warnings = [];
   for (const part of cell.split(/[\n/;|]+/)) {
@@ -203,7 +203,7 @@ export function parseLifts(cell, strengthText = '') {
 }
 
 // "2026-11-04", "2026.11.04", "2026. 11. 4", "2026/11/4" → "2026-11-04"
-export function parseDate(cell) {
+function parseDate(cell) {
   const m = cell.trim().match(/^(\d{4})\s*[-./]\s*(\d{1,2})\s*[-./]\s*(\d{1,2})\.?$/);
   if (!m) return null;
   const iso = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;

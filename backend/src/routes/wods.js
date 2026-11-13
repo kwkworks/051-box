@@ -4,7 +4,7 @@ import multer from 'multer';
 import { requireAdmin } from '../auth.js';
 import { HttpError, fromDbError, unwrap } from '../errors.js';
 import { isoDate, photoOrderSchema, uuid, wodSchema } from '../schemas.js';
-import { naverEnabled, postToCafe, postToCafeWithImages, wodCafePost } from '../naver.js';
+import { naverEnabled, postToCafe, postToCafeWithImages, serialCafe, wodCafePost } from '../naver.js';
 import { z } from 'zod';
 
 export const wodsRouter = Router();
@@ -79,6 +79,11 @@ wodsRouter.put('/:date', requireAdmin, async (req, res) => {
 wodsRouter.post('/:date/cafe', requireAdmin, async (req, res) => {
   const date = isoDate.parse(req.params.date);
   if (!naverEnabled()) throw new HttpError(400, '네이버 카페 연동이 아직 설정되지 않았어요');
+  // 확인 → 올리기 → 주소 기록을 한 번에 하나씩 (연타·자동 등록과 겹쳐도 두 번 올라가지 않게)
+  res.json(await serialCafe(() => postWodNow(req, date)));
+});
+
+async function postWodNow(req, date) {
   const wod = unwrap(await req.sb.from('wods').select('wod_date, title, content, lifts, cafe_url').eq('wod_date', date).maybeSingle());
   if (!wod) throw new HttpError(404, '이 날짜의 WOD가 없어요');
   if (wod.cafe_url) throw new HttpError(409, '이미 카페에 올린 WOD예요');
@@ -90,8 +95,8 @@ wodsRouter.post('/:date/cafe', requireAdmin, async (req, res) => {
     throw new HttpError(502, e instanceof Error ? e.message : '카페에 올리지 못했어요');
   }
   unwrap(await req.sb.from('wods').update({ cafe_url: url }).eq('wod_date', date));
-  res.json({ cafe_url: url });
-});
+  return { cafe_url: url };
+}
 
 // 관리자: 그날 기록 사진을 카페 RECORD 게시판에 올리기. 제목은 카페에서 쓰던 모양 "2026_11_13 기록(○○님👑 보세요)"
 const recordCafeSchema = z.strictObject({ note: z.string().trim().max(60).optional() });
@@ -99,6 +104,10 @@ wodsRouter.post('/:date/record-cafe', requireAdmin, async (req, res) => {
   const date = isoDate.parse(req.params.date);
   const { note } = recordCafeSchema.parse(req.body ?? {});
   if (!naverEnabled()) throw new HttpError(400, '네이버 카페 연동이 아직 설정되지 않았어요');
+  res.json(await serialCafe(() => postRecordNow(req, date, note)));
+});
+
+async function postRecordNow(req, date, note) {
   const wod = unwrap(await req.sb.from('wods').select('id, record_cafe_url').eq('wod_date', date).maybeSingle());
   if (!wod) throw new HttpError(404, '이 날짜의 WOD가 없어요');
   if (wod.record_cafe_url) throw new HttpError(409, '이미 카페 RECORD에 올린 기록이에요');
@@ -120,8 +129,20 @@ wodsRouter.post('/:date/record-cafe', requireAdmin, async (req, res) => {
     throw new HttpError(502, e instanceof Error ? e.message : '카페에 올리지 못했어요');
   }
   unwrap(await req.sb.from('wods').update({ record_cafe_url: url }).eq('id', wod.id));
-  res.json({ record_cafe_url: url });
-});
+  return { record_cafe_url: url };
+}
+
+// 관리자: 카페에서 글을 지웠을 때 앱에 남은 카페 주소를 지워 다시 올릴 수 있게 한다.
+// 네이버는 글이 지워졌는지 알려주지 않으므로 관리자가 직접 확인하고 누른다. (카페 글 자체는 건드리지 않음)
+for (const [path, column] of [['cafe', 'cafe_url'], ['record-cafe', 'record_cafe_url']]) {
+  wodsRouter.delete(`/:date/${path}`, requireAdmin, async (req, res) => {
+    const date = isoDate.parse(req.params.date);
+    const wod = unwrap(await req.sb.from('wods').select('id').eq('wod_date', date).maybeSingle());
+    if (!wod) throw new HttpError(404, '이 날짜의 WOD가 없어요');
+    unwrap(await req.sb.from('wods').update({ [column]: null }).eq('id', wod.id));
+    res.status(204).end();
+  });
+}
 
 wodsRouter.delete('/:id', requireAdmin, async (req, res) => {
   const id = uuid.parse(req.params.id);
