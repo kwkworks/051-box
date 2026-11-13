@@ -15,7 +15,9 @@ export const naverPublicRouter = Router();
 const COOKIE = 'naver_oauth';
 const STATE_RE = /^[0-9a-f]{48}$/;
 const sha256 = (v) => createHash('sha256').update(v).digest('hex');
-const back = (res, result) => res.redirect(302, `${config.appUrl}/admin?naver=${result}`);
+// why: 실패 원인 짧은 코드 (관리자 화면에 보여 주는 용도, 비밀값·토큰은 넣지 않는다)
+const back = (res, result, why) =>
+  res.redirect(302, `${config.appUrl}/admin?naver=${result}${why ? `&why=${encodeURIComponent(String(why).replace(/[^a-z0-9_]/gi, '').slice(0, 40))}` : ''}`);
 
 function readCookie(req) {
   for (const part of String(req.headers.cookie ?? '').split(';')) {
@@ -27,7 +29,8 @@ function readCookie(req) {
 
 naverPublicRouter.get('/start', async (req, res) => {
   const state = typeof req.query.state === 'string' ? req.query.state : '';
-  if (!naverEnabled() || !STATE_RE.test(state)) return back(res, 'fail');
+  if (!naverEnabled()) return back(res, 'fail', 'not_configured');
+  if (!STATE_RE.test(state)) return back(res, 'fail', 'bad_state');
   try {
     const nonce = randomBytes(32).toString('hex');
     if (!(await startState(state, sha256(nonce)))) return back(res, 'expired');
@@ -36,7 +39,7 @@ naverPublicRouter.get('/start', async (req, res) => {
     return res.redirect(302, authorizeUrl(state));
   } catch (e) {
     console.warn('[naver] 연결 시작 실패', e instanceof Error ? e.message : e);
-    return back(res, 'fail');
+    return back(res, 'fail', 'start');
   }
 });
 
@@ -46,16 +49,29 @@ naverPublicRouter.get('/callback', async (req, res) => {
   const nonce = readCookie(req);
   res.clearCookie(COOKIE, { httpOnly: true, secure: true, sameSite: 'lax', path: '/naver' });
   res.set('Cache-Control', 'no-store');
-  if (!naverEnabled() || !code || !STATE_RE.test(state)) return back(res, 'fail');
+  if (!naverEnabled()) return back(res, 'fail', 'not_configured');
+  // 네이버가 오류로 돌려보낸 경우 (동의 취소 등): ?error=...
+  if (typeof req.query.error === 'string') {
+    console.warn('[naver] 네이버가 거절', req.query.error);
+    return back(res, 'fail', `naver_${req.query.error}`);
+  }
+  if (!code) return back(res, 'fail', 'no_code');
+  if (!STATE_RE.test(state)) return back(res, 'fail', 'bad_state');
   if (!/^[0-9a-f]{64}$/.test(nonce)) return back(res, 'browser');
+  let adminId;
   try {
-    const adminId = await consumeState(state, sha256(nonce));
-    if (!adminId) return back(res, 'expired');
+    adminId = await consumeState(state, sha256(nonce));
+  } catch (e) {
+    console.warn('[naver] 연결 확인 실패', e instanceof Error ? e.message : e);
+    return back(res, 'fail', 'consume');
+  }
+  if (!adminId) return back(res, 'expired');
+  try {
     await connectWithCode(code, state, adminId);
     return back(res, 'connected');
   } catch (e) {
     console.warn('[naver] 연결 실패', e instanceof Error ? e.message : e);
-    return back(res, 'fail');
+    return back(res, 'fail', e instanceof Error && e.why ? e.why : 'token');
   }
 });
 

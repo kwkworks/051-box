@@ -26,10 +26,12 @@ export function NaverCafeCard() {
     const params = new URLSearchParams(window.location.search);
     const r = params.get('naver');
     if (!r) return;
+    const why = (params.get('why') ?? '').replace(/[^a-z0-9_]/gi, '').slice(0, 40);
     params.delete('naver');
+    params.delete('why');
     const rest = params.toString();
     window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}`);
-    const text = RESULT_TEXT[r] ?? RESULT_TEXT.fail;
+    const text = `${RESULT_TEXT[r] ?? RESULT_TEXT.fail}${why ? ` (원인: ${why})` : ''}`;
     const t = setTimeout(() => setMsg(text), 0);
     return () => clearTimeout(t);
   }, []);

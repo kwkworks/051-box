@@ -43,7 +43,9 @@ async function tokenRequest(params) {
   const res = await fetch(`https://nid.naver.com/oauth2.0/token?${q}`, { signal: AbortSignal.timeout(10_000) });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.access_token) {
-    throw new Error(`네이버 인증 실패 (${data.error ?? res.status})`); // 토큰 값은 남기지 않는다
+    const err = new Error(`네이버 인증 실패 (${data.error ?? res.status})`); // 토큰 값은 남기지 않는다
+    err.why = `token_${data.error ?? res.status}`;
+    throw err;
   }
   return data;
 }
@@ -63,7 +65,11 @@ async function saveToken(access, refresh, expiresIn, by) {
     p_expires_at: expiresAt,
     p_by: by ?? null,
   });
-  if (error) throw new Error(`네이버 연결 정보를 저장하지 못했어요 (${error.code})`);
+  if (error) {
+    const err = new Error(`네이버 연결 정보를 저장하지 못했어요 (${error.code})`);
+    err.why = `save_${error.code ?? ''}`;
+    throw err;
+  }
 }
 
 // 연결을 시작한 브라우저 표시(해시)를 state에 한 번만 묶는다. 이미 묶였거나 만료됐으면 false
