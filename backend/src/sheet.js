@@ -154,6 +154,15 @@ export function findMovements(text) {
   return found;
 }
 
+// '내용' 한 칸에 모두 적은 시트: [Strength] 줄부터 다음 [구역] 줄 전까지만 스트렝스로 본다. 없으면 빈 글
+export function strengthSection(content) {
+  const lines = String(content ?? '').split(/\r\n|\r|\n/);
+  const start = lines.findIndex((l) => /^\s*\[\s*(strength|스트렝스)[^\]]*\]\s*$/i.test(l));
+  if (start < 0) return '';
+  const end = lines.findIndex((l, i) => i > start && /^\s*\[[^\]]{1,30}\]\s*$/.test(l));
+  return lines.slice(start + 1, end < 0 ? undefined : end).join('\n');
+}
+
 // "백스쿼트 70,75,80 / 데드리프트 60,65" → [{movement, percents}]
 // 퍼센트만 적은 경우("65~68%")는 그날 스트렝스 글에 종목이 하나뿐이면 그 종목으로 계산한다
 export function parseLifts(cell, strengthText = '') {
@@ -253,7 +262,8 @@ export function rowsToWods(rows, { from, to }) {
       title = `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 (${WEEKDAYS[d.getUTCDay()]}) WOD`;
     }
     const content = parts.join('\n\n').slice(0, 4000);
-    const { lifts, warnings } = parseLifts(rawLifts, cell(r, col.strength) || cell(r, col.content));
+    // 종목은 스트렝스에서만 찾는다 (본 와드·비고의 종목은 보지 않음)
+    const { lifts, warnings } = parseLifts(rawLifts, cell(r, col.strength) || strengthSection(cell(r, col.content)));
     for (const w of warnings) skipped.push({ row: rowNo, reason: w });
     wods.push({ wod_date: date, title, content, lifts });
   }
