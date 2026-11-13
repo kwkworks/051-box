@@ -49,6 +49,7 @@ declare
   rm_first uuid;
   g_cap uuid;  -- 정원 줄이기 테스트용 모임
   g_close uuid;  -- 신청 마감하기 테스트용 모임
+  act_id uuid;   -- 축하 테스트용 명예의 벽 글
   w_past uuid;
   w_future uuid;
   anon_id uuid := gen_random_uuid();
@@ -310,6 +311,21 @@ begin
   (93, '마감한 모임에 신청 (마감일 전이어도)', 'err', pg_temp.run_as(a, format('insert into public.event_participants (event_id) values (%L)', g_close))),
   (94, '모임 만든 사람이 다시 신청 받기', 'ok:1', pg_temp.run_as(m, format('update public.events set closed_at = null where id = %L', g_close))),
   (95, '다시 받은 모임에 신청 (원래 마감일 유지)', 'ok:1', pg_temp.run_as(a, format('insert into public.event_participants (event_id) values (%L)', g_close)));
+
+  -- 0017: 명예의 벽 축하해요 (임시 회원 m의 첫 기록 글을 쓴다. 실제 회원 데이터와 무관)
+  select id into act_id from public.activities where user_id = m order by created_at limit 1;
+  if act_id is null then
+    raise exception '축하 테스트용 글이 없어요 (임시 회원 m의 PR 글)';
+  end if;
+  insert into public.activity_likes (activity_id, user_id) values (act_id, d);
+  insert into rls_results values
+  (96, '회원이 명예의 벽 글에 축하해요', 'ok:1', pg_temp.run_as(a, format('insert into public.activity_likes (activity_id) values (%L)', act_id))),
+  (97, '같은 글에 축하해요 두 번', 'err', pg_temp.run_as(a, format('insert into public.activity_likes (activity_id) values (%L)', act_id))),
+  (98, '남의 이름으로 축하해요', 'err', pg_temp.run_as(a, format('insert into public.activity_likes (activity_id, user_id) values (%L, %L)', act_id, m))),
+  (99, '남의 축하 취소', 'ok:0', pg_temp.run_as(a, format('delete from public.activity_likes where activity_id = %L and user_id = %L', act_id, d))),
+  (100, '비로그인으로 축하 목록 조회', 'err', pg_temp.run_as(null, 'select * from public.activity_likes')),
+  (101, '승인 대기자가 축하해요', 'err', pg_temp.run_as(c, format('insert into public.activity_likes (activity_id) values (%L)', act_id))),
+  (102, '회원 본인 축하 취소', 'ok:1', pg_temp.run_as(a, format('delete from public.activity_likes where activity_id = %L and user_id = %L', act_id, a)));
 
   -- 마지막: 임시 회원 m이 스스로 탈퇴 → 계정과 기록이 모두 사라지는지
   r := pg_temp.run_as(m, 'select public.delete_my_account()');

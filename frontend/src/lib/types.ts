@@ -117,6 +117,8 @@ export type FeedItem = {
   user_id: string;
   nickname: string;
   avatar: Partial<Avatar>;
+  like_count?: number; // 축하해요 🎉 수
+  liked?: boolean; // 내가 축하했는지
 };
 
 export type ChatMessage = {
