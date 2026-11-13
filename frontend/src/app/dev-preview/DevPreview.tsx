@@ -8,6 +8,8 @@ import { AvatarView } from '@/components/AvatarView';
 import { ChatPanel } from '@/components/ChatPanel';
 import { EventDetailView } from '@/components/EventDetailView';
 import { EventForm } from '@/components/EventForm';
+import { NaverCafeCard } from '@/components/NaverCafeCard';
+import { NoticeEditor } from '@/components/NoticeEditor';
 import { NotificationSettings } from '@/components/NotificationSettings';
 import { QnaItem } from '@/components/QnaItem';
 import { WallCard } from '@/components/WallCard';
@@ -148,6 +150,8 @@ export function DevPreview() {
         // 좁은 화면에서 입력칸이 넘치지 않는지 보는 미리보기 (모임 만들기 양식 + 날짜 칸)
         <div className="mx-auto w-full max-w-3xl overflow-y-auto px-4 pb-10">
           <EventForm kind="gathering" onDone={() => {}} />
+          <NoticeEditor notice={null} onDone={() => {}} />
+          <NaverCafeCard />
           <div className="card flex flex-col gap-2 p-4">
             <input type="date" className="input" aria-label="날짜" />
             <div className="flex gap-2">

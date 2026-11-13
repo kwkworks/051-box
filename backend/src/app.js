@@ -11,6 +11,7 @@ import { eventsRouter } from './routes/events.js';
 import { feedRouter } from './routes/feed.js';
 import { meRouter } from './routes/me.js';
 import { qnaRouter } from './routes/qna.js';
+import { naverAdminRouter, naverPublicRouter } from './routes/naver.js';
 import { noticesRouter } from './routes/notices.js';
 import { oneRmRouter } from './routes/oneRm.js';
 import { wodsRouter } from './routes/wods.js';
@@ -69,6 +70,8 @@ export function createApp() {
 
   // 매일 20:30 예약 작업이 부르는 WOD 공개 알림 (로그인 없음, 하루 한 번만 실제로 보냄)
   app.use('/push', pushPublicRouter);
+  // 네이버 카페 연결 콜백 (로그인 없음, 일회용 state로 확인)
+  app.use('/naver', naverPublicRouter);
 
   app.use(requireAuth, userLimiter, writeLimiter);
   app.use('/me', meRouter);
@@ -80,6 +83,7 @@ export function createApp() {
   app.use('/chat', requireMember, chatRouter);
   app.use('/qna', requireMember, qnaRouter);
   app.use('/push', requireMember, pushRouter);
+  app.use('/admin/naver', requireAdmin, naverAdminRouter);
   app.use('/admin', requireAdmin, adminRouter);
 
   app.use((req, res) => res.status(404).json({ error: '없는 주소입니다' }));

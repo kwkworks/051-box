@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Fragment, useRef, useState } from 'react';
 import { AvatarView } from '@/components/AvatarView';
+import { NaverCafeCard } from '@/components/NaverCafeCard';
 import { BoardShell } from '@/components/BoardShell';
 import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { api } from '@/lib/api';
@@ -36,6 +37,7 @@ function Admin({ me }: { me: Me }) {
       </div>
       {tab === 'members' && (
         <>
+          <NaverCafeCard />
           <Link href="/poster" className="card mb-4 flex items-center gap-3 p-4">
             <span className="text-3xl" aria-hidden>🖨</span>
             <span>

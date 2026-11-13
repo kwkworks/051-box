@@ -46,6 +46,7 @@ export type Notice = {
   title: string;
   body: string;
   pinned: boolean;
+  cafe_url: string | null; // 네이버 카페 원문 (카페에서 가져왔거나 카페에도 올린 글)
   created_at: string;
   updated_at: string;
 };

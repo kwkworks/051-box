@@ -352,6 +352,21 @@ begin
   (116, '작성자가 본인 문의 삭제', 'ok:1', pg_temp.run_as(a, format('delete from public.qna_questions where id = %L', q_a)));
   delete from public.qna_questions where title like 'rls-test%';
 
+  -- 0020: 네이버 카페 연동 (연결 정보는 서버 비밀값으로만, 카페 주소는 우리 카페 글만, 한 글은 한 번만)
+  insert into rls_results values
+  (117, '회원이 네이버 연결 시작', 'err', pg_temp.run_as(a, 'select public.naver_state_create()')),
+  (118, '관리자가 네이버 연결 시작', 'ok:1', pg_temp.run_as(d, 'select public.naver_state_create()')),
+  (119, '비로그인으로 네이버 토큰 읽기 (틀린 비밀값)', 'err', pg_temp.run_as(null, 'select * from public.naver_token_get(''wrong'')')),
+  (120, '관리자도 네이버 토큰 읽기 (틀린 비밀값)', 'err', pg_temp.run_as(d, 'select * from public.naver_token_get(''wrong'')')),
+  (121, '비로그인으로 연결 확인 위조 (틀린 비밀값)', 'err', pg_temp.run_as(null, 'select public.naver_state_consume(''wrong'', ''abc'')')),
+  (122, '회원이 네이버 연결 상태 보기', 'err', pg_temp.run_as(a, 'select public.naver_status()')),
+  (123, '관리자가 네이버 연결 상태 보기', 'ok:1', pg_temp.run_as(d, 'select public.naver_status()')),
+  (124, '다른 사이트 주소를 카페 주소로 저장', 'err', pg_temp.run_as(d, 'insert into public.notices (title, cafe_url) values (''rls-test 공지'', ''https://evil.example/crossfit051/1'')')),
+  (125, '관리자가 카페 글 주소로 공지 등록', 'ok:1', pg_temp.run_as(d, 'insert into public.notices (title, cafe_url) values (''rls-test 공지'', ''https://cafe.naver.com/crossfit051/999999999'')')),
+  (126, '같은 카페 글을 두 번 가져오기', 'err', pg_temp.run_as(d, 'insert into public.notices (title, cafe_url) values (''rls-test 공지 2'', ''https://cafe.naver.com/crossfit051/999999999'')'));
+  delete from public.notices where title like 'rls-test 공지%';
+  delete from private.naver_oauth_states where admin_id = d and created_at >= now() - interval '1 minute';
+
   -- 마지막: 임시 회원 m이 스스로 탈퇴 → 계정과 기록이 모두 사라지는지
   r := pg_temp.run_as(m, 'select public.delete_my_account()');
   insert into rls_results values

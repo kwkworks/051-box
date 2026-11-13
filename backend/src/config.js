@@ -35,6 +35,13 @@ export const config = {
   vapidPrivateKey: clean(process.env.VAPID_PRIVATE_KEY),
   vapidSubject: subject(clean(process.env.VAPID_SUBJECT)),
   pushSecret: clean(process.env.PUSH_SECRET),
+  // 네이버 카페 연동 (선택). 없으면 '카페에도 올리기'만 꺼진다. Client Secret은 Render 환경변수에만 둔다
+  naverClientId: clean(process.env.NAVER_CLIENT_ID),
+  naverClientSecret: clean(process.env.NAVER_CLIENT_SECRET),
+  naverRedirectUri: clean(process.env.NAVER_REDIRECT_URI) || 'https://zero51-box.onrender.com/naver/callback',
+  naverCafeEncode: clean(process.env.NAVER_CAFE_ENCODE) || 'double',
+  // 네이버 연결이 끝나면 돌아갈 앱 주소 (허용된 주소 중 https인 첫 번째)
+  appUrl: clean(process.env.APP_URL) || (process.env.ALLOWED_ORIGIN ?? '').split(',').map((s) => s.trim()).find((s) => s.startsWith('https://')) || 'http://localhost:3000',
 };
 
 if (process.env.SUPABASE_SERVICE_ROLE_KEY) {

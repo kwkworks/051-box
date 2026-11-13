@@ -100,8 +100,14 @@ export const noticeSchema = z.strictObject({
   title: requiredText(100),
   body: text(5000).default(''),
   pinned: z.boolean().default(false),
+  // A. 카페에서 가져온 글이면 카페 원문 주소 (서버가 우리 카페 주소 모양으로 바꿔서 저장)
+  cafe_url: z.string().trim().max(1000).nullable().optional(),
 });
 export const noticeUpdateSchema = noticeSchema.partial();
+// B. 새 공지를 카페에도 올리기: 공지사항 / 대회 정보 공유 게시판
+export const noticeCreateSchema = noticeSchema.extend({
+  post_to_cafe: z.enum(['notice', 'competition']).nullable().optional(),
+});
 
 const httpsUrl = z
   .url({ protocol: /^https$/ })
