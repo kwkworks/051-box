@@ -29,7 +29,9 @@ export function InviteButton({ className = 'btn', compact = false }: { className
   return (
     <>
       <button type="button" className={className} onClick={invite}>
-        📨 {compact ? '초대하기' : '박스 회원 초대하기'}
+        {/* 이모지를 따로 두어 버튼 간격(6px)으로 글자와 띄운다 (공백 한 칸은 이모지 뒤에서 붙어 보임) */}
+        <span aria-hidden="true">📨</span>
+        <span>{compact ? '초대하기' : '박스 회원 초대하기'}</span>
       </button>
       {status && (
         <p className="mt-2 text-sm font-bold text-[var(--burgundy)]" role="status">
