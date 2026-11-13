@@ -89,34 +89,55 @@ async function accessToken() {
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-// 네이버 카페 글쓰기 API는 제목·본문을 UTF-8로 인코딩한 값을 한 번 더 인코딩해서 보내야 한글이 깨지지 않는다.
-// 혹시 네이버가 바꾸면 NAVER_CAFE_ENCODE=single 로 바꿀 수 있게 둔다.
-function enc(v) {
-  const once = encodeURIComponent(v);
-  return config.naverCafeEncode === 'single' ? once : encodeURIComponent(once);
-}
+// 네이버 카페 글쓰기 API는 제목·본문을 UTF-8로 인코딩한 값을 한 번 더 인코딩해서 보내는 방식(공식 예제)을 쓴다.
+const encDouble = (v) => encodeURIComponent(encodeURIComponent(v));
+const encSingle = (v) => encodeURIComponent(v);
+// 이모지처럼 4바이트 글자는 네이버 글쓰기 API가 이유 없이 거절(999)하는 경우가 있어 재시도 때 뺀다
+const stripEmoji = (s) => String(s).replace(/[\u{10000}-\u{10FFFF}]/gu, '').replace(/[‍️]/g, '');
 
-// 카페에 글 올리기 → 카페 글 주소
-export async function postToCafe(menuKey, subject, bodyText) {
-  const menuId = CAFE_MENUS[menuKey];
-  if (!menuId) throw new Error('올릴 카페 게시판이 올바르지 않아요');
-  const token = await accessToken();
-  const html = `${escapeHtml(bodyText).replace(/\r?\n/g, '<br>')}<br><br><span style="color:#888">📱 051 BOX 앱에서 작성된 공지입니다</span>`;
+async function tryPost(token, menuId, subject, content, enc) {
   const res = await fetch(`https://openapi.naver.com/v1/cafe/${CAFE_ID}/menu/${menuId}/articles`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `subject=${enc(subject)}&content=${enc(html)}`,
+    body: `subject=${enc(subject)}&content=${enc(content)}`,
     signal: AbortSignal.timeout(15_000),
   });
   const data = await res.json().catch(() => ({}));
   const articleId = data?.message?.result?.articleId;
-  if (!res.ok || !articleId) {
-    // 네이버가 알려 준 이유(코드·문구)를 관리자에게 그대로 보여준다 (토큰 같은 비밀 값은 들어 있지 않음)
-    const err = data?.message?.error ?? {};
-    const code = err.code ?? data?.errorCode ?? '';
-    const reason = String(err.msg ?? err.message ?? data?.errorMessage ?? `HTTP ${res.status}`).slice(0, 120);
-    console.warn('[naver] 카페 글쓰기 실패', res.status, code, reason);
-    throw new Error(`네이버가 거절했어요 (${res.status}${code ? ` · ${code}` : ''}: ${reason})`);
+  if (res.ok && articleId) return { articleId };
+  // 네이버가 알려 준 이유(코드·문구). 토큰 같은 비밀 값은 들어 있지 않다
+  const err = data?.message?.error ?? {};
+  return {
+    status: res.status,
+    code: String(err.code ?? data?.errorCode ?? ''),
+    reason: String(err.msg ?? err.message ?? data?.errorMessage ?? `HTTP ${res.status}`).slice(0, 120),
+  };
+}
+
+// 카페에 글 올리기 → 카페 글 주소.
+// 형식 문제(999)면 안전한 형식으로 바꿔 자동으로 다시 시도한다: ① 기본 ② 이모지 뺌 ③ 한 번만 인코딩
+export async function postToCafe(menuKey, subject, bodyText) {
+  const menuId = CAFE_MENUS[menuKey];
+  if (!menuId) throw new Error('올릴 카페 게시판이 올바르지 않아요');
+  const token = await accessToken();
+  const toHtml = (t) => `${escapeHtml(t).replace(/\r?\n/g, '<br>')}<br><br>(051 BOX 앱에서 작성된 공지입니다)`;
+  const first = config.naverCafeEncode === 'single' ? encSingle : encDouble;
+  const second = first === encDouble ? encSingle : encDouble;
+  const attempts = [
+    { subject, content: toHtml(bodyText), enc: first },
+    { subject: stripEmoji(subject), content: toHtml(stripEmoji(bodyText)), enc: first },
+    { subject: stripEmoji(subject), content: toHtml(stripEmoji(bodyText)), enc: second },
+  ];
+  let last = null;
+  for (const [i, a] of attempts.entries()) {
+    const r = await tryPost(token, menuId, a.subject, a.content, a.enc);
+    if (r.articleId) {
+      if (i > 0) console.warn(`[naver] 카페 글쓰기 ${i + 1}번째 방식으로 성공`);
+      return `${CAFE_URL_BASE}/${r.articleId}`;
+    }
+    last = r;
+    console.warn('[naver] 카페 글쓰기 실패', i + 1, r.status, r.code, r.reason);
+    if (r.status === 401) break; // 권한·인증 문제는 형식을 바꿔도 같다
   }
-  return `${CAFE_URL_BASE}/${articleId}`;
+  throw new Error(`네이버가 거절했어요 (${last.status}${last.code ? ` · ${last.code}` : ''}: ${last.reason})`);
 }
