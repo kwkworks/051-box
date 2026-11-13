@@ -164,6 +164,9 @@ const SHORTCUTS: (Box & { board: ObjectKey })[] = [
   { x: 13, y: 3, w: 7, h: 2, board: 'wod' }, // 📝 RECORD 화이트보드 → 오늘의 WOD
   { x: 2, y: 0, w: 6, h: 3, board: 'wall' }, // 🏅 상장 벽 → PR 명예의 벽
   { x: 1, y: 11, w: 3, h: 6, board: 'one-rm' }, // 🏋️ 바벨·원판 랙 → 1RM 기록
+  { x: 3, y: 19, w: 3, h: 1, board: 'one-rm' }, // 🔔 케틀벨 랙 → 1RM 기록
+  { x: 8, y: 19, w: 3, h: 1, board: 'one-rm' }, // 💪 덤벨 랙 → 1RM 기록
+  { x: 9, y: 0, w: 7, h: 3, board: 'gathering' }, // 🚩 팀 배너 → 회원 모임
 ];
 
 export function shortcutAt(wx: number, wy: number): ObjectKey | null {
