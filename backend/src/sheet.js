@@ -118,10 +118,10 @@ const MOVEMENT_ALIASES = {
   프론트스쿼트: 'front_squat', 'front squat': 'front_squat',
   오버헤드스쿼트: 'overhead_squat', 'overhead squat': 'overhead_squat', ohs: 'overhead_squat',
   데드리프트: 'deadlift', deadlift: 'deadlift', dl: 'deadlift',
-  클린: 'clean', clean: 'clean',
+  클린: 'clean', clean: 'clean', 'squat clean': 'clean', 스쿼트클린: 'clean',
   파워클린: 'power_clean', 'power clean': 'power_clean',
   클린앤저크: 'clean_and_jerk', 'clean and jerk': 'clean_and_jerk', 'clean & jerk': 'clean_and_jerk',
-  스내치: 'snatch', snatch: 'snatch',
+  스내치: 'snatch', snatch: 'snatch', 'squat snatch': 'snatch', 스쿼트스내치: 'snatch',
   파워스내치: 'power_snatch', 'power snatch': 'power_snatch',
   푸시프레스: 'push_press', 'push press': 'push_press',
   스트릭트프레스: 'strict_press', 'strict press': 'strict_press', 'shoulder press': 'strict_press',
@@ -144,8 +144,11 @@ export function findMovements(text) {
   );
   const found = [];
   for (const [name, movement] of names) {
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = /^[a-z0-9 &]+$/.test(name) ? new RegExp(`(?<![a-z])${escaped}(?![a-z])`, 'g') : new RegExp(escaped, 'g');
+    const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // 영어: 단어 단위, 복수형(Squats, Snatches)도 / 한글: 글자 사이 띄어쓰기("백 스쿼트")도
+    const re = /^[a-z0-9 &]+$/.test(name)
+      ? new RegExp(`(?<![a-z])${name.split(' ').map(esc).join('\\s*')}(?:e?s)?(?![a-z])`, 'g')
+      : new RegExp([...name.replace(/\s+/g, '')].map(esc).join('\\s*'), 'g');
     if (re.test(rest)) {
       if (!found.includes(movement)) found.push(movement);
       rest = rest.replace(re, ' ');
