@@ -72,9 +72,14 @@ function LiftWeights({ lifts, bestLifts, inline }: { lifts: Wod['lifts']; bestLi
                   {lift.percents.map((p, j) => {
                     const w = weightText(best, p);
                     return (
-                      <span key={j} className="chip bg-yellow">
-                        {`${percentLabel(p)}% → ${w.lb} lb`}
-                        <span className="font-normal">({w.kg} kg)</span>
+                      // 좁은 화면(아이폰 미니 등)에서는 퍼센트·lb·kg 덩어리째 줄을 바꾼다 (덩어리 안에서는 안 끊김)
+                      <span
+                        key={j}
+                        className="weight-chip inline-flex max-w-full flex-wrap items-baseline gap-x-1.5 rounded-lg border-[1.5px] border-[var(--line)] bg-yellow px-2 py-1 text-xs font-bold leading-snug"
+                      >
+                        <span className="whitespace-nowrap">{`${percentLabel(p)}% →`}</span>
+                        <span className="whitespace-nowrap">{`${w.lb} lb`}</span>
+                        <span className="whitespace-nowrap font-normal">{`(${w.kg} kg)`}</span>
                       </span>
                     );
                   })}
