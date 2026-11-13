@@ -60,7 +60,7 @@ export function DevPreview() {
               wod={{
                 id: 'demo', wod_date: '2026-11-13', title: 'Heavy Day',
                 content: '[Strength]\nBack Squat\n5-5-3 @70%, 75%, 80%\n\n[Conditioning]\nAMRAP 12\n10 Wall Balls\n10 Box Jumps',
-                lifts: [{ movement: 'back_squat', percents: [70, 75, 80] }, { movement: 'deadlift', percents: [60, 65] }],
+                lifts: [{ movement: 'back_squat', percents: [[60, 65], 70, 75] }, { movement: 'deadlift', percents: [[60, 65], 70] }],
               } as Wod}
             />
           ))}

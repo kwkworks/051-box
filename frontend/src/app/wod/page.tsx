@@ -7,6 +7,7 @@ import { WodView } from '@/components/WodView';
 import { api } from '@/lib/api';
 import { MOVEMENTS, type MovementKey } from '@/lib/constants';
 import { formatDateLabel, kstToday, shiftDate } from '@/lib/format';
+import { parsePercents, percentLabel } from '@/lib/percents';
 import { shrinkImage } from '@/lib/shrinkImage';
 import type { Lift, Me, Wod, WodPhoto } from '@/lib/types';
 import { useLoad } from '@/lib/useLoad';
@@ -161,15 +162,11 @@ function WodEditor({ date, wod, onDone }: { date: string; wod: Wod | null; onDon
             </select>
             <input
               className="input w-44"
-              defaultValue={lift.percents.join(', ')}
-              placeholder="70, 75, 80"
-              aria-label="퍼센트 (쉼표로 구분)"
+              defaultValue={lift.percents.map(percentLabel).join(', ')}
+              placeholder="60~65, 70, 75"
+              aria-label="퍼센트 (쉼표로 구분, 범위는 60~65)"
               onChange={(e) => {
-                const percents = e.target.value
-                  .split(/[,\s]+/)
-                  .map(Number)
-                  .filter((n) => Number.isInteger(n) && n >= 30 && n <= 120)
-                  .slice(0, 10);
+                const percents = parsePercents(e.target.value);
                 setLifts(lifts.map((l, j) => (j === i ? { ...l, percents } : l)));
               }}
             />

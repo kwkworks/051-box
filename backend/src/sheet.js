@@ -1,5 +1,6 @@
 // 구글 시트("웹에 게시" → CSV)에서 WOD를 읽어온다.
 // 보안: 구글 시트 주소만 허용하고, 응답 크기와 시간을 제한해서 이 기능이 다른 서버를 찌르는 통로(SSRF)가 되지 않게 한다.
+import { parsePercents } from './percents.js';
 import { HttpError } from './errors.js';
 import { MOVEMENTS } from './schemas.js';
 
@@ -141,11 +142,9 @@ export function parseLifts(cell) {
   for (const part of cell.split(/[\n/;|]+/)) {
     const text = part.trim();
     if (!text) continue;
-    const m = text.match(/^([^\d:]+?)\s*:?\s*([\d\s,%.]+)$/);
+    const m = text.match(/^([^\d:]+?)\s*:?\s*([\d\s,%.~\-–—]+)$/);
     const movement = m && toMovement(m[1]);
-    const percents = m
-      ? m[2].split(/[,\s%]+/).map(Number).filter((n) => Number.isInteger(n) && n >= 30 && n <= 120).slice(0, 10)
-      : [];
+    const percents = m ? parsePercents(m[2]) : [];
     if (!movement || !percents.length) {
       warnings.push(`강도 "${text.slice(0, 30)}"를 이해하지 못해 건너뛰었어요`);
       continue;

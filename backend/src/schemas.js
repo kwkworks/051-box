@@ -66,6 +66,8 @@ export const meUpdateSchema = z
     '변경할 내용이 없습니다',
   );
 
+const percentValue = z.number().int().min(30).max(120);
+
 export const wodSchema = z.strictObject({
   title: requiredText(80),
   content: text(4000).default(''),
@@ -73,7 +75,16 @@ export const wodSchema = z.strictObject({
     .array(
       z.strictObject({
         movement: z.enum(MOVEMENTS),
-        percents: z.array(z.number().int().min(30).max(120)).min(1).max(10),
+        // 단일 값(70) 또는 범위([60, 65], 작은 수 → 큰 수)
+        percents: z
+          .array(
+            z.union([
+              percentValue,
+              z.tuple([percentValue, percentValue]).refine(([a, b]) => a < b, '범위는 작은 수부터 적어주세요'),
+            ]),
+          )
+          .min(1)
+          .max(10),
       }),
     )
     .max(10)

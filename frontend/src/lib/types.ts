@@ -26,7 +26,9 @@ export type Me = {
   bestLifts: Record<string, number>;
 };
 
-export type Lift = { movement: string; percents: number[] };
+// 퍼센트: 단일 값(70) 또는 범위([60, 65])
+export type Percent = number | [number, number];
+export type Lift = { movement: string; percents: Percent[] };
 
 export type Wod = {
   id: string;

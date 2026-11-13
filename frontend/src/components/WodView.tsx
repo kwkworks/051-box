@@ -1,6 +1,18 @@
 import type { ReactNode } from 'react';
 import { movementLabel } from '@/lib/constants';
 import { fixed2, lbToKg2, percentWeight } from '@/lib/format';
+import { percentLabel } from '@/lib/percents';
+import type { Percent } from '@/lib/types';
+
+// 퍼센트(단일 또는 범위)에 맞는 무게 글자: "220.50 lb" / "189.00~204.75 lb", kg도 같은 모양
+function weightText(best: number, p: Percent): { lb: string; kg: string } {
+  const [a, b] = Array.isArray(p) ? p : [p, p];
+  const wa = percentWeight(best, a);
+  const wb = percentWeight(best, b);
+  return a === b
+    ? { lb: fixed2(wa), kg: lbToKg2(wa) }
+    : { lb: `${fixed2(wa)}~${fixed2(wb)}`, kg: `${lbToKg2(wa)}~${lbToKg2(wb)}` };
+}
 import type { Wod } from '@/lib/types';
 
 // WOD 본문: [Strength], [Conditioning] 같은 구역 제목 줄은 굵게
@@ -57,16 +69,19 @@ function LiftWeights({ lifts, bestLifts, inline }: { lifts: Wod['lifts']; bestLi
               </p>
               {best ? (
                 <div className="mt-1 flex flex-wrap gap-2">
-                  {lift.percents.map((p, j) => (
-                    <span key={j} className="chip bg-yellow">
-                      {`${p}% → ${fixed2(percentWeight(best, p))} lb`}
-                      <span className="font-normal">({lbToKg2(percentWeight(best, p))} kg)</span>
-                    </span>
-                  ))}
+                  {lift.percents.map((p, j) => {
+                    const w = weightText(best, p);
+                    return (
+                      <span key={j} className="chip bg-yellow">
+                        {`${percentLabel(p)}% → ${w.lb} lb`}
+                        <span className="font-normal">({w.kg} kg)</span>
+                      </span>
+                    );
+                  })}
                 </div>
               ) : (
                 <>
-                  <p className="mt-1 text-sm font-bold">{lift.percents.map((p) => `${p}%`).join(' · ')}</p>
+                  <p className="mt-1 text-sm font-bold">{lift.percents.map((p) => `${percentLabel(p)}%`).join(' · ')}</p>
                   <p className="text-xs text-muted">1RM 게시판에 기록하면 무게가 자동 계산돼요</p>
                 </>
               )}
