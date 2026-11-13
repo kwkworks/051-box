@@ -181,3 +181,54 @@ export async function autoPostWodToCafe() {
   console.log('[naver] 카페 WOD 등록', wod.wod_date);
   return url;
 }
+
+// ---- 기록 사진 → 카페 RECORD 게시판 (사진 첨부)
+// 사진이 있으면 multipart로 보낸다. 네이버 공식 예제는 multipart일 때 제목·본문을 한 번만 인코딩한다.
+// 형식 문제(999)면 ① 한 번 인코딩 ② 인코딩 없이 ③ 두 번 인코딩 순서로 자동 재시도한다.
+async function tryPostMultipart(token, menuId, subject, content, enc, images) {
+  const form = new FormData();
+  form.append('subject', enc(subject));
+  form.append('content', enc(content));
+  images.forEach((img, i) => form.append('image', new Blob([img.buffer], { type: img.type }), img.name || `record-${i + 1}.jpg`));
+  const res = await fetch(`https://openapi.naver.com/v1/cafe/${CAFE_ID}/menu/${menuId}/articles`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+    signal: AbortSignal.timeout(60_000),
+  });
+  const data = await res.json().catch(() => ({}));
+  const articleId = data?.message?.result?.articleId;
+  if (res.ok && articleId) return { articleId };
+  const err = data?.message?.error ?? {};
+  return {
+    status: res.status,
+    code: String(err.code ?? data?.errorCode ?? ''),
+    reason: String(err.msg ?? err.message ?? data?.errorMessage ?? `HTTP ${res.status}`).slice(0, 120),
+  };
+}
+
+export async function postToCafeWithImages(menuKey, subject, bodyText, images) {
+  const menuId = CAFE_MENUS[menuKey];
+  if (!menuId) throw new Error('올릴 카페 게시판이 올바르지 않아요');
+  if (!images.length) return postToCafe(menuKey, subject, bodyText);
+  const token = await accessToken();
+  const content = `${escapeHtml(bodyText).replace(/\r?\n/g, '<br>')}<br><br>(051 BOX 앱에서 올린 글입니다)`;
+  const raw = (v) => v;
+  const attempts = [
+    { s: subject, c: content, enc: encSingle },
+    { s: stripEmoji(subject), c: stripEmoji(content), enc: raw },
+    { s: stripEmoji(subject), c: stripEmoji(content), enc: encDouble },
+  ];
+  let last = null;
+  for (const [i, a] of attempts.entries()) {
+    const r = await tryPostMultipart(token, menuId, a.s, a.c, a.enc, images);
+    if (r.articleId) {
+      if (i > 0) console.warn(`[naver] 사진 글쓰기 ${i + 1}번째 방식으로 성공`);
+      return `${CAFE_URL_BASE}/${r.articleId}`;
+    }
+    last = r;
+    console.warn('[naver] 사진 글쓰기 실패', i + 1, r.status, r.code, r.reason);
+    if (r.status === 401) break;
+  }
+  throw new Error(`네이버가 거절했어요 (${last.status}${last.code ? ` · ${last.code}` : ''}: ${last.reason})`);
+}

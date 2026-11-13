@@ -88,6 +88,7 @@ function WodBoard({ me }: { me: Me }) {
           )}
 
           {data.wod && <Photos wodId={data.wod.id} photos={data.photos} isAdmin={isAdmin} onChange={reload} />}
+          {data.wod && <RecordCafeRow wod={data.wod} photoCount={data.photos.length} isAdmin={isAdmin} onPosted={reload} />}
         </>
       )}
     </BoardShell>
@@ -99,6 +100,47 @@ function opensLabel(iso: string | undefined, today: string) {
   if (!iso) return '전날 오후 8시 30분';
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(iso));
   return `${day === today ? '오늘' : formatDateLabel(day)} 오후 8시 30분`;
+}
+
+// 네이버 카페 RECORD 게시판: 올린 글이 있으면 "카페에서 보기", 관리자는 사진이 있으면 제목 메모와 함께 올리기
+function RecordCafeRow({ wod, photoCount, isAdmin, onPosted }: { wod: Wod; photoCount: number; isAdmin: boolean; onPosted: () => void }) {
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const link = safeHttpsUrl(wod.record_cafe_url);
+  if (link) {
+    return (
+      <a href={link} target="_blank" rel="noopener noreferrer nofollow" className="btn btn-sm mt-3">
+        기록 사진 카페에서 보기 ↗
+      </a>
+    );
+  }
+  if (!isAdmin || photoCount === 0) return null;
+  const title = `${wod.wod_date.replace(/-/g, '_')} 기록${note.trim() ? `(${note.trim()})` : ''}`;
+  const post = async () => {
+    if (!confirm(`기록 사진 ${photoCount}장을 카페 RECORD 게시판에 올릴까요?
+제목: ${title}`)) return;
+    setBusy(true);
+    try {
+      await api.post(`/wods/${wod.wod_date}/record-cafe`, note.trim() ? { note: note.trim() } : {});
+      onPosted();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '카페에 올리지 못했어요');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="card mt-3 flex flex-col gap-2 p-3" aria-label="카페 RECORD에 올리기">
+      <label className="label" htmlFor="rec-note">
+        카페 RECORD 제목 메모 (선택)
+      </label>
+      <input id="rec-note" className="input" maxLength={60} value={note} onChange={(e) => setNote(e.target.value)} placeholder="인호님👑 성준님 보세요" />
+      <p className="break-all text-xs text-muted">제목: {title}</p>
+      <button type="button" className="btn btn-dark" disabled={busy} onClick={post}>
+        {busy ? '올리는 중… (사진이 많으면 조금 걸려요)' : `🟢 기록 사진 ${photoCount}장 카페 RECORD에 올리기`}
+      </button>
+    </section>
+  );
 }
 
 // 네이버 카페 WOD 게시판: 올린 글이 있으면 "카페에서 보기", 관리자는 아직 안 올렸으면 "카페 WOD에 올리기"

@@ -4,7 +4,8 @@ import multer from 'multer';
 import { requireAdmin } from '../auth.js';
 import { HttpError, fromDbError, unwrap } from '../errors.js';
 import { isoDate, photoOrderSchema, uuid, wodSchema } from '../schemas.js';
-import { naverEnabled, postToCafe, wodCafePost } from '../naver.js';
+import { naverEnabled, postToCafe, postToCafeWithImages, wodCafePost } from '../naver.js';
+import { z } from 'zod';
 
 export const wodsRouter = Router();
 
@@ -40,7 +41,7 @@ wodsRouter.get('/', async (req, res) => {
     return res.json({ wod: null, photos: [], locked: true, opensAt: opensAt.toISOString() });
   }
   const wod = unwrap(
-    await req.sb.from('wods').select('id, wod_date, title, content, lifts, cafe_url, updated_at').eq('wod_date', date).maybeSingle(),
+    await req.sb.from('wods').select('id, wod_date, title, content, lifts, cafe_url, record_cafe_url, updated_at').eq('wod_date', date).maybeSingle(),
   );
   if (!wod) return res.json({ wod: null, photos: [], locked: false, opensAt: opensAt.toISOString(), released });
 
@@ -68,7 +69,7 @@ wodsRouter.put('/:date', requireAdmin, async (req, res) => {
     await req.sb
       .from('wods')
       .upsert({ ...body, wod_date }, { onConflict: 'wod_date' })
-      .select('id, wod_date, title, content, lifts, cafe_url, updated_at')
+      .select('id, wod_date, title, content, lifts, cafe_url, record_cafe_url, updated_at')
       .single(),
   );
   res.json({ wod });
@@ -90,6 +91,36 @@ wodsRouter.post('/:date/cafe', requireAdmin, async (req, res) => {
   }
   unwrap(await req.sb.from('wods').update({ cafe_url: url }).eq('wod_date', date));
   res.json({ cafe_url: url });
+});
+
+// 관리자: 그날 기록 사진을 카페 RECORD 게시판에 올리기. 제목은 카페에서 쓰던 모양 "2026_11_13 기록(○○님👑 보세요)"
+const recordCafeSchema = z.strictObject({ note: z.string().trim().max(60).optional() });
+wodsRouter.post('/:date/record-cafe', requireAdmin, async (req, res) => {
+  const date = isoDate.parse(req.params.date);
+  const { note } = recordCafeSchema.parse(req.body ?? {});
+  if (!naverEnabled()) throw new HttpError(400, '네이버 카페 연동이 아직 설정되지 않았어요');
+  const wod = unwrap(await req.sb.from('wods').select('id, record_cafe_url').eq('wod_date', date).maybeSingle());
+  if (!wod) throw new HttpError(404, '이 날짜의 WOD가 없어요');
+  if (wod.record_cafe_url) throw new HttpError(409, '이미 카페 RECORD에 올린 기록이에요');
+  const photos = unwrap(
+    await req.sb.from('wod_photos').select('storage_path').eq('wod_id', wod.id).order('sort_order').order('created_at').limit(10),
+  );
+  if (!photos.length) throw new HttpError(400, '올릴 기록 사진이 없어요. 먼저 사진을 올려 주세요');
+  const images = [];
+  for (const [i, p] of photos.entries()) {
+    const { data, error } = await req.sb.storage.from(BUCKET).download(p.storage_path);
+    if (error || !data) throw new HttpError(502, '기록 사진을 불러오지 못했어요');
+    images.push({ buffer: Buffer.from(await data.arrayBuffer()), type: data.type || 'image/jpeg', name: `record-${i + 1}.${p.storage_path.split('.').pop()}` });
+  }
+  const subject = `${date.replace(/-/g, '_')} 기록${note ? `(${note})` : ''}`;
+  let url;
+  try {
+    url = await postToCafeWithImages('record', subject, `${date.replace(/-/g, '.')} 기록입니다`, images);
+  } catch (e) {
+    throw new HttpError(502, e instanceof Error ? e.message : '카페에 올리지 못했어요');
+  }
+  unwrap(await req.sb.from('wods').update({ record_cafe_url: url }).eq('id', wod.id));
+  res.json({ record_cafe_url: url });
 });
 
 wodsRouter.delete('/:id', requireAdmin, async (req, res) => {

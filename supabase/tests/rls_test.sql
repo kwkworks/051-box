@@ -385,6 +385,11 @@ begin
   end if;
   delete from public.wods where title = 'rls-test 카페';
 
+  -- 0023: 기록 사진 카페 주소도 우리 카페 글만
+  insert into rls_results values
+  (134, '기록 사진 카페 주소에 다른 사이트 저장', 'err', pg_temp.run_as(d, format('insert into public.wods (wod_date, title, record_cafe_url) values (%L, ''rls-test 기록'', ''https://evil.example/crossfit051/1'')', public.kst_today() - 298)));
+  delete from public.wods where title = 'rls-test 기록';
+
   -- 마지막: 임시 회원 m이 스스로 탈퇴 → 계정과 기록이 모두 사라지는지
   r := pg_temp.run_as(m, 'select public.delete_my_account()');
   insert into rls_results values
