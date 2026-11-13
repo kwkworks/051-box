@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { NavCard } from '@/components/NavCard';
 import { BoardShell } from '@/components/BoardShell';
 import { Guard } from '@/components/Guard';
 import { InstallHint } from '@/components/InstallHint';
@@ -41,13 +41,13 @@ function Hub({ me }: { me: Me }) {
           const b = BOARDS[key];
           return (
             <li key={key}>
-              <Link href={b.href} className="card flex h-full items-center gap-4 p-4 transition-transform hover:-translate-y-0.5">
+              <NavCard href={b.href} className="card flex h-full items-center gap-4 p-4 transition-transform hover:-translate-y-0.5">
                 <span className="text-3xl" aria-hidden>{b.icon}</span>
                 <span>
                   <span className="block text-lg font-black">{b.label}</span>
                   <span className="block text-sm text-muted">{b.hint}</span>
                 </span>
-              </Link>
+              </NavCard>
             </li>
           );
         })}
@@ -57,13 +57,13 @@ function Hub({ me }: { me: Me }) {
       <ul className="grid gap-3 sm:grid-cols-2">
         {extras.map((x) => (
           <li key={x.href}>
-            <Link href={x.href} className="card flex h-full items-center gap-4 p-4 transition-transform hover:-translate-y-0.5">
+            <NavCard href={x.href} className="card flex h-full items-center gap-4 p-4 transition-transform hover:-translate-y-0.5">
               <span className="text-3xl" aria-hidden>{x.icon}</span>
               <span>
                 <span className="block text-lg font-black">{x.label}</span>
                 <span className="block text-sm text-muted">{x.hint}</span>
               </span>
-            </Link>
+            </NavCard>
           </li>
         ))}
       </ul>

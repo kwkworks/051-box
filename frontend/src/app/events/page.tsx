@@ -1,7 +1,7 @@
 'use client';
 
+import { NavCard } from '@/components/NavCard';
 import { Suspense, useState } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { BoardShell } from '@/components/BoardShell';
 import { EventForm } from '@/components/EventForm';
@@ -94,7 +94,7 @@ function EventCard({ ev, now, past }: { ev: BoxEvent; now: number; past: boolean
   const soon = deadline !== null && !closed && deadline - now < 3 * 86400000;
   return (
     <li>
-      <Link href={`/events/${ev.id}`} className={`card block p-4 transition-transform hover:-translate-y-0.5 ${past ? 'opacity-80' : ''}`}>
+      <NavCard href={`/events/${ev.id}`} className={`card block p-4 transition-transform hover:-translate-y-0.5 ${past ? 'opacity-80' : ''}`}>
         <div className="mb-1 flex flex-wrap items-center gap-2">
           {past ? (
             <>
@@ -120,7 +120,7 @@ function EventCard({ ev, now, past }: { ev: BoxEvent; now: number; past: boolean
           {ev.capacity ? ` / ${ev.capacity}명` : '명 참가'}
           {!past && ev.signup_deadline && <span className="ml-2 font-normal text-muted">신청 마감 {formatDateTime(ev.signup_deadline)}</span>}
         </p>
-      </Link>
+      </NavCard>
     </li>
   );
 }
