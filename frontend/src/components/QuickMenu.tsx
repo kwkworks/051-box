@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
-import { useCallback, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDismiss } from '@/lib/useDismiss';
 import { BOARDS } from '@/game/map';
 import { useAuth } from './AuthProvider';
@@ -19,38 +19,49 @@ const ITEMS = [
 ];
 
 // 공간을 돌아다니지 않고 게시판으로 바로 가는 메뉴
-// 글자색을 '가 본 링크(visited)'에도 똑같이 지정한다: 휴대폰 다크 모드가 가 본 링크를 회색으로 바꾸지 않게
+// 항목은 링크(<a>)가 아니라 버튼으로 만든다: 휴대폰 다크 모드가 '가 본 링크'를 회색으로 바꾸기 때문 (버튼은 그런 상태가 없음)
 export function QuickMenu() {
   const [open, setOpen] = useState(false);
   const { me, signOut } = useAuth();
   const ref = useRef<HTMLDivElement>(null);
 
+  const router = useRouter();
   useDismiss(open, useCallback(() => setOpen(false), []), ref);
+
+  // 메뉴를 열면 이동할 화면을 미리 받아 둔다 (링크였을 때처럼 빠르게)
+  useEffect(() => {
+    if (open) ITEMS.forEach((item) => router.prefetch(item.href));
+  }, [open, router]);
+
+  const go = (href: string) => {
+    setOpen(false);
+    router.push(href);
+  };
 
   return (
     <div ref={ref} className="relative">
       {open && (
         <nav className="card absolute bottom-14 right-0 w-56 overflow-hidden p-1" aria-label="빠른 메뉴">
           {ITEMS.map((item) => (
-            <Link
+            <button
               key={item.href}
-              href={item.href}
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-ink visited:text-ink hover:bg-[var(--bg)]"
+              type="button"
+              onClick={() => go(item.href)}
+              className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-bold hover:bg-[var(--bg)]"
             >
               <span aria-hidden>{item.icon}</span>
               {item.label}
-            </Link>
+            </button>
           ))}
           {me?.profile.role === 'admin' && (
-            <Link
-              href="/admin"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-bold text-burgundy visited:text-burgundy hover:bg-[var(--bg)]"
+            <button
+              type="button"
+              onClick={() => go('/admin')}
+              className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-bold text-[var(--burgundy)] hover:bg-[var(--bg)]"
             >
               <span aria-hidden>🔑</span>
               관리자
-            </Link>
+            </button>
           )}
           <InviteButton
             compact
