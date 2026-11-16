@@ -166,6 +166,7 @@ adminRouter.put('/chat-lock', async (req, res) => {
       .upsert({ key: 'chat_locked', value: String(locked), updated_at: new Date().toISOString() }, { onConflict: 'key' }),
   );
   res.json({ locked });
+});
 
 // 채팅 고정 공지 (닉네임 규칙 등): 채팅창 맨 위에 📌로 모두에게 보인다
 adminRouter.get('/chat-notice', async (req, res) => {
@@ -185,5 +186,4 @@ adminRouter.put('/chat-notice', async (req, res) => {
     );
   }
   res.json({ notice });
-});
 });
