@@ -304,7 +304,7 @@ export const ChatPanel = forwardRef<
             setOpen(true);
           }}
         >
-          📌 {notice}
+          📌 {notice.replace(/^(📌\s*)+/u, '')}
         </p>
       )}
       <div ref={listRef} onScroll={onScroll} className={`relative touch-pan-y overflow-y-auto overscroll-contain px-3 ${open ? 'max-h-[35vh]' : 'max-h-20 sm:max-h-24'}`} aria-live="polite">

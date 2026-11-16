@@ -561,6 +561,9 @@ function SheetImport() {
 }
 
 // 채팅 고정 공지: 채팅창 맨 위에 📌로 모두에게 보인다 (닉네임 규칙 등). 비우고 저장하면 내려간다
+// 확정한 닉네임 안내 문구 (공지 칸이 비어 있을 때 '추천 문구 넣기'로 채운다)
+const NICKNAME_NOTICE = '회원 확인을 위해 닉네임에 이름을 넣어 주세요. 이름만 쓰셔도 되고, 이름이 들어간 별명도 괜찮습니다. 변경: ☰ 메뉴 → 캐릭터 꾸미기';
+
 function ChatNotice() {
   const { data, reload } = useLoad(() => api.get<{ notice: string }>('/admin/chat-notice'), 'chat-notice');
   const [text, setText] = useState<string | null>(null);
@@ -570,7 +573,7 @@ function ChatNotice() {
   const save = async () => {
     setBusy(true);
     try {
-      await api.put('/admin/chat-notice', { notice: value.trim() });
+      await api.put('/admin/chat-notice', { notice: value.trim().replace(/^(📌\s*)+/u, '').trim() });
       setText(null);
       await reload();
       alert(value.trim() ? '채팅창 맨 위에 공지를 고정했어요.' : '채팅 공지를 내렸어요.');
@@ -589,11 +592,18 @@ function ChatNotice() {
         maxLength={200}
         value={value}
         onChange={(e) => setText(e.target.value)}
-        placeholder="예: 닉네임은 '실명+운동시간'으로 바꿔 주세요 (예: 김민수7시)"
+        placeholder={NICKNAME_NOTICE}
         aria-label="채팅 고정 공지"
       />
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-muted">{value.length}/200</span>
+        <span className="flex items-center gap-2 text-xs text-muted">
+          {value.length}/200
+          {!value.trim() && (
+            <button type="button" className="underline" onClick={() => setText(NICKNAME_NOTICE)}>
+              닉네임 안내 문구 넣기
+            </button>
+          )}
+        </span>
         <button type="button" className="btn btn-sm btn-primary shrink-0 whitespace-nowrap" disabled={busy || !changed} onClick={save}>
           {busy ? '저장 중…' : value.trim() ? '공지 고정하기' : '공지 내리기'}
         </button>
