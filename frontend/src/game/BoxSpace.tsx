@@ -7,8 +7,8 @@ import { supabase } from '@/lib/supabase';
 import type { ChatMessage, Profile } from '@/lib/types';
 import { SPRITE_H, drawAvatar, type Dir, type Pose } from './avatar';
 import {
-  OBJECT_LABELS, SPAWN, WORLD_H, WORLD_W, collides, drawObjectHint, drawStaticMap, findPath, isNear,
-  nameAt, nearbyBoard, objectAt, shortcutAt, type ObjectKey,
+  OBJECT_LABELS, SPAWN, WORLD_H, WORLD_W, collides, drawNoticeBoard, drawObjectHint, drawStaticMap, findPath, isNear,
+  nameAt, nearbyBoard, objectAt, shortcutAt, type ObjectKey, type WallNotice,
 } from './map';
 
 type Player = {
@@ -109,6 +109,7 @@ export function BoxSpace({
   onRealtimeReady,
   onRequestChat,
   handleRef,
+  wallNotice = null,
 }: {
   profile: Profile;
   onOpen: (target: ObjectKey) => void;
@@ -119,6 +120,8 @@ export function BoxSpace({
   onRealtimeReady?: () => void;
   onRequestChat?: () => void;
   handleRef?: React.RefObject<BoxSpaceHandle | null>;
+  // 대회 포스터 옆 벽 게시판에 보일 최신 공지 (제목 + 새 공지 여부)
+  wallNotice?: WallNotice;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -128,6 +131,10 @@ export function BoxSpace({
   const [connError, setConnError] = useState<string | null>(null);
   const avatarKey = JSON.stringify(normalizeAvatar(profile.avatar));
   const callbacks = useRef({ onOpen, onNearbyChange, onActionState, onChat, onRequestChat, onRealtimeReady });
+  const wallNoticeRef = useRef<WallNotice>(wallNotice);
+  useEffect(() => {
+    wallNoticeRef.current = wallNotice;
+  }, [wallNotice]);
   useEffect(() => {
     callbacks.current = { onOpen, onNearbyChange, onActionState, onChat, onRequestChat, onRealtimeReady };
   });
@@ -575,6 +582,7 @@ export function BoxSpace({
       ctx.setTransform(zoom, 0, 0, zoom, -Math.round(cam.x * zoom), -Math.round(cam.y * zoom));
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(bg, 0, 0);
+      drawNoticeBoard(ctx, wallNoticeRef.current, now);
       if (near) drawObjectHint(ctx, near, now);
 
       const everyone = [...peers.values(), me].sort((a, b) => a.y - b.y);

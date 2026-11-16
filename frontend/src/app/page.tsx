@@ -13,7 +13,9 @@ import { BoxSpace, type ActionState, type BoxSpaceHandle } from '@/game/BoxSpace
 import { BOARDS, type ObjectKey } from '@/game/map';
 import { api } from '@/lib/api';
 import { useLockPageScroll } from '@/lib/useLockPageScroll';
-import type { ChatMessage, ChatState, Me } from '@/lib/types';
+import { NoticePopup } from '@/components/NoticePopup';
+import { isNewNotice, latestNotice, markNoticesSeen, markPopped, shouldPopup } from '@/lib/noticeSeen';
+import type { ChatMessage, ChatState, Me, Notice } from '@/lib/types';
 
 export default function HomePage() {
   return <Guard need="member">{(me) => <Space me={me} />}</Guard>;
@@ -30,6 +32,21 @@ function Space({ me }: { me: Me }) {
   const [markerAt, setMarkerAt] = useState<string | null>(null); // 들어올 때 읽었던 곳 ("여기까지 읽었어요")
   const [chatLocked, setChatLocked] = useState(false);
   const [chatNotice, setChatNotice] = useState<string | null>(null);
+  // 최신 공지: 대회 포스터 옆 벽 게시판에 보여 주고, 안 본 새 공지면 들어올 때 한 번 팝업
+  const [latest, setLatest] = useState<Notice | null>(null);
+  const [popup, setPopup] = useState<Notice | null>(null);
+  useEffect(() => {
+    let alive = true;
+    api.get<{ notices: Notice[] }>('/notices').then((res) => {
+      if (!alive) return;
+      const n = latestNotice(res.notices);
+      setLatest(n);
+      if (n && shouldPopup(n)) setPopup(n);
+    }, () => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [mutedUntil, setMutedUntil] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -164,7 +181,22 @@ function Space({ me }: { me: Me }) {
           onRealtimeReady={() => refreshChat.current()}
           onRequestChat={() => chatInputRef.current?.focus()}
           handleRef={spaceRef}
+          wallNotice={latest ? { title: latest.title, isNew: isNewNotice(latest) } : null}
         />
+        {popup && (
+          <NoticePopup
+            notice={popup}
+            onClose={() => {
+              markPopped(popup);
+              setPopup(null);
+            }}
+            onGo={() => {
+              markPopped(popup);
+              markNoticesSeen(popup);
+              router.push('/notices');
+            }}
+          />
+        )}
 
         {toast && (
           <div className="card absolute left-1/2 top-12 z-30 -translate-x-1/2 px-4 py-2 text-sm font-bold" role="status">

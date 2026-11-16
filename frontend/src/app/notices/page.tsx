@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BoardShell } from '@/components/BoardShell';
 import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { NoticeEditor } from '@/components/NoticeEditor';
@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { formatRelative, safeHttpsUrl } from '@/lib/format';
 import type { Me, Notice } from '@/lib/types';
 import { useLoad } from '@/lib/useLoad';
+import { latestNotice, markNoticesSeen } from '@/lib/noticeSeen';
 
 export default function NoticesPage() {
   return <Guard need="member">{(me) => <Notices me={me} />}</Guard>;
@@ -16,6 +17,10 @@ export default function NoticesPage() {
 function Notices({ me }: { me: Me }) {
   const isAdmin = me.profile.role === 'admin';
   const { data, error, loading, reload } = useLoad(() => api.get<{ notices: Notice[] }>('/notices'), 'notices');
+  // 공지사항을 열면 지금까지의 공지는 본 것으로 (박스 벽 게시판의 NEW가 꺼진다)
+  useEffect(() => {
+    if (data) markNoticesSeen(latestNotice(data.notices));
+  }, [data]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Notice | 'new' | null>(null);
 

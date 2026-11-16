@@ -293,7 +293,7 @@ export const ChatPanel = forwardRef<
       {notice && (
         // 고정 공지: 들어온 사람 누구나 보게 맨 위에. 작은 창에서는 두 줄까지, 기록을 열면 전체
         <p
-          className={`mx-2 mb-1 whitespace-pre-line break-words rounded bg-yellow/15 px-2 py-1 text-xs leading-snug text-yellow ${open ? '' : 'line-clamp-2 cursor-pointer'}`}
+          className={`mx-2 mb-1 rounded bg-yellow/15 px-2 py-1 text-xs leading-snug text-yellow ${open ? '' : 'cursor-pointer'}`}
           role="note"
           aria-label="채팅 공지"
           title={open ? undefined : '눌러서 전체 보기'}
@@ -304,7 +304,8 @@ export const ChatPanel = forwardRef<
             setOpen(true);
           }}
         >
-          📌 {notice.replace(/^(📌\s*)+/u, '')}
+          {/* 줄 자르기는 안쪽 글자에만: 바깥 여백에 세 번째 줄이 비치지 않게 */}
+          <span className={`whitespace-pre-line break-words ${open ? 'block' : 'line-clamp-2'}`}>📌 {notice.replace(/^(📌\s*)+/u, '')}</span>
         </p>
       )}
       <div ref={listRef} onScroll={onScroll} className={`relative touch-pan-y overflow-y-auto overscroll-contain px-3 ${open ? 'max-h-[35vh]' : 'max-h-20 sm:max-h-24'}`} aria-live="polite">

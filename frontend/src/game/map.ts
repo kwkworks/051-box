@@ -168,6 +168,7 @@ const SHORTCUTS: (Box & { board: ObjectKey })[] = [
   { x: 3, y: 19, w: 3, h: 1, board: 'one-rm' }, // 🔔 케틀벨 랙 → 1RM 기록
   { x: 8, y: 19, w: 3, h: 1, board: 'one-rm' }, // 💪 덤벨 랙 → 1RM 기록
   { x: 9, y: 0, w: 7, h: 3, board: 'gathering' }, // 🚩 팀 배너 → 회원 모임
+  { x: 28, y: 0, w: 5, h: 3, board: 'notices' }, // 📢 공지 게시판(대회 포스터 옆 벽) → 공지사항
 ];
 
 export function shortcutAt(wx: number, wy: number): ObjectKey | null {
@@ -519,6 +520,55 @@ export function drawStaticMap(ctx: CanvasRenderingContext2D) {
     ctx.lineWidth = 1;
     ctx.stroke();
     label(ctx, text, cx, cy + 1, '#FFFFFF', 12);
+  }
+}
+
+// 대회 포스터 옆 벽의 공지 게시판: 최신 공지 제목(두 줄까지) + 안 읽었으면 깜빡이는 NEW
+export type WallNotice = { title: string; isNew: boolean } | null;
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number, maxLines: number): string[] {
+  const lines: string[] = [];
+  let cur = '';
+  for (const ch of Array.from(text.replace(/\s+/g, ' ').trim())) {
+    if (ctx.measureText(cur + ch).width > maxW && cur) {
+      lines.push(cur);
+      cur = ch.trimStart();
+      if (lines.length === maxLines) break;
+    } else {
+      cur += ch;
+    }
+  }
+  if (lines.length < maxLines && cur) lines.push(cur);
+  const used = lines.join('').length;
+  if (used < text.replace(/\s+/g, ' ').trim().length && lines.length) {
+    let last = lines[lines.length - 1];
+    while (last && ctx.measureText(last + '…').width > maxW) last = last.slice(0, -1);
+    lines[lines.length - 1] = last + '…';
+  }
+  return lines;
+}
+
+export function drawNoticeBoard(ctx: CanvasRenderingContext2D, notice: WallNotice, t: number) {
+  const T = TILE;
+  const x = 28.2 * T;
+  const y = 0.2 * T;
+  const w = 4.6 * T;
+  const h = 2.5 * T;
+  rect(ctx, x, y, w, h, '#6B4A2E'); // 나무 테두리
+  rect(ctx, x + 4, y + 4, w - 8, h - 8, '#F4EBD8'); // 게시판 종이
+  rect(ctx, x + 4, y + 4, w - 8, 18, C.burgundy); // 머리띠
+  label(ctx, '📢 공지사항', x + w / 2, y + 13, '#FFFFFF', 11);
+  rect(ctx, x + w / 2 - 3, y + 1, 6, 6, '#D9443E'); // 압정
+  ctx.font = `bold 11px system-ui, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif`;
+  const lines = notice ? wrapText(ctx, notice.title, w - 20, 2) : ['아직 공지가 없어요'];
+  lines.forEach((ln, i) => label(ctx, ln, x + w / 2, y + 36 + i * 15, notice ? '#2A2320' : '#8A8178', 11));
+  if (notice?.isNew) {
+    const on = Math.floor(t / 600) % 2 === 0;
+    ctx.fillStyle = on ? '#D9443E' : '#B8322C';
+    ctx.beginPath();
+    ctx.roundRect(x + w - 34, y - 6, 34, 16, 8);
+    ctx.fill();
+    label(ctx, 'NEW', x + w - 17, y + 2, '#FFFFFF', 10);
   }
 }
 

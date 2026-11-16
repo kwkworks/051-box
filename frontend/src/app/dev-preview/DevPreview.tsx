@@ -16,6 +16,7 @@ import { WallCard } from '@/components/WallCard';
 import { WodView } from '@/components/WodView';
 import { Podium } from '@/components/Podium';
 import { BoxSpace, type BoxSpaceHandle } from '@/game/BoxSpace';
+import { NoticePopup } from '@/components/NoticePopup';
 import { AVATAR_OPTIONS, type Avatar } from '@/lib/constants';
 import type { ChatMessage, FeedItem, Profile, Wod } from '@/lib/types';
 
@@ -36,6 +37,10 @@ function samples(): Partial<Avatar>[] {
 
 export function DevPreview() {
   const [opened, setOpened] = useState("");
+  // 새 공지 미리보기: 벽 게시판 + 팝업 (가짜 공지)
+  const demoNotice = { id: 'demo-notice', title: '11월 넷째 주 박스 운영 시간 변경 안내 (추수감사절 이벤트 WOD 포함)', body: '이번 주 토요일은 오전 10시 단체 WOD 한 타임만 운영합니다. 일요일은 정상 휴무이고, 다음 주 월요일부터는 평소 시간표로 돌아갑니다. 이벤트 WOD는 파트너 와드로 진행되니 짝꿍과 함께 오세요!', pinned: false, cafe_url: null, created_at: '2026-11-16T09:00:00Z', updated_at: '2026-11-16T09:00:00Z' };
+  const [demoPopup, setDemoPopup] = useState(true);
+  const [demoNew, setDemoNew] = useState(true);
   const [view, setView] = useState<'space' | 'avatars' | 'podium' | 'forms' | 'wod' | 'event' | 'wall' | 'qna'>('space');
   const space = useRef<BoxSpaceHandle | null>(null);
   // 채팅 미리보기: 다른 회원 메시지 8개, 그중 5개는 이미 읽음
@@ -174,10 +179,11 @@ export function DevPreview() {
       ) : view === 'space' ? (
         <div className="relative min-h-0 flex-1">
           <p id="opened" className="absolute z-10 ml-40 mt-2 rounded bg-white px-2 text-xs">열림: {opened}</p>
-          <BoxSpace profile={DEMO} handleRef={space} onOpen={(b) => setOpened(`${b} @ ${new Date().toLocaleTimeString()}`)} />
+          <BoxSpace profile={DEMO} handleRef={space} wallNotice={{ title: demoNotice.title, isNew: demoNew }} onOpen={(b) => setOpened(`${b} @ ${new Date().toLocaleTimeString()}`)} />
+          {mounted && demoPopup && <NoticePopup notice={demoNotice} onClose={() => setDemoPopup(false)} onGo={() => { setDemoPopup(false); setDemoNew(false); }} />}
           {mounted && <ChatPanel
             messages={msgs}
-            notice={'닉네임은 "실명+운동시간"으로 바꿔 주세요 (예: 김민수7시). 회원 확인을 위해 꼭 부탁드려요! 바꾸는 곳: ☰ 메뉴 → 캐릭터 꾸미기'}
+            notice={'회원 확인을 위해 닉네임에 이름을 넣어 주세요. 이름만 쓰셔도 되고, 이름이 들어간 별명도 괜찮습니다. 변경: ☰ 메뉴 → 캐릭터 꾸미기'}
             markerAt={demoMarker}
             readAt={demoRead}
             onRead={setDemoRead}
