@@ -4,9 +4,9 @@ import { chatReadSchema, chatSchema, uuid } from '../schemas.js';
 
 export const chatRouter = Router();
 
-// 오늘(한국 시간 0시부터) 대화 전체 + 내가 어디까지 읽었는지 + 잠금/제한 상태
+// 오늘(한국 시간 0시부터) 대화 전체 + 내가 어디까지 읽었는지 + 잠금/제한 상태 + 고정 공지
 chatRouter.get('/', async (req, res) => {
-  const [rows, me, locked] = await Promise.all([
+  const [rows, me, locked, notice] = await Promise.all([
     req.sb
       .from('chat_messages')
       .select('id, user_id, body, created_at, profiles(nickname, role)')
@@ -14,6 +14,8 @@ chatRouter.get('/', async (req, res) => {
       .limit(300),
     req.sb.from('profiles').select('chat_read_at').eq('id', req.userId).single(),
     req.sb.rpc('chat_locked'),
+    // 고정 공지: DB에 아직 없으면(0026 적용 전) 그냥 없음으로
+    req.sb.rpc('chat_notice').then((r) => (r.error ? null : r.data)),
   ]);
   res.json({
     messages: unwrap(rows)
@@ -21,6 +23,7 @@ chatRouter.get('/', async (req, res) => {
       .map(({ profiles, ...m }) => ({ ...m, nickname: profiles?.nickname ?? '알 수 없음', role: profiles?.role ?? 'member' })),
     readAt: unwrap(me)?.chat_read_at ?? null,
     locked: Boolean(unwrap(locked)),
+    notice: typeof notice === 'string' ? notice : null,
     mutedUntil: req.profile.chat_muted_until ?? null,
   });
 });

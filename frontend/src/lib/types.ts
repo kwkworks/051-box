@@ -138,6 +138,7 @@ export type ChatState = {
   readAt: string | null; // 어디까지 읽었는지
   locked: boolean;
   mutedUntil: string | null;
+  notice?: string | null; // 채팅창 맨 위 고정 공지 (관리자가 정함)
 };
 
 // 종목마다 전체 / 남자 / 여자 상위 10명

@@ -29,6 +29,7 @@ function Space({ me }: { me: Me }) {
   const [readAt, setReadAt] = useState<string | null>(null); // 지금까지 읽은 곳 (서버에도 저장)
   const [markerAt, setMarkerAt] = useState<string | null>(null); // 들어올 때 읽었던 곳 ("여기까지 읽었어요")
   const [chatLocked, setChatLocked] = useState(false);
+  const [chatNotice, setChatNotice] = useState<string | null>(null);
   const [mutedUntil, setMutedUntil] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -58,6 +59,7 @@ function Space({ me }: { me: Me }) {
           setMarkerAt(res.readAt);
         }
         setChatLocked(res.locked);
+        setChatNotice(res.notice ?? null);
         setMutedUntil(res.mutedUntil);
       }, () => {});
     const refresh = () => {
@@ -173,6 +175,7 @@ function Space({ me }: { me: Me }) {
         <ChatPanel
             ref={chatInputRef}
             messages={messages}
+            notice={chatNotice}
             markerAt={markerAt}
             readAt={readAt}
             onRead={markRead}

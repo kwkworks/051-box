@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { HttpError, unwrap } from '../errors.js';
-import { chatLockSchema, chatMuteSchema, holidaySchema, isoDate, roleSchema, sheetUrlSchema, uuid } from '../schemas.js';
+import { chatLockSchema, chatMuteSchema, chatNoticeSchema, holidaySchema, isoDate, roleSchema, sheetUrlSchema, uuid } from '../schemas.js';
 import { fetchSheetCsv, normalizeSheetUrl, parseCsv, rowsToWods } from '../sheet.js';
 
 export const adminRouter = Router();
@@ -166,4 +166,24 @@ adminRouter.put('/chat-lock', async (req, res) => {
       .upsert({ key: 'chat_locked', value: String(locked), updated_at: new Date().toISOString() }, { onConflict: 'key' }),
   );
   res.json({ locked });
+
+// 채팅 고정 공지 (닉네임 규칙 등): 채팅창 맨 위에 📌로 모두에게 보인다
+adminRouter.get('/chat-notice', async (req, res) => {
+  const row = unwrap(await req.sb.from('app_settings').select('value').eq('key', 'chat_notice').maybeSingle());
+  res.json({ notice: row?.value ?? '' });
+});
+
+adminRouter.put('/chat-notice', async (req, res) => {
+  const { notice } = chatNoticeSchema.parse(req.body);
+  if (!notice) {
+    unwrap(await req.sb.from('app_settings').delete().eq('key', 'chat_notice'));
+  } else {
+    unwrap(
+      await req.sb
+        .from('app_settings')
+        .upsert({ key: 'chat_notice', value: notice, updated_at: new Date().toISOString() }, { onConflict: 'key' }),
+    );
+  }
+  res.json({ notice });
+});
 });

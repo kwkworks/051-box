@@ -193,6 +193,7 @@ function Members({ myId }: { myId: string }) {
         </div>
       )}
       <ChatLock />
+      <ChatNotice />
       <h2 className="mb-2 font-black">승인 대기 {pending.length}명</h2>
       {pending.length === 0 ? (
         <p className="card mb-6 p-4 text-sm text-muted">승인을 기다리는 회원이 없어요</p>
@@ -555,6 +556,48 @@ function SheetImport() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// 채팅 고정 공지: 채팅창 맨 위에 📌로 모두에게 보인다 (닉네임 규칙 등). 비우고 저장하면 내려간다
+function ChatNotice() {
+  const { data, reload } = useLoad(() => api.get<{ notice: string }>('/admin/chat-notice'), 'chat-notice');
+  const [text, setText] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const value = text ?? data?.notice ?? '';
+  const changed = data !== undefined && value.trim() !== (data?.notice ?? '');
+  const save = async () => {
+    setBusy(true);
+    try {
+      await api.put('/admin/chat-notice', { notice: value.trim() });
+      setText(null);
+      await reload();
+      alert(value.trim() ? '채팅창 맨 위에 공지를 고정했어요.' : '채팅 공지를 내렸어요.');
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '저장하지 못했어요');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="card mb-6 flex flex-col gap-2 p-4">
+      <p className="font-black">📌 채팅 고정 공지</p>
+      <p className="text-xs text-muted">채팅창 맨 위에 고정돼 들어온 회원 누구나 봐요. 비우고 저장하면 공지가 내려가요. (200자까지)</p>
+      <textarea
+        className="input min-h-20 text-sm"
+        maxLength={200}
+        value={value}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="예: 닉네임은 '실명+운동시간'으로 바꿔 주세요 (예: 김민수7시)"
+        aria-label="채팅 고정 공지"
+      />
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-muted">{value.length}/200</span>
+        <button type="button" className="btn btn-sm btn-primary shrink-0 whitespace-nowrap" disabled={busy || !changed} onClick={save}>
+          {busy ? '저장 중…' : value.trim() ? '공지 고정하기' : '공지 내리기'}
+        </button>
+      </div>
     </div>
   );
 }

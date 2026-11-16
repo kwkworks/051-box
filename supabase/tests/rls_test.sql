@@ -397,6 +397,13 @@ begin
   (137, '비로그인으로 네이버 비밀값 확인 함수 직접 호출', 'err', pg_temp.run_as(null, 'select private.check_naver_secret(''wrong'')')),
   (138, '관리자도 네이버 토큰 지우기 (틀린 비밀값)', 'err', pg_temp.run_as(d, 'select public.naver_token_clear(''wrong'')'));
 
+  -- 0026: 채팅 고정 공지 (읽기는 승인 회원, 쓰기는 관리자만, 200자까지)
+  insert into rls_results values
+  (139, '비로그인으로 채팅 공지 읽기', 'err', pg_temp.run_as(null, 'select public.chat_notice()')),
+  (140, '회원이 채팅 공지 읽기', 'ok:1', pg_temp.run_as(a, 'select public.chat_notice()')),
+  (141, '회원이 채팅 공지 쓰기', 'err', pg_temp.run_as(a, 'insert into public.app_settings (key, value) values (''chat_notice'', ''rls-test'') on conflict (key) do update set value = excluded.value')),
+  (142, '관리자가 200자 넘는 채팅 공지 저장', 'err', pg_temp.run_as(d, format('insert into public.app_settings (key, value) values (''chat_notice'', %L) on conflict (key) do update set value = excluded.value', repeat('가', 201))));
+
   -- 마지막: 임시 회원 m이 스스로 탈퇴 → 계정과 기록이 모두 사라지는지
   r := pg_temp.run_as(m, 'select public.delete_my_account()');
   insert into rls_results values

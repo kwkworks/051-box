@@ -177,6 +177,7 @@ export function DevPreview() {
           <BoxSpace profile={DEMO} handleRef={space} onOpen={(b) => setOpened(`${b} @ ${new Date().toLocaleTimeString()}`)} />
           {mounted && <ChatPanel
             messages={msgs}
+            notice={'닉네임은 "실명+운동시간"으로 바꿔 주세요 (예: 김민수7시). 회원 확인을 위해 꼭 부탁드려요! 바꾸는 곳: ☰ 메뉴 → 캐릭터 꾸미기'}
             markerAt={demoMarker}
             readAt={demoRead}
             onRead={setDemoRead}

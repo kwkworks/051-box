@@ -49,8 +49,9 @@ export const ChatPanel = forwardRef<
     onDelete: (id: string) => void;
     onMinimizedChange?: (minimized: boolean) => void;
     onRead?: (at: string) => void;
+    notice?: string | null; // 맨 위 고정 공지 (예: 닉네임 규칙)
   }
->(function ChatPanel({ messages, markerAt, readAt, myId, canModerate, blockedReason, onSend, onDelete, onMinimizedChange, onRead }, ref) {
+>(function ChatPanel({ messages, markerAt, readAt, myId, canModerate, blockedReason, onSend, onDelete, onMinimizedChange, onRead, notice }, ref) {
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const [sending, setSending] = useState(false);
@@ -289,6 +290,23 @@ export const ChatPanel = forwardRef<
           ✕
         </button>
       </div>
+      {notice && (
+        // 고정 공지: 들어온 사람 누구나 보게 맨 위에. 작은 창에서는 두 줄까지, 기록을 열면 전체
+        <p
+          className={`mx-2 mb-1 whitespace-pre-line break-words rounded bg-yellow/15 px-2 py-1 text-xs leading-snug text-yellow ${open ? '' : 'line-clamp-2 cursor-pointer'}`}
+          role="note"
+          aria-label="채팅 공지"
+          title={open ? undefined : '눌러서 전체 보기'}
+          onClick={() => {
+            // 작은 창에서 잘린 공지를 누르면 기록을 열어 전체를 보여준다
+            if (open) return;
+            scrollTo.current = 'bottom';
+            setOpen(true);
+          }}
+        >
+          📌 {notice}
+        </p>
+      )}
       <div ref={listRef} onScroll={onScroll} className={`relative touch-pan-y overflow-y-auto overscroll-contain px-3 ${open ? 'max-h-[35vh]' : 'max-h-20 sm:max-h-24'}`} aria-live="polite">
         {visible.length === 0 && <p className="py-1 text-xs text-white/60">아직 대화가 없어요. 먼저 인사해보세요!</p>}
         {visible.map((m, i) => {

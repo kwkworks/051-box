@@ -175,5 +175,7 @@ export const photoOrderSchema = z.strictObject({ ids: z.array(z.uuid()).min(1).m
 
 export const chatMuteSchema = z.strictObject({ mute: z.enum(['1h', 'today', 'off']) });
 export const chatLockSchema = z.strictObject({ locked: z.boolean() });
+// 채팅창 맨 위 고정 공지 (빈 문자열이면 공지를 내린다)
+export const chatNoticeSchema = z.strictObject({ notice: z.string().trim().max(200) });
 
 export const holidaySchema = z.strictObject({ day: isoDate, name: requiredText(30) });
