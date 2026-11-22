@@ -529,18 +529,21 @@ export type WallNotice = { title: string; isNew: boolean } | null;
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number, maxLines: number): string[] {
   const lines: string[] = [];
   let cur = '';
+  let cut = false; // 두 줄에 다 못 넣고 남은 글자가 있는지
   for (const ch of Array.from(text.replace(/\s+/g, ' ').trim())) {
     if (ctx.measureText(cur + ch).width > maxW && cur) {
       lines.push(cur);
+      if (lines.length === maxLines) {
+        cut = true;
+        break;
+      }
       cur = ch.trimStart();
-      if (lines.length === maxLines) break;
     } else {
       cur += ch;
     }
   }
-  if (lines.length < maxLines && cur) lines.push(cur);
-  const used = lines.join('').length;
-  if (used < text.replace(/\s+/g, ' ').trim().length && lines.length) {
+  if (!cut && cur) lines.push(cur);
+  if (cut && lines.length) {
     let last = lines[lines.length - 1];
     while (last && ctx.measureText(last + '…').width > maxW) last = last.slice(0, -1);
     lines[lines.length - 1] = last + '…';

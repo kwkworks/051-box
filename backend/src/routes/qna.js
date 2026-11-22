@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { HttpError, unwrap } from '../errors.js';
 import { qnaAnswerSchema, qnaQuestionSchema, uuid } from '../schemas.js';
+import { sendQnaPushLater } from '../push.js';
 
 export const qnaRouter = Router();
 
@@ -24,6 +25,7 @@ qnaRouter.get('/', async (req, res) => {
 qnaRouter.post('/', async (req, res) => {
   const body = qnaQuestionSchema.parse(req.body);
   const question = unwrap(await req.sb.from('qna_questions').insert(body).select(COLUMNS).single());
+  sendQnaPushLater(question.id, req.profile.nickname); // 관리자에게 새 문의 알림 (응답은 기다리지 않음)
   res.status(201).json({ question });
 });
 

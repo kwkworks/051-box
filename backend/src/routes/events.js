@@ -58,11 +58,11 @@ eventsRouter.get('/:id', async (req, res) => {
   });
 });
 
-// 대회/이벤트는 관리자만, 모임은 회원 누구나. (DB RLS도 같은 규칙을 강제)
+// 모임·대회는 회원 누구나, 이벤트는 관리자만. (DB RLS도 같은 규칙을 강제)
 eventsRouter.post('/', async (req, res) => {
   const body = eventSchema.parse(req.body);
-  if (body.kind !== 'gathering' && req.profile.role !== 'admin') {
-    throw new HttpError(403, '대회와 이벤트는 관리자만 등록할 수 있어요');
+  if (body.kind === 'event' && req.profile.role !== 'admin') {
+    throw new HttpError(403, '이벤트는 관리자만 등록할 수 있어요');
   }
   const event = unwrap(await req.sb.from('events').insert(body).select(COLUMNS).single());
   const gathering = event.kind === 'gathering';
@@ -132,7 +132,7 @@ eventsRouter.delete('/:id/join', async (req, res) => {
   res.json({ joined: false });
 });
 
-// ---- 회원 모임 댓글: 승인 회원 누구나 쓰고, 쓴 사람과 관리자가 지운다 (DB RLS도 같은 규칙)
+// ---- 모임·대회 댓글: 승인 회원 누구나 쓰고, 쓴 사람과 관리자가 지운다 (DB RLS도 같은 규칙)
 const commentSchema = z.strictObject({ body: z.string().trim().min(1, '댓글을 입력해 주세요').max(300) });
 const COMMENT_COLUMNS = 'id, user_id, body, created_at, profiles!user_id(nickname, avatar, role)';
 const toComment = ({ profiles, ...c }) => ({
@@ -144,10 +144,16 @@ const toComment = ({ profiles, ...c }) => ({
 
 eventsRouter.get('/:id/comments', async (req, res) => {
   const id = uuid.parse(req.params.id);
+  // 최신 300개를 가져와 오래된 순으로 보여준다 (300개가 넘어도 새 댓글이 보이게)
   const rows = unwrap(
-    await req.sb.from('event_comments').select(COMMENT_COLUMNS).eq('event_id', id).order('created_at').limit(300),
+    await req.sb
+      .from('event_comments')
+      .select(COMMENT_COLUMNS)
+      .eq('event_id', id)
+      .order('created_at', { ascending: false })
+      .limit(300),
   );
-  res.json({ comments: rows.map(toComment) });
+  res.json({ comments: rows.reverse().map(toComment) });
 });
 
 eventsRouter.post('/:id/comments', async (req, res) => {

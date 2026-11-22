@@ -43,6 +43,7 @@ declare
   rm uuid;
   ev_full uuid;
   ev_closed uuid;
+  ev_evt uuid;  -- 관리자 전용 이벤트 (댓글 불가)
   dm uuid;     -- 관리자가 쓴 채팅
   rm_pr uuid;  -- 회원의 PR 기록
   dm2 uuid;    -- 회원이 접속한 뒤 관리자가 쓴 채팅
@@ -79,6 +80,8 @@ begin
     values ('gathering', 'RLS 테스트 정원', now() + interval '1 day', 1, d) returning id into ev_full;
   insert into public.events (kind, title, starts_at, signup_deadline, created_by)
     values ('competition', 'RLS 테스트 마감', now() + interval '1 day', now() - interval '1 hour', d) returning id into ev_closed;
+  insert into public.events (kind, title, starts_at, created_by)
+    values ('event', 'RLS 테스트 이벤트', now() + interval '1 day', d) returning id into ev_evt;
 
   -- 실제 Realtime 서버는 접속을 검사할 때 채널 이름을 realtime.topic 설정으로 알려준다. 테스트도 똑같이 흉내 낸다.
   perform set_config('realtime.topic', 'box-space', true);
@@ -91,7 +94,7 @@ begin
   (5, '회원이 자기 role을 admin으로 변경', 'err', pg_temp.run_as(a, format('update public.profiles set role = ''admin'' where id = %L', a))),
   (6, '회원이 관리자 닉네임 변경', 'ok:0', pg_temp.run_as(a, format('update public.profiles set nickname = ''해킹'' where id = %L', d))),
   (7, '회원이 WOD 작성', 'err', pg_temp.run_as(a, 'insert into public.wods (wod_date, title) values (current_date + 100, ''x'')')),
-  (8, '회원이 대회 등록', 'err', pg_temp.run_as(a, format('insert into public.events (kind, title, starts_at, created_by) values (''competition'', ''x'', now(), %L)', a))),
+  (8, '회원이 이벤트(관리자 전용) 등록', 'err', pg_temp.run_as(a, format('insert into public.events (kind, title, starts_at, created_by) values (''event'', ''x'', now(), %L)', a))),
   (9, '회원이 남의 이름으로 모임 등록', 'err', pg_temp.run_as(a, format('insert into public.events (kind, title, starts_at, created_by) values (''gathering'', ''x'', now(), %L)', d))),
   (10, '회원이 관리자의 1RM 기록 삭제', 'ok:0', pg_temp.run_as(a, format('delete from public.one_rm_records where id = %L', rm))),
   (11, '회원이 어제 날짜로 출석 위조', 'err', pg_temp.run_as(a, 'insert into public.attendance (attend_date) values (public.kst_today() - 1)')),
@@ -301,7 +304,7 @@ begin
   -- 일반 회원이 앱과 같은 방식(저장 후 결과 돌려받기)으로 모임 만들기
   insert into rls_results values
   (89, '일반 회원이 모임 만들기', 'ok:1', pg_temp.run_as(a, 'insert into public.events (kind, title, starts_at) values (''gathering'', ''rls-test 회원 모임'', now() + interval ''1 day'') returning id')),
-  (90, '일반 회원이 대회 만들기', 'err', pg_temp.run_as(a, 'insert into public.events (kind, title, starts_at) values (''competition'', ''rls-test 회원 대회'', now() + interval ''1 day'') returning id'));
+  (90, '일반 회원이 대회 모집글 만들기', 'ok:1', pg_temp.run_as(a, 'insert into public.events (kind, title, starts_at) values (''competition'', ''rls-test 회원 대회'', now() + interval ''1 day'') returning id'));
   delete from public.events where title in ('rls-test 회원 모임', 'rls-test 회원 대회');
 
   -- 0016: 마감하기 / 다시 신청 받기 (서버와 같은 방식: closed_at을 지금으로 / 지우기, 신청 마감일은 그대로)
@@ -409,12 +412,29 @@ begin
   (143, '비로그인으로 댓글 읽기', 'err', pg_temp.run_as(null, 'select * from public.event_comments')),
   (144, '회원이 모임에 댓글 작성', 'ok:1', pg_temp.run_as(a, format('insert into public.event_comments (event_id, body) values (%L, ''rls-test 댓글'')', ev_full))),
   (145, '회원이 남의 이름으로 댓글 작성', 'err', pg_temp.run_as(a, format('insert into public.event_comments (event_id, user_id, body) values (%L, %L, ''rls-test'')', ev_full, d))),
-  (146, '회원이 대회(모임 아님)에 댓글 작성', 'err', pg_temp.run_as(a, format('insert into public.event_comments (event_id, body) values (%L, ''rls-test'')', ev_closed))),
+  (146, '회원이 이벤트(모임·대회 아님)에 댓글 작성', 'err', pg_temp.run_as(a, format('insert into public.event_comments (event_id, body) values (%L, ''rls-test'')', ev_evt))),
   (147, '관리자가 모임에 댓글 작성', 'ok:1', pg_temp.run_as(d, format('insert into public.event_comments (event_id, body) values (%L, ''rls-test 관리자'')', ev_full)));
   insert into rls_results values
   (148, '회원이 남(관리자)의 댓글 지우기', 'ok:0', pg_temp.run_as(a, 'delete from public.event_comments where body = ''rls-test 관리자''')),
   (149, '회원이 댓글 고치기', 'err', pg_temp.run_as(a, 'update public.event_comments set body = ''x'' where body like ''rls-test%''')),
   (150, '관리자가 회원 댓글 지우기', 'ok:1', pg_temp.run_as(d, 'delete from public.event_comments where body = ''rls-test 댓글'''));
+  delete from public.event_comments where body like 'rls-test%';
+
+  -- 0028: 대회 모집글에도 댓글
+  insert into rls_results values
+  (153, '회원이 대회 모집글에 댓글 작성', 'ok:1', pg_temp.run_as(a, format('insert into public.event_comments (event_id, body) values (%L, ''rls-test 대회 댓글'')', ev_closed)));
+  delete from public.event_comments where body like 'rls-test%';
+
+  -- 0028: Q&A 새 문의 알림 대상은 서버 비밀값으로만
+  insert into rls_results values
+  (151, '비로그인으로 Q&A 알림 대상 요청 (틀린 비밀값)', 'err', pg_temp.run_as(null, format('select * from public.push_claim_qna(''wrong'', %L)', gen_random_uuid())));
+
+  -- 0028: 모임 댓글 도배 방지 (1분에 5개까지). 5개를 쓴 뒤 6번째는 거부
+  for i in 1..5 loop
+    perform pg_temp.run_as(a, format('insert into public.event_comments (event_id, body) values (%L, ''rls-test 도배'')', ev_full));
+  end loop;
+  insert into rls_results values
+  (152, '1분 안에 댓글 6개째 쓰기', 'err', pg_temp.run_as(a, format('insert into public.event_comments (event_id, body) values (%L, ''rls-test 도배'')', ev_full)));
   delete from public.event_comments where body like 'rls-test%';
 
   -- 마지막: 임시 회원 m이 스스로 탈퇴 → 계정과 기록이 모두 사라지는지
@@ -428,7 +448,7 @@ begin
   delete from public.chat_messages where body like 'rls-test%';
   delete from public.chat_sessions where user_id = a and started_at = now();
   delete from public.one_rm_records where user_id = m and movement = 'snatch' and weight_lb in (50, 55) and created_at > now() - interval '1 minute';
-  delete from public.events where id in (ev_full, ev_closed);
+  delete from public.events where id in (ev_full, ev_closed, ev_evt);
   delete from public.one_rm_records where id = rm;
   delete from public.activities where user_id = d and payload ->> 'movement' = 'deadlift' and created_at > now() - interval '1 minute';
   delete from auth.users where id = c;

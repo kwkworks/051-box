@@ -101,15 +101,15 @@ function Detail({ me }: { me: Me }) {
           onEdit={() => setEditing(true)}
           onRemove={remove}
         >
-          {ev.kind === "gathering" && <GatheringComments eventId={ev.id} me={me} />}
+          {ev.kind !== "event" && <EventCommentsBox eventId={ev.id} me={me} />}
         </EventDetailView>
       )}
     </BoardShell>
   );
 }
 
-// 회원 모임 댓글: 불러오기, 등록, 삭제 (쓴 사람·관리자)
-function GatheringComments({ eventId, me }: { eventId: string; me: Me }) {
+// 모임·대회 댓글: 불러오기, 등록, 삭제 (쓴 사람·관리자)
+function EventCommentsBox({ eventId, me }: { eventId: string; me: Me }) {
   const { data, error: loadError, loading, reload } = useLoad(
     () => api.get<{ comments: EventComment[] }>(`/events/${eventId}/comments`),
     `comments-${eventId}`,

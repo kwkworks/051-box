@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { formatRelative } from '@/lib/format';
 import type { EventComment } from '@/lib/types';
 
-// 회원 모임 댓글 (보이는 부분). 쓴 사람은 자기 댓글을, 관리자는 모든 댓글을 지울 수 있다
+// 모임·대회 댓글 (보이는 부분). 쓴 사람은 자기 댓글을, 관리자는 모든 댓글을 지울 수 있다
 export function EventComments({
   comments,
   myId,

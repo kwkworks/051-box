@@ -294,12 +294,19 @@ export const ChatPanel = forwardRef<
         // 고정 공지: 들어온 사람 누구나 보게 맨 위에. 작은 창에서는 두 줄까지, 기록을 열면 전체
         <p
           className={`mx-2 mb-1 rounded bg-yellow/15 px-2 py-1 text-xs leading-snug text-yellow ${open ? '' : 'cursor-pointer'}`}
-          role="note"
+          role={open ? 'note' : 'button'}
           aria-label="채팅 공지"
+          tabIndex={open ? undefined : 0}
           title={open ? undefined : '눌러서 전체 보기'}
           onClick={() => {
             // 작은 창에서 잘린 공지를 누르면 기록을 열어 전체를 보여준다
             if (open) return;
+            scrollTo.current = 'bottom';
+            setOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (open || (e.key !== 'Enter' && e.key !== ' ')) return;
+            e.preventDefault();
             scrollTo.current = 'bottom';
             setOpen(true);
           }}

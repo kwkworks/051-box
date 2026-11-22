@@ -1,5 +1,19 @@
 // 051 BOX 서비스 워커: 푸시 알림만 다룬다 (페이지 캐시는 하지 않음 → 항상 최신 화면)
 
+// 이 사이트 안의 경로만 돌려준다. 주소를 푼 "뒤의" 경로도 다시 확인한다
+// (/./ /evil 같은 점·슬래시 우회가 풀리면 //evil 이 되어 다른 사이트로 나갈 수 있기 때문)
+function safePath(raw) {
+  if (typeof raw !== 'string' || !raw.startsWith('/')) return '/';
+  try {
+    const u = new URL(raw, self.location.origin);
+    if (u.origin !== self.location.origin) return '/';
+    const path = u.pathname + u.search + u.hash;
+    return /^\/(?![/\\])/.test(path) ? path : '/';
+  } catch {
+    return '/';
+  }
+}
+
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
@@ -12,14 +26,8 @@ self.addEventListener('push', (event) => {
   }
   const title = typeof data.title === 'string' ? data.title.slice(0, 80) : '051 BOX';
   const body = typeof data.body === 'string' ? data.body.slice(0, 200) : '';
-  // 이 사이트 안의 경로만 연다 (/\다른사이트 같은 우회도 막기 위해 주소를 풀어서 출처를 비교)
-  let url = '/';
-  if (typeof data.url === 'string' && data.url.startsWith('/')) {
-    try {
-      const u = new URL(data.url, self.location.origin);
-      if (u.origin === self.location.origin) url = u.pathname + u.search + u.hash;
-    } catch {}
-  }
+  // 이 사이트 안의 경로만 연다
+  const url = safePath(data.url);
   event.waitUntil(
     self.registration.showNotification(title, {
       body,
@@ -40,11 +48,7 @@ const NAV_KEY = '/__pending-nav';
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  let path = '/';
-  try {
-    const u = new URL(event.notification.data?.url || '/', self.location.origin);
-    if (u.origin === self.location.origin) path = u.pathname + u.search + u.hash;
-  } catch {}
+  const path = safePath(event.notification.data?.url);
   const url = new URL(path, self.location.origin).href;
   event.waitUntil(
     (async () => {

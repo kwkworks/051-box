@@ -3,7 +3,7 @@ import { sendPushLater } from '../push.js';
 import { requireAdmin } from '../auth.js';
 import { HttpError, unwrap } from '../errors.js';
 import { noticeCreateSchema, noticeUpdateSchema, uuid } from '../schemas.js';
-import { naverEnabled, normalizeCafeUrl, postToCafe } from '../naver.js';
+import { naverEnabled, normalizeCafeUrl, postToCafe, serialCafe } from '../naver.js';
 
 export const noticesRouter = Router();
 
@@ -45,7 +45,8 @@ noticesRouter.post('/', requireAdmin, async (req, res) => {
       cafe_error = '네이버 카페 연동이 아직 설정되지 않았어요';
     } else {
       try {
-        const url = await postToCafe(post_to_cafe, notice.title, notice.body);
+        // 카페 글쓰기는 한 번에 하나씩 (WOD 자동 등록과 겹쳐도 토큰 갱신이 꼬이지 않게)
+        const url = await serialCafe(() => postToCafe(post_to_cafe, notice.title, notice.body));
         notice = unwrap(await req.sb.from('notices').update({ cafe_url: url }).eq('id', notice.id).select(COLUMNS).single());
       } catch (e) {
         cafe_error = e instanceof Error ? e.message : '카페에 올리지 못했어요';

@@ -47,7 +47,8 @@ function Events({ me }: { me: Me }) {
     () => api.get<{ events: BoxEvent[] }>(`/events?kind=${kind}${past ? '&past=1' : ''}`),
     `${kind}:${past ? 'past' : 'upcoming'}`,
   );
-  const canCreate = isAdmin || kind === 'gathering';
+  // 모임·대회는 회원 누구나, 이벤트는 관리자만
+  const canCreate = isAdmin || kind !== 'event';
 
   return (
     <BoardShell title="🏆 대회·이벤트 · 🍻 회원 모임" subtitle="버튼 하나로 참가 신청">

@@ -7,12 +7,14 @@ const NAV_CACHE = 'box-nav';
 const NAV_KEY = '/__pending-nav';
 const MAX_AGE_MS = 2 * 60 * 1000;
 
-// 이 사이트 안의 경로만 (//다른사이트 같은 우회 차단)
+// 이 사이트 안의 경로만. 주소를 푼 뒤의 경로도 다시 확인한다 (/./ /evil → //evil 우회 차단)
 function safePath(p: unknown): string | null {
-  if (typeof p !== 'string' || !p.startsWith('/') || p.startsWith('//')) return null;
+  if (typeof p !== 'string' || !p.startsWith('/')) return null;
   try {
     const u = new URL(p, window.location.origin);
-    return u.origin === window.location.origin ? u.pathname + u.search + u.hash : null;
+    if (u.origin !== window.location.origin) return null;
+    const path = u.pathname + u.search + u.hash;
+    return /^\/(?![/\\])/.test(path) ? path : null;
   } catch {
     return null;
   }
@@ -24,9 +26,14 @@ export function PushNavigator() {
 
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
+    // 메시지와 저장된 주소가 거의 동시에 와도 한 번만 이동한다 (같은 주소는 2초 안에 다시 이동하지 않음)
+    let last = { path: '', at: 0 };
     const go = (raw: unknown) => {
       const path = safePath(raw);
       if (!path) return;
+      const now = Date.now();
+      if (path === last.path && now - last.at < 2000) return;
+      last = { path, at: now };
       const here = window.location.pathname + window.location.search + window.location.hash;
       if (path !== here) router.push(path);
     };

@@ -11,17 +11,26 @@ export function NavCard({ href, className, children }: { href: string; className
   useEffect(() => {
     router.prefetch(href);
   }, [href, router]);
-  const go = () => router.push(href);
+  // Ctrl/⌘ + 클릭(또는 가운데 버튼)은 링크처럼 새 탭으로
+  const go = (newTab = false) => {
+    if (newTab) window.open(href, '_blank', 'noopener');
+    else router.push(href);
+  };
   return (
     <div
       role="link"
       tabIndex={0}
       className={`cursor-pointer ${className ?? ''}`}
-      onClick={go}
+      onClick={(e) => go(e.ctrlKey || e.metaKey)}
+      onAuxClick={(e) => {
+        if (e.button === 1) go(true);
+      }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') {
+        // 안쪽의 다른 버튼에서 누른 키는 무시하고, 카드 자체에서 Enter·스페이스를 누르면 연다
+        if (e.target !== e.currentTarget) return;
+        if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          go();
+          go(e.ctrlKey || e.metaKey);
         }
       }}
     >

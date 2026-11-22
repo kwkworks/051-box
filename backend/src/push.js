@@ -86,6 +86,20 @@ export function sendSignupPushLater(userId, ref, nickname) {
   })().catch((e) => console.warn('[push]', e?.message));
 }
 
+// Q&A 새 문의 → "Q&A 문의 알림"을 켠 관리자 기기에만 (쓴 사람·중복은 DB 함수가 걸러낸다)
+// 문의 제목·내용은 알림에 넣지 않는다: 비공개 문의가 잠금 화면에 보이지 않게
+export function sendQnaPushLater(questionId, nickname) {
+  if (!enabled) return;
+  (async () => {
+    const { data, error } = await sb.rpc('push_claim_qna', { p_secret: config.pushSecret, p_question: questionId });
+    if (error) {
+      console.warn('[push] Q&A 알림 대상을 불러오지 못했어요', error.code);
+      return;
+    }
+    await deliver(data, { title: '💬 새 Q&A 문의', body: `${nickname ?? '회원'}님이 문의를 남겼어요`, url: '/qna' });
+  })().catch((e) => console.warn('[push]', e?.message));
+}
+
 // 축하해요 🎉 → PR 글 주인에게 (자기 글·중복·알림 끈 사람은 DB 함수가 걸러낸다)
 export function sendCheerPushLater(activityId, likerId, payload) {
   if (!enabled) return;
