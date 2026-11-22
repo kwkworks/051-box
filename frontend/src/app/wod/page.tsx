@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { BoardShell } from '@/components/BoardShell';
 import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { WodView } from '@/components/WodView';
@@ -13,12 +14,27 @@ import type { Lift, Me, Wod, WodPhoto } from '@/lib/types';
 import { useLoad } from '@/lib/useLoad';
 
 export default function WodPage() {
-  return <Guard need="member">{(me) => <WodBoard me={me} />}</Guard>;
+  return (
+    <Guard need="member">
+      {(me) => (
+        <Suspense fallback={<Loading />}>
+          <WodFromUrl me={me} />
+        </Suspense>
+      )}
+    </Guard>
+  );
 }
 
-function WodBoard({ me }: { me: Me }) {
+// 주소의 ?date=YYYY-MM-DD 로 그 날짜를 바로 연다 (예: "내일 WOD 공개" 알림을 누르면 내일 WOD)
+function WodFromUrl({ me }: { me: Me }) {
+  const q = useSearchParams().get('date');
+  const initial = q && /^\d{4}-\d{2}-\d{2}$/.test(q) ? q : null;
+  return <WodBoard key={initial ?? 'today'} me={me} initialDate={initial} />;
+}
+
+function WodBoard({ me, initialDate }: { me: Me; initialDate: string | null }) {
   const today = kstToday();
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useState(initialDate ?? today);
   const isAdmin = me.profile.role === 'admin';
   const { data, error, loading, reload } = useLoad(
     () => api.get<{ wod: Wod | null; photos: WodPhoto[]; locked?: boolean; opensAt?: string; released?: boolean }>(`/wods?date=${date}`),

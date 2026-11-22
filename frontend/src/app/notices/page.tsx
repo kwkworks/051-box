@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { BoardShell } from '@/components/BoardShell';
 import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { NoticeEditor } from '@/components/NoticeEditor';
@@ -11,17 +12,39 @@ import { useLoad } from '@/lib/useLoad';
 import { latestNotice, markNoticesSeen } from '@/lib/noticeSeen';
 
 export default function NoticesPage() {
-  return <Guard need="member">{(me) => <Notices me={me} />}</Guard>;
+  return (
+    <Guard need="member">
+      {(me) => (
+        <Suspense fallback={<Loading />}>
+          <NoticesFromUrl me={me} />
+        </Suspense>
+      )}
+    </Guard>
+  );
 }
 
-function Notices({ me }: { me: Me }) {
+// 주소의 ?id= 로 그 공지를 펼쳐서 보여준다 (새 공지 알림을 누르면 그 공지)
+function NoticesFromUrl({ me }: { me: Me }) {
+  const q = useSearchParams().get('id');
+  const initial = q && /^[0-9a-f-]{36}$/i.test(q) ? q : null;
+  return <Notices key={initial ?? 'list'} me={me} initialId={initial} />;
+}
+
+function Notices({ me, initialId }: { me: Me; initialId: string | null }) {
   const isAdmin = me.profile.role === 'admin';
   const { data, error, loading, reload } = useLoad(() => api.get<{ notices: Notice[] }>('/notices'), 'notices');
   // 공지사항을 열면 지금까지의 공지는 본 것으로 (박스 벽 게시판의 NEW가 꺼진다)
   useEffect(() => {
     if (data) markNoticesSeen(latestNotice(data.notices));
   }, [data]);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(initialId);
+  // 알림으로 들어와 펼친 공지가 화면에 보이게 스크롤
+  const scrolled = useRef(false);
+  useEffect(() => {
+    if (!data || !initialId || scrolled.current) return;
+    scrolled.current = true;
+    document.getElementById(`notice-${initialId}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [data, initialId]);
   const [editing, setEditing] = useState<Notice | 'new' | null>(null);
 
   return (
@@ -41,7 +64,7 @@ function Notices({ me }: { me: Me }) {
         {data?.notices.map((n) => {
           const open = openId === n.id;
           return (
-            <li key={n.id} className={`card overflow-hidden ${n.pinned ? 'border-[var(--burgundy)]' : ''}`}>
+            <li key={n.id} id={`notice-${n.id}`} className={`card scroll-mt-20 overflow-hidden ${n.pinned ? 'border-[var(--burgundy)]' : ''}`}>
               <button type="button" className="flex w-full items-start gap-2 px-4 py-3 text-left" aria-expanded={open} onClick={() => setOpenId(open ? null : n.id)}>
                 {n.pinned && <span className="chip shrink-0 border-[var(--burgundy)] bg-[var(--burgundy)] text-white">📌 고정</span>}
                 <span className="flex-1 font-bold">{n.title}</span>

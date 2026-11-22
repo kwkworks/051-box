@@ -131,3 +131,37 @@ eventsRouter.delete('/:id/join', async (req, res) => {
   unwrap(await req.sb.from('event_participants').delete().eq('event_id', event_id).eq('user_id', req.userId));
   res.json({ joined: false });
 });
+
+// ---- 회원 모임 댓글: 승인 회원 누구나 쓰고, 쓴 사람과 관리자가 지운다 (DB RLS도 같은 규칙)
+const commentSchema = z.strictObject({ body: z.string().trim().min(1, '댓글을 입력해 주세요').max(300) });
+const COMMENT_COLUMNS = 'id, user_id, body, created_at, profiles!user_id(nickname, avatar, role)';
+const toComment = ({ profiles, ...c }) => ({
+  ...c,
+  nickname: profiles?.nickname ?? '알 수 없음',
+  avatar: profiles?.avatar ?? {},
+  role: profiles?.role ?? 'member',
+});
+
+eventsRouter.get('/:id/comments', async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  const rows = unwrap(
+    await req.sb.from('event_comments').select(COMMENT_COLUMNS).eq('event_id', id).order('created_at').limit(300),
+  );
+  res.json({ comments: rows.map(toComment) });
+});
+
+eventsRouter.post('/:id/comments', async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  const { body } = commentSchema.parse(req.body);
+  const result = await req.sb.from('event_comments').insert({ event_id: id, body }).select(COMMENT_COLUMNS).single();
+  if (result.error) throw fromDbError(result.error);
+  res.status(201).json({ comment: toComment(result.data) });
+});
+
+eventsRouter.delete('/:id/comments/:commentId', async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  const commentId = uuid.parse(req.params.commentId);
+  const deleted = unwrap(await req.sb.from('event_comments').delete().eq('id', commentId).eq('event_id', id).select('id'));
+  if (!deleted.length) throw new HttpError(404, '댓글을 찾을 수 없거나 지울 권한이 없어요');
+  res.status(204).end();
+});

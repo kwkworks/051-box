@@ -19,7 +19,7 @@ pushPublicRouter.post('/wod-release', async (req, res) => {
   sendPushLater('wod', wod.wod_date, null, {
     title: '📋 내일 WOD가 공개됐어요',
     body: wod.title,
-    url: '/wod',
+    url: `/wod?date=${wod.wod_date}`, // 알림을 누르면 내일 WOD가 바로 열린다
   });
   res.json({ ok: true });
 });

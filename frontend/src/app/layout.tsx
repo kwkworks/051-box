@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { AuthProvider } from '@/components/AuthProvider';
+import { Suspense } from 'react';
+import { PushNavigator } from '@/components/PushNavigator';
 import { BadgeClear } from '@/components/BadgeClear';
 import { IosInstallSheet } from '@/components/IosInstallSheet';
 import { OrientationLock } from '@/components/OrientationLock';
@@ -31,6 +33,10 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           <IosInstallSheet />
           <UpdateNotice />
           <BadgeClear />
+          {/* 화면 주소를 다루는 부품이라 미리 만들어 두는 페이지를 막지 않게 Suspense로 감싼다 */}
+          <Suspense fallback={null}>
+            <PushNavigator />
+          </Suspense>
           <OrientationLock />
         </AuthProvider>
       </body>

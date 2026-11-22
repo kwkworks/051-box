@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { AvatarView } from "./AvatarView";
 import { formatDateTime, safeHttpsUrl } from "@/lib/format";
 import type { EventDetail } from "@/lib/types";
@@ -14,6 +15,7 @@ export function EventDetailView({
   onToggleClose,
   onEdit,
   onRemove,
+  children,
 }: {
   ev: EventDetail;
   now: number;
@@ -23,6 +25,7 @@ export function EventDetailView({
   onToggleClose: (closeNow: boolean) => void;
   onEdit: () => void;
   onRemove: () => void;
+  children?: ReactNode; // 참가자 목록 아래에 넣을 것 (회원 모임 댓글)
 }) {
   // 만든 사람·관리자가 마감했거나(closed_at), 신청 마감일이 지났으면 마감
   const manuallyClosed = Boolean(ev.closed_at);
@@ -149,6 +152,8 @@ export function EventDetailView({
           </ul>
         )}
       </section>
+
+      {children}
 
       {ev.can_manage && (
         <div className="mt-6 grid grid-cols-2 gap-2">

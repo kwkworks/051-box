@@ -72,6 +72,17 @@ export type BoxEvent = {
   joined: boolean;
 };
 
+// 회원 모임 댓글
+export type EventComment = {
+  id: string;
+  user_id: string;
+  body: string;
+  created_at: string;
+  nickname: string;
+  avatar: Partial<Avatar>;
+  role: Role;
+};
+
 export type EventDetail = BoxEvent & {
   creator?: { nickname: string } | null;
   participants: { user_id: string; nickname: string; avatar: Partial<Avatar>; created_at: string }[];

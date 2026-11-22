@@ -6,6 +6,7 @@ import { BgmControl } from '@/components/BgmControl';
 import { QuickMenu } from '@/components/QuickMenu';
 import { AvatarView } from '@/components/AvatarView';
 import { ChatPanel } from '@/components/ChatPanel';
+import { EventComments } from '@/components/EventComments';
 import { EventDetailView } from '@/components/EventDetailView';
 import { EventForm } from '@/components/EventForm';
 import { NaverCafeCard } from '@/components/NaverCafeCard';
@@ -132,7 +133,22 @@ export function DevPreview() {
                   creator: { nickname: '김코치' },
                   participants: [1, 2, 3, 4].map((n) => ({ user_id: `p${n}`, nickname: `회원${n}`, avatar: {}, created_at: '2026-11-12T00:00:00Z' })),
                 }}
-              />
+              >
+                {c.label !== 'creator-closed' && (
+                  // 댓글 미리보기: 'creator-open'은 관리자로 보기(모든 댓글 삭제 가능), 'member'는 일반 회원(내 댓글만 삭제)
+                  <EventComments
+                    myId={DEMO.id}
+                    isAdmin={c.label === 'creator-open'}
+                    comments={[
+                      { id: 'c1', user_id: 'admin1', nickname: '김코치', role: 'admin', avatar: {}, body: '7시까지 박스 앞에서 모여요! 늦으시는 분은 댓글 남겨 주세요 🙌', created_at: '2026-11-12T09:00:00Z' },
+                      { id: 'c2', user_id: 'p2', nickname: '이지은', role: 'member', avatar: {}, body: '저는 30분 정도 늦을 것 같아요', created_at: '2026-11-12T10:00:00Z' },
+                      { id: 'c3', user_id: DEMO.id, nickname: DEMO.nickname, role: 'member', avatar: {}, body: '참가합니다! 차 있으신 분 같이 가요', created_at: '2026-11-12T11:00:00Z' },
+                    ]}
+                    onSend={async () => true}
+                    onDelete={() => {}}
+                  />
+                )}
+              </EventDetailView>
             </div>
           ))}
         </div>

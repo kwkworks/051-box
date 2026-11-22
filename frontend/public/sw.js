@@ -31,22 +31,37 @@ self.addEventListener('push', (event) => {
   );
 });
 
+// 알림을 누르면 그 알림의 화면으로 바로 간다.
+//  1) 앱이 열려 있으면: 앱에 "이 주소로 가" 메시지를 보내고(PushNavigator가 받음), 되면 창 자체도 그 주소로 옮긴 뒤 앞으로 가져온다
+//  2) 앱이 꺼져 있으면: 그 주소로 새 창을 연다
+//  아이폰처럼 새 창을 첫 화면으로 여는 기기를 위해 가야 할 주소를 잠깐(2분) 저장해 두고, 앱이 켜지면 PushNavigator가 이어서 이동한다
+const NAV_CACHE = 'box-nav';
+const NAV_KEY = '/__pending-nav';
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  let url = new URL('/', self.location.origin).href;
+  let path = '/';
   try {
     const u = new URL(event.notification.data?.url || '/', self.location.origin);
-    if (u.origin === self.location.origin) url = u.href;
+    if (u.origin === self.location.origin) path = u.pathname + u.search + u.hash;
   } catch {}
+  const url = new URL(path, self.location.origin).href;
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
-      for (const w of wins) {
-        if ('focus' in w) {
-          w.navigate(url);
-          return w.focus();
-        }
+    (async () => {
+      try {
+        const cache = await caches.open(NAV_CACHE);
+        await cache.put(NAV_KEY, new Response(JSON.stringify({ path, at: Date.now() }), { headers: { 'Content-Type': 'application/json' } }));
+      } catch {}
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const win = wins.find((w) => 'focus' in w);
+      if (win) {
+        win.postMessage({ type: 'box-navigate', path });
+        try {
+          await win.focus();
+        } catch {}
+        return;
       }
-      return self.clients.openWindow(url);
-    }),
+      await self.clients.openWindow(url);
+    })(),
   );
 });

@@ -36,7 +36,7 @@ noticesRouter.post('/', requireAdmin, async (req, res) => {
   const result = await req.sb.from('notices').insert({ ...input, cafe_url: cafe_url ?? null }).select(COLUMNS).single();
   if (result.error?.code === '23505') throw new HttpError(409, '이미 앱에 가져온 카페 글이에요');
   let notice = unwrap(result);
-  sendPushLater('notices', notice.id, req.userId, { title: '📢 새 공지사항', body: notice.title, url: '/notices' });
+  sendPushLater('notices', notice.id, req.userId, { title: '📢 새 공지사항', body: notice.title, url: `/notices?id=${notice.id}` });
 
   // B. 카페에도 올리기 (카페에서 가져온 글은 다시 올리지 않는다). 실패해도 앱 공지는 그대로 남긴다
   let cafe_error = null;

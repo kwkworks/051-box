@@ -404,6 +404,19 @@ begin
   (141, '회원이 채팅 공지 쓰기', 'err', pg_temp.run_as(a, 'insert into public.app_settings (key, value) values (''chat_notice'', ''rls-test'') on conflict (key) do update set value = excluded.value')),
   (142, '관리자가 200자 넘는 채팅 공지 저장', 'err', pg_temp.run_as(d, format('insert into public.app_settings (key, value) values (''chat_notice'', %L) on conflict (key) do update set value = excluded.value', repeat('가', 201))));
 
+  -- 0027: 회원 모임 댓글 (읽기·쓰기는 승인 회원, 모임에만, 지우기는 쓴 사람·관리자, 수정 불가)
+  insert into rls_results values
+  (143, '비로그인으로 댓글 읽기', 'err', pg_temp.run_as(null, 'select * from public.event_comments')),
+  (144, '회원이 모임에 댓글 작성', 'ok:1', pg_temp.run_as(a, format('insert into public.event_comments (event_id, body) values (%L, ''rls-test 댓글'')', ev_full))),
+  (145, '회원이 남의 이름으로 댓글 작성', 'err', pg_temp.run_as(a, format('insert into public.event_comments (event_id, user_id, body) values (%L, %L, ''rls-test'')', ev_full, d))),
+  (146, '회원이 대회(모임 아님)에 댓글 작성', 'err', pg_temp.run_as(a, format('insert into public.event_comments (event_id, body) values (%L, ''rls-test'')', ev_closed))),
+  (147, '관리자가 모임에 댓글 작성', 'ok:1', pg_temp.run_as(d, format('insert into public.event_comments (event_id, body) values (%L, ''rls-test 관리자'')', ev_full)));
+  insert into rls_results values
+  (148, '회원이 남(관리자)의 댓글 지우기', 'ok:0', pg_temp.run_as(a, 'delete from public.event_comments where body = ''rls-test 관리자''')),
+  (149, '회원이 댓글 고치기', 'err', pg_temp.run_as(a, 'update public.event_comments set body = ''x'' where body like ''rls-test%''')),
+  (150, '관리자가 회원 댓글 지우기', 'ok:1', pg_temp.run_as(d, 'delete from public.event_comments where body = ''rls-test 댓글'''));
+  delete from public.event_comments where body like 'rls-test%';
+
   -- 마지막: 임시 회원 m이 스스로 탈퇴 → 계정과 기록이 모두 사라지는지
   r := pg_temp.run_as(m, 'select public.delete_my_account()');
   insert into rls_results values
