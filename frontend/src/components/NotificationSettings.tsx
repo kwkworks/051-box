@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './AuthProvider';
 import { api } from '@/lib/api';
-import { disablePush, enablePush, pushState, type PushState } from '@/lib/push';
+import { PushHelp } from './PushHelp';
+import { PushStepError, browserKind, disablePush, enablePush, pushDiagnostics, pushState, type PushStep, type PushState } from '@/lib/push';
 import type { NotifyPrefs, Profile } from '@/lib/types';
 
 const KINDS: { key: keyof NotifyPrefs; label: string; hint: string; adminOnly?: boolean }[] = [
@@ -32,6 +33,9 @@ export function NotificationSettings({ profile }: { profile: Profile }) {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // 알림 켜기가 멈춘 단계와 문제 정보 (안내 카드로 보여준다)
+  const [failedStep, setFailedStep] = useState<PushStep | null>(null);
+  const [diag, setDiag] = useState<[string, string][] | null>(null);
   const [prefs, setPrefs] = useState<NotifyPrefs>({ ...DEFAULT_PREFS, ...(profile.notify_prefs ?? {}) });
 
   useEffect(() => {
@@ -45,10 +49,14 @@ export function NotificationSettings({ profile }: { profile: Profile }) {
   const toggleDevice = async () => {
     setBusy(true);
     setMsg(null);
+    setFailedStep(null);
     try {
       setState(state === 'on' ? await disablePush() : await enablePush());
+      setDiag(null);
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : '알림을 설정하지 못했어요');
+      if (e instanceof PushStepError) setFailedStep(e.step);
+      else setMsg(e instanceof Error ? e.message : '알림을 설정하지 못했어요');
+      pushDiagnostics().then(setDiag, () => setDiag(null));
     } finally {
       setBusy(false);
     }
@@ -80,10 +88,21 @@ export function NotificationSettings({ profile }: { profile: Profile }) {
     <section className="card mt-6 flex flex-col gap-3 p-4" aria-label="알림 설정">
       <h2 className="font-black">🔔 알림 설정</h2>
       {state && <p className="text-sm text-muted">{STATE_TEXT[state]}</p>}
-      {(state === 'on' || state === 'off') && (
+      {(state === 'on' || state === 'off') && !failedStep && (
         <button type="button" className={`btn h-11 ${state === 'on' ? '' : 'btn-primary'}`} disabled={busy} onClick={toggleDevice}>
-          {busy ? '설정하는 중…' : state === 'on' ? '이 기기 알림 끄기' : '🔔 이 기기에서 알림 받기'}
+          {busy ? '설정하는 중… (최대 20초)' : state === 'on' ? '이 기기 알림 끄기' : '🔔 이 기기에서 알림 받기'}
         </button>
+      )}
+      {failedStep && <PushHelp step={failedStep} browser={browserKind()} diag={diag} busy={busy} onRetry={toggleDevice} />}
+      {msg && diag && !failedStep && (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 rounded border border-ink/20 bg-white p-2 text-xs">
+          {diag.map(([k, v]) => (
+            <div key={k} className="contents">
+              <dt className="text-muted">{k}</dt>
+              <dd className="break-words font-bold">{v}</dd>
+            </div>
+          ))}
+        </dl>
       )}
       <div>
         <p className="mb-1 text-xs font-bold text-muted">받을 알림 (내 모든 기기 공통)</p>

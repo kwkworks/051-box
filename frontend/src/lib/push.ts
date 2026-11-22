@@ -22,11 +22,17 @@ async function registration() {
   return navigator.serviceWorker.register('/sw.js', { scope: '/' });
 }
 
-// 휴대폰이 응답하지 않으면 영원히 기다리지 않게 단계마다 시간 제한을 둔다
-class PushStepError extends Error {}
-function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> {
+// 휴대폰이 응답하지 않으면 영원히 기다리지 않게 단계마다 시간 제한을 둔다.
+// 멈춘 단계(1 알림 허용 · 2 알림 준비 · 3 푸시 등록)를 화면이 받아서 그 단계의 해결 방법을 보여준다
+export type PushStep = 1 | 2 | 3;
+export class PushStepError extends Error {
+  constructor(public step: PushStep) {
+    super(`push step ${step} timed out`);
+  }
+}
+function withTimeout<T>(p: Promise<T>, ms: number, step: PushStep): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new PushStepError(message)), ms);
+    const t = setTimeout(() => reject(new PushStepError(step)), ms);
     p.then(
       (v) => {
         clearTimeout(t);
@@ -40,11 +46,45 @@ function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> 
   });
 }
 
-const MSG_PERMISSION =
-  '알림 허용 창이 뜨지 않았어요. 크롬이면 주소창 옆 🔔(또는 자물쇠) 아이콘 → 알림 허용, 또는 휴대폰 설정 → 애플리케이션 → 크롬(또는 삼성 인터넷) → 알림에서 허용한 뒤 다시 눌러 주세요. (1단계: 알림 허용)';
-const MSG_WORKER = '알림 준비가 끝나지 않았어요. 앱을 완전히 껐다가 다시 열고 눌러 주세요. (2단계: 알림 준비)';
-const MSG_SUBSCRIBE =
-  '휴대폰의 푸시 서비스에 연결하지 못했어요. 와이파이·데이터 연결과 절전 모드를 확인하고, Play 스토어에서 "Google Play 서비스"를 업데이트한 뒤 다시 눌러 주세요. (3단계: 푸시 등록)';
+// 지금 어떤 브라우저로 열었는지 (해결 방법을 그에 맞춰 보여주기 위해)
+export type BrowserKind = 'installed' | 'samsung' | 'chrome' | 'other';
+export function browserKind(): BrowserKind {
+  if (typeof window === 'undefined') return 'other';
+  if (detectInstallEnv() === 'installed') return 'installed';
+  const ua = navigator.userAgent;
+  if (/SamsungBrowser/i.test(ua)) return 'samsung';
+  if (/Chrome\//i.test(ua)) return 'chrome';
+  return 'other';
+}
+
+// 문제 정보 (캡처해서 보내 주면 원인을 찾을 수 있게). 개인정보나 키는 넣지 않는다
+export async function pushDiagnostics(): Promise<[string, string][]> {
+  const ua = navigator.userAgent;
+  const browser = /SamsungBrowser\/([\d.]+)/.exec(ua)?.[1]
+    ? `삼성 인터넷 ${/SamsungBrowser\/([\d.]+)/.exec(ua)![1]}`
+    : /Chrome\/([\d]+)/.exec(ua)?.[1]
+      ? `크롬 ${/Chrome\/([\d]+)/.exec(ua)![1]}`
+      : '기타';
+  const android = /Android ([\d.]+)/.exec(ua)?.[1];
+  const permText: Record<string, string> = { granted: '허용됨', denied: '차단됨', default: '아직 묻지 않음' };
+  let worker = '없음';
+  let push = '없음';
+  try {
+    const reg = await navigator.serviceWorker.getRegistration('/');
+    if (reg) worker = reg.active ? '준비됨' : reg.installing ? '설치 중' : reg.waiting ? '대기 중' : '등록만 됨';
+    const sub = await reg?.pushManager.getSubscription();
+    if (sub) push = `등록됨 (${new URL(sub.endpoint).host})`;
+  } catch {
+    worker = '확인 실패';
+  }
+  return [
+    ['브라우저', `${browser}${android ? ` · 안드로이드 ${android}` : ''}`],
+    ['설치 앱으로 열림', detectInstallEnv() === 'installed' ? '예' : '아니요'],
+    ['알림 권한', permText[Notification.permission] ?? Notification.permission],
+    ['알림 준비', worker],
+    ['푸시 등록', push],
+  ];
+}
 
 export async function pushState(): Promise<PushState> {
   if (typeof window === 'undefined') return 'unsupported';
@@ -63,7 +103,7 @@ export async function enablePush(): Promise<PushState> {
   let permission = Notification.permission;
   if (permission !== 'granted') {
     try {
-      permission = await withTimeout(Notification.requestPermission(), 20_000, MSG_PERMISSION);
+      permission = await withTimeout(Notification.requestPermission(), 20_000, 1);
     } catch (e) {
       // 시간 안에 응답은 없었지만 그사이 설정에서 허용했으면 계속 진행
       if (Notification.permission !== 'granted') throw e;
@@ -78,7 +118,7 @@ export async function enablePush(): Promise<PushState> {
       return r;
     }),
     15_000,
-    MSG_WORKER,
+    2,
   );
   // 3) 휴대폰 푸시 서비스에 등록 (이미 등록돼 있으면 그대로)
   const sub = await withTimeout(
@@ -86,7 +126,7 @@ export async function enablePush(): Promise<PushState> {
       .getSubscription()
       .then((s) => s ?? reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(PUBLIC_KEY) })),
     20_000,
-    MSG_SUBSCRIBE,
+    3,
   );
   // 4) 우리 서버에 저장 (서버가 잠들어 있으면 '깨우는 중' 안내가 따로 뜬다)
   await api.post('/push/subscribe', sub.toJSON());

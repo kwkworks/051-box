@@ -12,6 +12,7 @@ import { EventForm } from '@/components/EventForm';
 import { NaverCafeCard } from '@/components/NaverCafeCard';
 import { NoticeEditor } from '@/components/NoticeEditor';
 import { NotificationSettings } from '@/components/NotificationSettings';
+import { PushHelp } from '@/components/PushHelp';
 import { QnaItem } from '@/components/QnaItem';
 import { WallCard } from '@/components/WallCard';
 import { WodView } from '@/components/WodView';
@@ -107,6 +108,11 @@ export function DevPreview() {
             />
           ))}
           <NotificationSettings profile={{ ...DEMO, role: 'admin', notify_prefs: {} }} />
+          {/* 알림 켜기가 멈췄을 때 안내 카드 미리보기: 삼성 인터넷 1단계 / 설치 앱 3단계 */}
+          <div className="mt-4 flex flex-col gap-4" data-case="push-help">
+            <PushHelp step={1} browser="samsung" busy={false} onRetry={() => {}} diag={[['브라우저', '삼성 인터넷 27.0 · 안드로이드 14'], ['설치 앱으로 열림', '아니요'], ['알림 권한', '아직 묻지 않음'], ['알림 준비', '준비됨'], ['푸시 등록', '없음']]} />
+            <PushHelp step={3} browser="installed" busy={false} onRetry={() => {}} diag={[['브라우저', '크롬 142 · 안드로이드 14'], ['설치 앱으로 열림', '예'], ['알림 권한', '허용됨'], ['알림 준비', '준비됨'], ['푸시 등록', '없음']]} />
+          </div>
         </div>
       ) : view === 'event' ? (
         // 모임 상세 미리보기: 만든 사람(열림) / 만든 사람(마감됨) / 일반 회원
