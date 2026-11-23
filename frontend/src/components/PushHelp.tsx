@@ -11,6 +11,15 @@ const STEP_TITLE: Record<PushStep, string> = {
 // 멈춘 단계와 브라우저에 맞는 해결 순서
 function stepsFor(step: PushStep, browser: BrowserKind): string[] {
   if (step === 1) {
+    // 삼성 인터넷으로 설치한 앱: 사이트 알림 허용은 '앱 정보'가 아니라 삼성 인터넷 설정에 있다
+    if (browser === 'installed-samsung')
+      return [
+        '홈 화면에서 삼성 인터넷 앱 열기',
+        '아래 메뉴(≡) → 설정 → 사이트 및 다운로드',
+        '알림(또는 사이트 권한 관리 → 알림) → 051-box.vercel.app 허용',
+        '목록에 없으면: 삼성 인터넷 주소창에 051-box.vercel.app 열고 게시판 → 알림 받기 누르기',
+        '051 BOX 앱으로 돌아와 다시 시도',
+      ];
     if (browser === 'installed')
       return ['홈 화면의 051 BOX 아이콘을 길게 누르기', 'ⓘ 앱 정보 → 알림 → 허용', '앱을 완전히 껐다가 다시 열고 버튼 누르기'];
     if (browser === 'samsung')

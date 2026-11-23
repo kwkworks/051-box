@@ -47,11 +47,11 @@ function withTimeout<T>(p: Promise<T>, ms: number, step: PushStep): Promise<T> {
 }
 
 // 지금 어떤 브라우저로 열었는지 (해결 방법을 그에 맞춰 보여주기 위해)
-export type BrowserKind = 'installed' | 'samsung' | 'chrome' | 'other';
+export type BrowserKind = 'installed-samsung' | 'installed' | 'samsung' | 'chrome' | 'other';
 export function browserKind(): BrowserKind {
   if (typeof window === 'undefined') return 'other';
-  if (detectInstallEnv() === 'installed') return 'installed';
   const ua = navigator.userAgent;
+  if (detectInstallEnv() === 'installed') return /SamsungBrowser/i.test(ua) ? 'installed-samsung' : 'installed';
   if (/SamsungBrowser/i.test(ua)) return 'samsung';
   if (/Chrome\//i.test(ua)) return 'chrome';
   return 'other';
@@ -99,35 +99,45 @@ export async function pushState(): Promise<PushState> {
 
 // 버튼을 눌렀을 때 호출 (알림 권한 요청은 사용자 동작 안에서만 가능)
 export async function enablePush(): Promise<PushState> {
-  // 1) 알림 허용: 이미 허용했으면 묻지 않는다. 창이 안 뜨는 기기(조용한 알림 요청)를 위해 20초 제한
+  // 알림 담당 프로그램(서비스 워커)은 허용을 묻는 동안 함께 준비해 둔다
+  const regReady = registration().then(async (r) => {
+    await navigator.serviceWorker.ready;
+    return r;
+  });
+  regReady.catch(() => {}); // 실패는 아래에서 단계별로 처리
+  const subscribe = (reg: ServiceWorkerRegistration) =>
+    reg.pushManager
+      .getSubscription()
+      .then((s) => s ?? reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(PUBLIC_KEY) }));
+
+  // 1) 알림 허용: 이미 허용했으면 묻지 않는다
   let permission = Notification.permission;
+  let sub: PushSubscription | null = null;
   if (permission !== 'granted') {
     try {
-      permission = await withTimeout(Notification.requestPermission(), 20_000, 1);
-    } catch (e) {
-      // 시간 안에 응답은 없었지만 그사이 설정에서 허용했으면 계속 진행
-      if (Notification.permission !== 'granted') throw e;
-      permission = 'granted';
+      permission = await withTimeout(Notification.requestPermission(), 12_000, 1);
+    } catch {
+      if (Notification.permission === 'granted') {
+        permission = 'granted'; // 그사이 설정에서 허용함
+      } else {
+        // 허용 창이 응답하지 않는 기기(예: 삼성 인터넷 설치 앱): 푸시 등록으로 허용을 한 번 더 요청한다
+        try {
+          const reg = await withTimeout(regReady, 15_000, 2);
+          sub = await withTimeout(subscribe(reg), 20_000, 1);
+          permission = 'granted';
+        } catch (e) {
+          if (e instanceof PushStepError && e.step === 2) throw e;
+          if (Notification.permission === 'denied') return 'denied';
+          throw new PushStepError(1);
+        }
+      }
     }
   }
   if (permission !== 'granted') return permission === 'denied' ? 'denied' : 'off';
   // 2) 알림 담당 프로그램(서비스 워커) 준비
-  const reg = await withTimeout(
-    registration().then(async (r) => {
-      await navigator.serviceWorker.ready;
-      return r;
-    }),
-    15_000,
-    2,
-  );
+  const reg = await withTimeout(regReady, 15_000, 2);
   // 3) 휴대폰 푸시 서비스에 등록 (이미 등록돼 있으면 그대로)
-  const sub = await withTimeout(
-    reg.pushManager
-      .getSubscription()
-      .then((s) => s ?? reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(PUBLIC_KEY) })),
-    20_000,
-    3,
-  );
+  if (!sub) sub = await withTimeout(subscribe(reg), 20_000, 3);
   // 4) 우리 서버에 저장 (서버가 잠들어 있으면 '깨우는 중' 안내가 따로 뜬다)
   await api.post('/push/subscribe', sub.toJSON());
   return 'on';

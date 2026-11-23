@@ -90,7 +90,7 @@ export function NotificationSettings({ profile }: { profile: Profile }) {
       {state && <p className="text-sm text-muted">{STATE_TEXT[state]}</p>}
       {(state === 'on' || state === 'off') && !failedStep && (
         <button type="button" className={`btn h-11 ${state === 'on' ? '' : 'btn-primary'}`} disabled={busy} onClick={toggleDevice}>
-          {busy ? '설정하는 중… (최대 20초)' : state === 'on' ? '이 기기 알림 끄기' : '🔔 이 기기에서 알림 받기'}
+          {busy ? '설정하는 중… (최대 1분)' : state === 'on' ? '이 기기 알림 끄기' : '🔔 이 기기에서 알림 받기'}
         </button>
       )}
       {failedStep && <PushHelp step={failedStep} browser={browserKind()} diag={diag} busy={busy} onRetry={toggleDevice} />}
