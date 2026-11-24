@@ -433,6 +433,14 @@ begin
   (157, 'Max Rep 첫 기록이 명예의 벽 PR로', 'ok:1',
    'ok:' || (select count(*) from public.activities where user_id = m and kind = 'pr' and payload ->> 'unit' = 'reps' and payload ->> 'movement' = 'rls-test 버피')::text);
   delete from public.one_rm_records where user_id = m and movement = 'rls-test 버피';
+
+  -- 0030: 접수 시작 전에는 참가 신청 불가
+  insert into public.events (kind, title, starts_at, signup_opens_at, created_by)
+    values ('competition', 'rls-test 접수 전 대회', now() + interval '10 days', now() + interval '2 days', d);
+  insert into rls_results values
+  (158, '접수 시작 전 대회에 참가 신청', 'err', pg_temp.run_as(a, 'insert into public.event_participants (event_id) select id from public.events where title = ''rls-test 접수 전 대회''')),
+  (159, '접수 시작이 접수 마감보다 늦은 대회 등록', 'err', pg_temp.run_as(d, 'insert into public.events (kind, title, starts_at, signup_deadline, signup_opens_at) values (''competition'', ''rls-test 순서'', now() + interval ''10 days'', now() + interval ''3 days'', now() + interval ''5 days'')'));
+  delete from public.events where title in ('rls-test 접수 전 대회', 'rls-test 순서');
   delete from public.event_comments where body like 'rls-test%';
 
   -- 0028: Q&A 새 문의 알림 대상은 서버 비밀값으로만
