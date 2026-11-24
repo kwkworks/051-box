@@ -6,7 +6,7 @@ import { eventSchema, eventUpdateSchema, uuid } from '../schemas.js';
 
 export const eventsRouter = Router();
 
-const COLUMNS = 'id, kind, title, description, starts_at, location, link_url, signup_deadline, capacity, closed_at, created_by, created_at';
+const COLUMNS = 'id, kind, title, description, starts_at, location, link_url, signup_deadline, signup_opens_at, capacity, closed_at, created_by, created_at';
 
 // 목록: 참가 인원 수와 내 참가 여부 포함. 기본은 오늘 이후 일정.
 eventsRouter.get('/', async (req, res) => {

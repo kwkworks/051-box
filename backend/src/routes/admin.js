@@ -115,6 +115,13 @@ adminRouter.put('/sheet', async (req, res) => {
   res.json({ url: value });
 });
 
+// 비교용: 객체 키 순서와 상관없이 같은 내용이면 같은 문자열
+function stableJson(v) {
+  if (Array.isArray(v)) return `[${v.map(stableJson).join(',')}]`;
+  if (v && typeof v === 'object') return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${stableJson(v[k])}`).join(',')}}`;
+  return JSON.stringify(v);
+}
+
 // 시트를 읽어서 최근 7일 ~ 앞으로 60일 사이 WOD를 날짜 기준으로 작성/수정한다 (관리자 권한으로 RLS 적용)
 adminRouter.post('/sheet/import', async (req, res) => {
   const row = unwrap(await req.sb.from('app_settings').select('value').eq('key', 'wod_sheet_url').maybeSingle());
@@ -124,18 +131,30 @@ adminRouter.post('/sheet/import', async (req, res) => {
   const range = { from: kstDate(-7), to: kstDate(60) };
   const { wods, skipped } = rowsToWods(parseCsv(csv), range);
 
+  // 이미 있는 WOD와 내용을 비교해서, 실제로 달라진 것만 '수정'으로 저장한다 (같으면 건드리지 않음)
   const existing = wods.length
-    ? unwrap(await req.sb.from('wods').select('wod_date').in('wod_date', wods.map((w) => w.wod_date)))
+    ? unwrap(await req.sb.from('wods').select('wod_date, title, content, lifts').in('wod_date', wods.map((w) => w.wod_date)))
     : [];
-  const existingDates = new Set(existing.map((w) => w.wod_date));
-  if (wods.length) unwrap(await req.sb.from('wods').upsert(wods, { onConflict: 'wod_date' }));
+  const byDate = new Map(existing.map((w) => [w.wod_date, w]));
+  const created = [];
+  const updated = [];
+  const unchanged = [];
+  const toSave = [];
+  for (const w of wods) {
+    const old = byDate.get(w.wod_date);
+    if (!old) {
+      created.push(w.wod_date);
+      toSave.push(w);
+    } else if (old.title !== w.title || (old.content ?? '') !== w.content || stableJson(old.lifts ?? []) !== stableJson(w.lifts ?? [])) {
+      updated.push(w.wod_date);
+      toSave.push(w);
+    } else {
+      unchanged.push(w.wod_date);
+    }
+  }
+  if (toSave.length) unwrap(await req.sb.from('wods').upsert(toSave, { onConflict: 'wod_date' }));
 
-  res.json({
-    range,
-    created: wods.filter((w) => !existingDates.has(w.wod_date)).map((w) => w.wod_date),
-    updated: wods.filter((w) => existingDates.has(w.wod_date)).map((w) => w.wod_date),
-    skipped,
-  });
+  res.json({ range, created, updated, unchanged, skipped });
 });
 
 // ---- 채팅 관리 ----

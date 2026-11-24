@@ -12,6 +12,7 @@ export class HttpError extends Error {
 const SAFE_DB_MESSAGES = new Set([
   '신청이 마감되었습니다',
   '정원이 가득 찼습니다',
+  '아직 접수 기간이 아니에요',
   '이벤트를 찾을 수 없습니다',
   '자신의 권한은 변경할 수 없습니다',
   '변경할 수 없는 항목입니다',

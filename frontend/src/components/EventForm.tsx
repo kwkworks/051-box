@@ -11,6 +11,9 @@ export function EventForm({ kind, initial, onDone, onCancel }: { kind: EventKind
   const [description, setDescription] = useState(initial?.description ?? '');
   const [startsAt, setStartsAt] = useState(initial ? isoToLocalInput(initial.starts_at) : '');
   const [deadline, setDeadline] = useState(initial?.signup_deadline ? isoToLocalInput(initial.signup_deadline) : '');
+  const [opensAt, setOpensAt] = useState(initial?.signup_opens_at ? isoToLocalInput(initial.signup_opens_at) : '');
+  // 대회·이벤트는 접수 시작·접수 마감·대회일을 따로 적는다 (모임은 일시·신청 마감만)
+  const isComp = kind !== 'gathering';
   const [location, setLocation] = useState(initial?.location ?? '');
   const [link, setLink] = useState(initial?.link_url ?? '');
   const [capacity, setCapacity] = useState(initial?.capacity ? String(initial.capacity) : '');
@@ -32,6 +35,7 @@ export function EventForm({ kind, initial, onDone, onCancel }: { kind: EventKind
         location,
         link_url: link || null,
         signup_deadline: deadline ? localInputToIso(deadline) : null,
+        signup_opens_at: isComp && opensAt ? localInputToIso(opensAt) : null,
         capacity: capacity ? Number(capacity) : null,
       };
       if (initial) await api.patch(`/events/${initial.id}`, fields);
@@ -51,13 +55,19 @@ export function EventForm({ kind, initial, onDone, onCancel }: { kind: EventKind
         <input id="e-title" className="input" maxLength={80} value={title} onChange={(e) => setTitle(e.target.value)} placeholder={kind === 'gathering' ? '금요일 회식 🍖' : '2026 부산 크로스핏 챌린지'} />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
+        {isComp && (
+          <div>
+            <label className="label" htmlFor="e-opens">접수 시작 (선택)</label>
+            <input id="e-opens" type="datetime-local" className="input" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} />
+          </div>
+        )}
         <div>
-          <label className="label" htmlFor="e-start">일시</label>
-          <input id="e-start" type="datetime-local" className="input" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+          <label className="label" htmlFor="e-deadline">{isComp ? '접수 마감 (선택)' : '신청 마감 (선택)'}</label>
+          <input id="e-deadline" type="datetime-local" className="input" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
         </div>
         <div>
-          <label className="label" htmlFor="e-deadline">신청 마감 (선택)</label>
-          <input id="e-deadline" type="datetime-local" className="input" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+          <label className="label" htmlFor="e-start">{kind === 'competition' ? '대회 일시' : '일시'}</label>
+          <input id="e-start" type="datetime-local" className="input" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
         </div>
         <div>
           <label className="label" htmlFor="e-loc">장소</label>

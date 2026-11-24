@@ -23,12 +23,17 @@ const REPS_MINUTES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 30, 0];
 const REPS_SUGGESTIONS = ['버피', '더블언더', '풀업', '토투바', '푸시업', '월볼', '박스점프', '케틀벨 스윙', '머슬업', '핸드스탠드 푸시업', '에어스쿼트', '싯업', '런지'];
 const NAME_OK = /^[0-9A-Za-z가-힣 ()_.-]+$/;
 
-export function OneRmBoard({ me }: { me: Me }) {
+// demo: 개발용 미리보기에서 서버 없이 보여줄 예시 기록 (실제 화면에서는 쓰지 않음)
+export function OneRmBoard({ me, demo }: { me: Me; demo?: { records: OneRmRecord[]; rankings: Record<string, RankGroups> } }) {
   const { refreshMe } = useAuth();
-  const { data, error, loading, reload } = useLoad(
+  const loaded = useLoad(
     () => api.get<{ records: OneRmRecord[]; rankings: Record<string, RankGroups> }>('/one-rm'),
     'one-rm',
   );
+  const data = demo ?? loaded.data;
+  const error = demo ? null : loaded.error;
+  const loading = demo ? false : loaded.loading;
+  const reload = loaded.reload;
   const [unit, setUnit] = useState<RecordUnit>('lb');
   const [movement, setMovement] = useState<string>('back_squat');
   const [customName, setCustomName] = useState('');
@@ -49,6 +54,13 @@ export function OneRmBoard({ me }: { me: Me }) {
   const repsNum = Number(repsCount);
   const repsName = repsMove.trim();
   const repsNameOk = repsName.length > 0 && repsName.length <= 30 && NAME_OK.test(repsName);
+  // 종목 버튼: 내가 Max Rep으로 기록한 종목 → 흔한 종목 순서, 입력한 글자가 들어간 것만
+  const repsChoices = useMemo(() => {
+    const mine = (data?.records ?? []).filter((r) => r.unit === 'reps').map((r) => r.movement);
+    const all = [...new Set([...mine, ...REPS_SUGGESTIONS])];
+    const q = repsName.replace(/\s+/g, '').toLowerCase();
+    return (q ? all.filter((s) => s.replace(/\s+/g, '').toLowerCase().includes(q)) : all).slice(0, 16);
+  }, [data, repsName]);
   const valueOk =
     unit === 'lb'
       ? weightNum > 0 && weightNum <= 1200 && (weightNum * 2) % 1 === 0
@@ -129,12 +141,12 @@ export function OneRmBoard({ me }: { me: Me }) {
           ))}
         </div>
         {/* 좁은 화면에서 버튼이 두 줄이 되지 않게 단위 안내는 버튼 밖에 둔다 */}
-        <p className="-mt-1 text-xs text-muted">
+        <p className="-mt-1 break-keep text-xs text-muted">
           {unit === 'lb'
-            ? '무게는 파운드(lb)로 기록해요'
+            ? '무게를 파운드(lb)로 기록해요'
             : unit === 'time'
-              ? '네임드 WOD는 끝낸 시간으로 기록해요 (빠를수록 좋음)'
-              : '정해진 시간 안에 최대한 많이 한 횟수를 기록해요 (많을수록 좋음)'}
+              ? '끝낸 시간을 기록해요 · 빠를수록 좋아요'
+              : '정해진 시간 안의 최대 횟수 · 많을수록 좋아요'}
         </p>
         {unit === 'reps' ? (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -154,18 +166,23 @@ export function OneRmBoard({ me }: { me: Me }) {
                 id="rm-reps-move"
                 className="input"
                 maxLength={30}
-                list="rm-reps-suggest"
                 value={repsMove}
                 onChange={(e) => setRepsMove(e.target.value)}
                 placeholder="예: 버피, 더블언더"
+                autoComplete="off"
               />
-              <datalist id="rm-reps-suggest">
-                {REPS_SUGGESTIONS.map((s) => (
-                  <option key={s} value={s} />
-                ))}
-              </datalist>
+              {/* 누르면 바로 입력되는 종목 버튼 (아이폰에서도 보이게 목록 대신 버튼으로). 내가 기록한 종목을 먼저 */}
+              {repsChoices.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="종목 고르기">
+                  {repsChoices.map((s) => (
+                    <button key={s} type="button" className="chip" aria-pressed={s === repsName} onClick={() => setRepsMove(s)}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
               {repsName.length > 0 && !NAME_OK.test(repsName) && (
-                <p className="mt-1 text-xs font-bold text-[var(--danger)]">한글·영어·숫자·띄어쓰기·( ) _ . - 만 쓸 수 있어요</p>
+                <p className="mt-1 break-keep text-xs font-bold text-[var(--danger)]">한글·영어·숫자·띄어쓰기·( ) _ . - 만 쓸 수 있어요</p>
               )}
             </div>
             <div>
@@ -212,7 +229,7 @@ export function OneRmBoard({ me }: { me: Me }) {
                 <span className="font-black">:</span>
                 <input aria-label="초" type="number" inputMode="numeric" min={0} max={59} className="input" value={seconds} onChange={(e) => setSeconds(e.target.value)} placeholder="초" />
               </div>
-              <p className="mt-1 text-xs text-muted">예: Fran 4분 5초 → 4 : 5 · Murph 45분 → 45 : 0</p>
+              <p className="mt-1 break-keep text-xs text-muted">예: Fran 4분 5초 → 4 : 5 · Murph 45분 → 45 : 0</p>
             </div>
           )}
           <div>
@@ -225,9 +242,15 @@ export function OneRmBoard({ me }: { me: Me }) {
         <button type="button" className="btn btn-primary h-12" disabled={saving || !valid} onClick={save}>
           {saving ? '저장 중…' : '기록하기'}
         </button>
-        {isCustom && unit === 'lb' && <p className="text-xs text-muted">직접 입력한 종목은 WOD 무게 자동 계산에는 쓰이지 않아요.</p>}
-        {unit === 'reps' && <p className="text-xs text-muted">같은 종목·같은 시간에서 더 많이 하면 PR이에요. 시간이 다르면 따로 기록돼요.</p>}
-        {unit === 'time' && <p className="text-xs text-muted">시간 기록은 더 빨리 끝냈을 때 PR이에요.</p>}
+        {isCustom && unit === 'lb' && <p className="break-keep text-xs text-muted">직접 입력한 종목은 WOD 무게 계산에 쓰이지 않아요</p>}
+        {unit === 'reps' && (
+          <p className="break-keep text-xs text-muted">
+            같은 종목·같은 시간에서 더 많이 하면 PR이에요
+            <br />
+            시간이 다르면 따로 기록돼요 (1분 버피 ≠ 3분 버피)
+          </p>
+        )}
+        {unit === 'time' && <p className="break-keep text-xs text-muted">더 빨리 끝내면 PR이에요</p>}
       </section>
 
       {loading && <Loading />}
@@ -333,7 +356,7 @@ function MyRecords({ me, records, onRemove }: { me: Me; records: OneRmRecord[]; 
                   ['custom', '✏️ 직접 입력'],
                 ] as const
               ).map(([k, label]) => (
-                <button key={k} type="button" className={`chip ${kind === k ? 'bg-yellow' : ''}`} aria-pressed={kind === k} onClick={() => setKind(k)}>
+                <button key={k} type="button" className="chip" aria-pressed={kind === k} onClick={() => setKind(k)}>
                   {label}
                 </button>
               ))}
@@ -407,6 +430,7 @@ function Rankings({ me, rankings }: { me: Me; rankings: Record<string, RankGroup
   const myGender = me.profile.gender ?? null;
   const [rankKey, setRankKey] = useState<string>('lb:back_squat');
   const [tab, setTab] = useState<'all' | Gender>(myGender ?? 'all');
+  const [rankQuery, setRankQuery] = useState('');
   const keys = [...new Set(['lb:back_squat', ...Object.keys(rankings)])];
   const ranking = rankings[rankKey]?.[tab] ?? [];
 
@@ -421,6 +445,19 @@ function Rankings({ me, rankings }: { me: Me; rankings: Record<string, RankGroup
     const label = name.startsWith('custom:') ? name.slice(7) : movementLabel(name);
     return u === 'time' ? `⏱ ${label}` : label;
   };
+  // 종목 검색: 한글 이름·영어 이름·별칭(프란, Fran 등)으로 찾는다
+  const searchKeyOf = (k: string) => {
+    const [u, ...rest] = k.split(':');
+    if (u === 'reps') return { key: rest.slice(1).join(':'), custom: true };
+    const name = rest.join(':');
+    return name.startsWith('custom:') ? { key: name.slice(7), custom: true } : { key: name, custom: false };
+  };
+  const found = rankQuery.trim()
+    ? keys.filter((k) => {
+        const s = searchKeyOf(k);
+        return matchesSearch(rankQuery, s.key, labelOf(k), s.custom);
+      }).slice(0, 12)
+    : [];
 
   return (
     <section className="mb-6">
@@ -433,6 +470,38 @@ function Rankings({ me, rankings }: { me: Me; rankings: Record<string, RankGroup
             </option>
           ))}
         </select>
+      </div>
+      <div className="mb-2">
+        <input
+          type="search"
+          className="input"
+          placeholder="🔍 종목 검색 (예: 스쿼트, 프란, 버피)"
+          value={rankQuery}
+          onChange={(e) => setRankQuery(e.target.value)}
+          aria-label="순위 종목 검색"
+        />
+        {rankQuery.trim() && (
+          <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="검색된 종목">
+            {found.length === 0 ? (
+              <span className="text-xs text-muted">찾는 종목의 기록이 아직 없어요</span>
+            ) : (
+              found.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className="chip"
+                  aria-pressed={k === rankKey}
+                  onClick={() => {
+                    setRankKey(k);
+                    setRankQuery('');
+                  }}
+                >
+                  {labelOf(k)}
+                </button>
+              ))
+            )}
+          </div>
+        )}
       </div>
       <div className="mb-2 grid grid-cols-3 gap-2" role="tablist" aria-label="순위 구분">
         {(

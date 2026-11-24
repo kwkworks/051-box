@@ -74,7 +74,31 @@ export function DevPreview() {
       {view === 'onerm' ? (
         // 1RM 기록 화면 (기록 남기기 칸: 무게 / 네임드 / Max Rep). 서버 없이 열어서 아래 목록은 불러오기 오류로 나온다
         <div className="overflow-y-auto" data-view="onerm">
-          <OneRmBoard me={{ profile: DEMO, streak: 3, checkedInToday: false, bestLifts: {} }} />
+          <OneRmBoard
+            me={{ profile: DEMO, streak: 3, checkedInToday: false, bestLifts: {} }}
+            demo={{
+              records: [
+                { id: 'r1', movement: '버피', is_custom: true, unit: 'reps', weight_lb: null, time_sec: null, reps: 48, minutes: 1, achieved_on: '2026-11-20', created_at: '2026-11-20T00:00:00Z' },
+                { id: 'r2', movement: 'back_squat', is_custom: false, unit: 'lb', weight_lb: 285, time_sec: null, achieved_on: '2026-11-18', created_at: '2026-11-18T00:00:00Z' },
+              ],
+              rankings: Object.fromEntries(
+                ([
+                  ['lb:back_squat', 'back_squat', 'lb'],
+                  ['lb:front_squat', 'front_squat', 'lb'],
+                  ['time:fran', 'fran', 'time'],
+                  ['reps:1:버피', '버피', 'reps'],
+                  ['reps:2:더블언더', '더블언더', 'reps'],
+                ] as const).map(([k, mv, u]) => {
+                  const rows = [0, 1, 2, 3].map((i) => ({
+                    user_id: `u${i}`, movement: mv, is_custom: u === 'reps', unit: u, weight_lb: u === 'lb' ? 315 - i * 20 : null,
+                    time_sec: u === 'time' ? 240 + i * 15 : null, reps: u === 'reps' ? 52 - i * 3 : null, minutes: u === 'reps' ? 1 : null,
+                    achieved_on: '2026-11-20', nickname: ['김코치', '미리보기', '박회원', '이지은'][i], gender: 'M' as const, avatar: {},
+                  }));
+                  return [k, { all: rows, M: rows, F: [] }];
+                }),
+              ),
+            }}
+          />
         </div>
       ) : view === 'qna' ? (
         // Q&A 미리보기: 회원(내 문의) / 관리자(모든 문의, 답변 칸)
@@ -130,6 +154,7 @@ export function DevPreview() {
             { can_manage: true, closed_at: null, label: 'creator-open' },
             { can_manage: true, closed_at: '2026-11-13T02:00:00Z', label: 'creator-closed' },
             { can_manage: false, closed_at: null, label: 'member' },
+            { can_manage: false, closed_at: null, label: 'competition-before-open' },
           ].map((c) => (
             <div key={c.label} data-case={c.label}>
               <EventDetailView
@@ -141,9 +166,9 @@ export function DevPreview() {
                 onEdit={() => {}}
                 onRemove={() => {}}
                 ev={{
-                  id: c.label, kind: 'gathering', title: '금요일 회식 🍖', description: '참가비 2만원',
-                  starts_at: '2026-11-14T10:00:00Z', location: '박스 앞 고깃집', link_url: null,
-                  signup_deadline: '2026-11-14T03:00:00Z', capacity: 10, closed_at: c.closed_at,
+                  ...(c.label === 'competition-before-open'
+                    ? { id: c.label, kind: 'competition' as const, title: '2027 부산 크로스핏 챌린지', description: '스케일·RX 부문', starts_at: '2027-01-20T00:00:00Z', location: '부산 벡스코', link_url: null, signup_deadline: '2026-12-31T14:59:00Z', signup_opens_at: '2026-12-01T00:00:00Z', capacity: null, closed_at: null }
+                    : { id: c.label, kind: 'gathering' as const, title: '금요일 회식 🍖', description: '참가비 2만원', starts_at: '2026-11-14T10:00:00Z', location: '박스 앞 고깃집', link_url: null, signup_deadline: '2026-11-14T03:00:00Z', capacity: 10, closed_at: c.closed_at }),
                   created_by: 'u1', created_at: '2026-11-12T00:00:00Z', joined: false, can_manage: c.can_manage,
                   creator: { nickname: '김코치' },
                   participants: [1, 2, 3, 4].map((n) => ({ user_id: `p${n}`, nickname: `회원${n}`, avatar: {}, created_at: '2026-11-12T00:00:00Z' })),
@@ -186,6 +211,7 @@ export function DevPreview() {
         // 좁은 화면에서 입력칸이 넘치지 않는지 보는 미리보기 (모임 만들기 양식 + 날짜 칸)
         <div className="mx-auto w-full max-w-3xl overflow-y-auto px-4 pb-10">
           <EventForm kind="gathering" onDone={() => {}} />
+          <EventForm kind="competition" onDone={() => {}} />
           <NoticeEditor notice={null} onDone={() => {}} />
           <NaverCafeCard />
           <div className="card flex flex-col gap-2 p-4">

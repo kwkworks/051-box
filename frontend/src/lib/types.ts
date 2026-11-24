@@ -64,6 +64,7 @@ export type BoxEvent = {
   location: string;
   link_url: string | null;
   signup_deadline: string | null;
+  signup_opens_at?: string | null; // 접수 시작 (대회)
   capacity: number | null;
   closed_at: string | null; // 만든 사람·관리자가 마감한 시각 (null이면 열림)
   created_by: string;

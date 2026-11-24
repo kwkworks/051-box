@@ -155,3 +155,8 @@ textarea.input {
   font-weight: 700;
   background: #fff;
 }
+/* 고른 칩(필터·종목 버튼)은 노란색으로. .chip이 배경을 흰색으로 고정해서 bg-yellow만으로는 안 바뀐다 */
+.chip[aria-pressed="true"] {
+  background: var(--yellow);
+  border-color: var(--ink);
+}

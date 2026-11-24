@@ -33,6 +33,9 @@ export function EventDetailView({
     ? new Date(ev.signup_deadline).getTime() < now
     : false;
   const closed = manuallyClosed || deadlinePassed;
+  // 접수 시작 전이면 아직 신청할 수 없다
+  const notOpenYet = ev.signup_opens_at ? new Date(ev.signup_opens_at).getTime() > now : false;
+  const isComp = ev.kind === "competition";
   // 시작 후 12시간이 지나면 지난 일정 (목록 기준과 같음)
   const ended = new Date(ev.starts_at).getTime() < now - 12 * 3600 * 1000;
   const full = ev.capacity !== null && ev.participants.length >= ev.capacity;
@@ -43,7 +46,7 @@ export function EventDetailView({
       <article className="card p-4">
         <h2 className="text-xl font-black">{ev.title}</h2>
         <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-          <dt className="font-bold text-muted">일시</dt>
+          <dt className="font-bold text-muted">{isComp ? "대회일" : "일시"}</dt>
           <dd>{formatDateTime(ev.starts_at)}</dd>
           {ev.location && (
             <>
@@ -51,9 +54,18 @@ export function EventDetailView({
               <dd>{ev.location}</dd>
             </>
           )}
+          {ev.signup_opens_at && (
+            <>
+              <dt className="font-bold text-muted">접수 시작</dt>
+              <dd>
+                {formatDateTime(ev.signup_opens_at)}
+                {notOpenYet && " (접수 전)"}
+              </dd>
+            </>
+          )}
           {ev.signup_deadline && (
             <>
-              <dt className="font-bold text-muted">신청 마감</dt>
+              <dt className="font-bold text-muted">{ev.signup_opens_at || isComp ? "접수 마감" : "신청 마감"}</dt>
               <dd>
                 {formatDateTime(ev.signup_deadline)}
                 {deadlinePassed && " (마감됨)"}
@@ -103,7 +115,7 @@ export function EventDetailView({
       <button
         type="button"
         className={`btn mt-4 h-12 w-full ${ev.joined ? "" : "btn-primary"}`}
-        disabled={busy || ended || (!ev.joined && (closed || full))}
+        disabled={busy || ended || (!ev.joined && (closed || full || notOpenYet))}
         onClick={onToggleJoin}
       >
         {busy
@@ -116,7 +128,9 @@ export function EventDetailView({
               ? "참가 취소"
               : closed
                 ? "신청 마감"
-                : full
+                : notOpenYet
+                  ? `접수 전 (${formatDateTime(ev.signup_opens_at!)}부터)`
+                  : full
                   ? "정원이 가득 찼어요"
                   : "🙋 참가하기"}
       </button>

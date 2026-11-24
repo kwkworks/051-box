@@ -93,6 +93,7 @@ function EventCard({ ev, now, past }: { ev: BoxEvent; now: number; past: boolean
   const closed = Boolean(ev.closed_at) || (deadline !== null && deadline < now);
   const full = ev.capacity !== null && (ev.participant_count ?? 0) >= ev.capacity;
   const soon = deadline !== null && !closed && deadline - now < 3 * 86400000;
+  const notOpenYet = ev.signup_opens_at ? new Date(ev.signup_opens_at).getTime() > now : false;
   return (
     <li>
       <NavCard href={`/events/${ev.id}`} className={`card block p-4 transition-transform hover:-translate-y-0.5 ${past ? 'opacity-80' : ''}`}>
@@ -107,7 +108,8 @@ function EventCard({ ev, now, past }: { ev: BoxEvent; now: number; past: boolean
               {ev.joined && <span className="chip border-[var(--ok)] text-[var(--ok)]">✓ 참가 중</span>}
               {closed && <span className="chip text-muted">마감</span>}
               {!closed && full && <span className="chip text-[var(--danger)]">정원 마감</span>}
-              {soon && !full && <span className="chip bg-yellow">마감 임박</span>}
+              {notOpenYet && !closed && <span className="chip">접수 예정</span>}
+              {soon && !full && !notOpenYet && <span className="chip bg-yellow">마감 임박</span>}
             </>
           )}
         </div>
@@ -119,7 +121,12 @@ function EventCard({ ev, now, past }: { ev: BoxEvent; now: number; past: boolean
         <p className="mt-1 text-sm font-bold">
           👥 {ev.participant_count ?? 0}
           {ev.capacity ? ` / ${ev.capacity}명` : '명 참가'}
-          {!past && ev.signup_deadline && <span className="ml-2 font-normal text-muted">신청 마감 {formatDateTime(ev.signup_deadline)}</span>}
+          {!past && notOpenYet && ev.signup_opens_at && <span className="ml-2 font-normal text-muted">접수 시작 {formatDateTime(ev.signup_opens_at)}</span>}
+          {!past && !notOpenYet && ev.signup_deadline && (
+            <span className="ml-2 font-normal text-muted">
+              {ev.kind === 'gathering' ? '신청' : '접수'} 마감 {formatDateTime(ev.signup_deadline)}
+            </span>
+          )}
         </p>
       </NavCard>
     </li>

@@ -460,7 +460,7 @@ function Holidays() {
   );
 }
 
-type ImportResult = { range: { from: string; to: string }; created: string[]; updated: string[]; skipped: { row: number; reason: string }[] };
+type ImportResult = { range: { from: string; to: string }; created: string[]; updated: string[]; unchanged?: string[]; skipped: { row: number; reason: string }[] };
 
 // 구글 시트("웹에 게시")에서 WOD를 가져온다
 function SheetImport() {
@@ -542,18 +542,37 @@ function SheetImport() {
       {result && (
         <div className="card p-4 text-sm" role="status">
           <p className="font-black">
-            새로 추가 {result.created.length}개 · 수정 {result.updated.length}개 · 건너뜀 {result.skipped.length}개
+            새로 추가 {result.created.length}개 · 수정 {result.updated.length}개 · 변경 없음 {result.unchanged?.length ?? 0}개
           </p>
           {result.created.length + result.updated.length > 0 && (
             <p className="mt-1 text-muted">{[...result.created, ...result.updated].sort().join(', ')}</p>
           )}
-          {result.skipped.length > 0 && (
-            <ul className="mt-2 list-disc pl-5 text-xs text-[var(--danger)]">
-              {result.skipped.slice(0, 20).map((s, i) => (
-                <li key={i}>{s.row}번째 줄: {s.reason}</li>
-              ))}
-            </ul>
-          )}
+          {(() => {
+            // 가져오는 기간 밖 줄은 지난(또는 너무 먼) 날짜라 그대로 둔 것 → 한 줄로만 알려준다
+            const outOfRange = result.skipped.filter((s) => s.reason.startsWith('가져오는 기간'));
+            const problems = result.skipped.filter((s) => !s.reason.startsWith('가져오는 기간'));
+            return (
+              <>
+                {outOfRange.length > 0 && (
+                  <p className="mt-2 break-keep text-xs text-muted">
+                    가져오는 기간({result.range.from} ~ {result.range.to}) 밖이라 그대로 둔 줄 {outOfRange.length}개
+                  </p>
+                )}
+                {problems.length > 0 && (
+                  <>
+                    <p className="mt-2 text-xs font-bold text-[var(--danger)]">확인이 필요한 줄 {problems.length}개</p>
+                    <ul className="mt-1 list-disc break-keep pl-5 text-xs text-[var(--danger)]">
+                      {problems.slice(0, 20).map((s, i) => (
+                        <li key={i}>
+                          {s.row}번째 줄: {s.reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
     </div>
