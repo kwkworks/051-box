@@ -33,7 +33,7 @@ export function Podium({ rows, myId }: { rows: RankRow[]; myId: string }) {
                 </span>
                 {r && (
                   <span className="text-[11px] leading-tight sm:text-xs">
-                    <RecordValue unit={r.unit} weightLb={r.weight_lb} timeSec={r.time_sec} />
+                    <RecordValue unit={r.unit} weightLb={r.weight_lb} timeSec={r.time_sec} reps={r.reps} />
                   </span>
                 )}
               </div>

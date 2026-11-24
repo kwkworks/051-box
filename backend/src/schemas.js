@@ -137,15 +137,24 @@ export const oneRmSchema = z
   .strictObject({
     movement: z.string().trim().min(1).max(30),
     is_custom: z.boolean(),
-    unit: z.enum(['lb', 'time']).default('lb'),
+    unit: z.enum(['lb', 'time', 'reps']).default('lb'),
     weight_lb: z.number().positive().max(1200).multipleOf(0.5).optional(), // 파운드
     time_sec: z.number().int().min(1).max(86400).optional(), // 초
+    reps: z.number().int().min(1).max(9999).optional(), // Max Rep 횟수
+    minutes: z.number().int().min(0).max(60).optional(), // Max Rep 시간(분), 0 = 제한 없음
     achieved_on: isoDate.optional(),
   })
-  .refine((v) => (v.unit === 'lb' ? v.weight_lb !== undefined && v.time_sec === undefined : v.time_sec !== undefined && v.weight_lb === undefined), {
-    message: '기록 값을 다시 입력해주세요',
-    path: ['unit'],
-  })
+  .refine(
+    (v) =>
+      v.unit === 'lb'
+        ? v.weight_lb !== undefined && v.time_sec === undefined && v.reps === undefined && v.minutes === undefined
+        : v.unit === 'time'
+          ? v.time_sec !== undefined && v.weight_lb === undefined && v.reps === undefined && v.minutes === undefined
+          : v.reps !== undefined && v.minutes !== undefined && v.weight_lb === undefined && v.time_sec === undefined,
+    { message: '기록 값을 다시 입력해주세요', path: ['unit'] },
+  )
+  // Max Rep은 종목을 직접 입력한다
+  .refine((v) => v.unit !== 'reps' || v.is_custom, { message: '종목을 직접 입력해주세요', path: ['movement'] })
   .refine((v) => v.is_custom || (v.unit === 'lb' ? MOVEMENTS : NAMED_WODS).includes(v.movement), {
     message: '종목을 다시 선택해주세요',
     path: ['movement'],

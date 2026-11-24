@@ -13,6 +13,7 @@ import { NaverCafeCard } from '@/components/NaverCafeCard';
 import { NoticeEditor } from '@/components/NoticeEditor';
 import { NotificationSettings } from '@/components/NotificationSettings';
 import { PushHelp } from '@/components/PushHelp';
+import { OneRmBoard } from '@/components/OneRmBoard';
 import { QnaItem } from '@/components/QnaItem';
 import { WallCard } from '@/components/WallCard';
 import { WodView } from '@/components/WodView';
@@ -43,7 +44,7 @@ export function DevPreview() {
   const demoNotice = { id: 'demo-notice', title: '11월 넷째 주 박스 운영 시간 변경 안내 (추수감사절 이벤트 WOD 포함)', body: '이번 주 토요일은 오전 10시 단체 WOD 한 타임만 운영합니다. 일요일은 정상 휴무이고, 다음 주 월요일부터는 평소 시간표로 돌아갑니다. 이벤트 WOD는 파트너 와드로 진행되니 짝꿍과 함께 오세요!', pinned: false, cafe_url: null, created_at: '2026-11-16T09:00:00Z', updated_at: '2026-11-16T09:00:00Z' };
   const [demoPopup, setDemoPopup] = useState(true);
   const [demoNew, setDemoNew] = useState(true);
-  const [view, setView] = useState<'space' | 'avatars' | 'podium' | 'forms' | 'wod' | 'event' | 'wall' | 'qna'>('space');
+  const [view, setView] = useState<'space' | 'avatars' | 'podium' | 'forms' | 'wod' | 'event' | 'wall' | 'qna' | 'onerm'>('space');
   const space = useRef<BoxSpaceHandle | null>(null);
   // 채팅 미리보기: 다른 회원 메시지 8개, 그중 5개는 이미 읽음
   const [msgs, setMsgs] = useState<ChatMessage[]>(() =>
@@ -68,8 +69,14 @@ export function DevPreview() {
         <button type="button" className="btn btn-sm" onClick={() => setView('event')}>모임</button>
         <button type="button" className="btn btn-sm" onClick={() => setView('wall')}>벽</button>
         <button type="button" className="btn btn-sm" onClick={() => setView('qna')}>Q&A</button>
+        <button type="button" className="btn btn-sm" onClick={() => setView('onerm')}>1RM</button>
       </div>
-      {view === 'qna' ? (
+      {view === 'onerm' ? (
+        // 1RM 기록 화면 (기록 남기기 칸: 무게 / 네임드 / Max Rep). 서버 없이 열어서 아래 목록은 불러오기 오류로 나온다
+        <div className="overflow-y-auto" data-view="onerm">
+          <OneRmBoard me={{ profile: DEMO, streak: 3, checkedInToday: false, bestLifts: {} }} />
+        </div>
+      ) : view === 'qna' ? (
         // Q&A 미리보기: 회원(내 문의) / 관리자(모든 문의, 답변 칸)
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 overflow-y-auto px-4 pb-10" data-view="qna">
           {[false, true].map((admin) => (
@@ -96,12 +103,14 @@ export function DevPreview() {
             { id: 'w1', nickname: '룰루', movement: 'clean_and_jerk', weight_lb: 215, prev_lb: null, liked: false, count: 0 },
             { id: 'w2', nickname: '아주긴닉네임회원님', movement: 'overhead_squat', weight_lb: 1205.5, prev_lb: 1100, liked: true, count: 128 },
             { id: 'w3', nickname: '코치', movement: 'murph', time_sec: 2523, prev_sec: 2600, unit: 'time', liked: false, count: 7 },
+            { id: 'w4', nickname: '박회원', movement: '버피', reps: 52, minutes: 1, prev_reps: 47, unit: 'reps', liked: false, count: 3 },
+            { id: 'w5', nickname: '이지은', movement: '풀업', reps: 25, minutes: 0, prev_reps: null, unit: 'reps', liked: false, count: 0 },
           ].map((d) => (
             <WallCard
               key={d.id}
               item={{
                 id: d.id, kind: 'pr', created_at: '2026-11-13T03:00:00Z', user_id: 'u', nickname: d.nickname, avatar: {},
-                payload: { movement: d.movement, is_custom: false, unit: (d.unit ?? 'lb') as 'lb' | 'time', weight_lb: d.weight_lb, prev_lb: d.prev_lb, time_sec: d.time_sec, prev_sec: d.prev_sec },
+                payload: { movement: d.movement, is_custom: d.unit === 'reps', unit: (d.unit ?? 'lb') as 'lb' | 'time' | 'reps', weight_lb: d.weight_lb, prev_lb: d.prev_lb, time_sec: d.time_sec, prev_sec: d.prev_sec, reps: d.reps, minutes: d.minutes, prev_reps: d.prev_reps },
               } as FeedItem}
               cheer={{ liked: d.liked, count: d.count }}
               onCheer={() => {}}
@@ -195,6 +204,15 @@ export function DevPreview() {
               user_id: `u${i + 1}`, movement: 'back_squat', is_custom: false, unit: 'lb' as const,
               weight_lb: [315, 285, 275][i], time_sec: null, achieved_on: '2026-11-05',
               nickname: ['김코치', '미리보기', '박회원'][i], gender: 'M' as const, avatar: a,
+            }))}
+          />
+          {/* Max Rep 순위: 1분 버피 */}
+          <Podium
+            myId="u2"
+            rows={samples().slice(3, 6).map((a, i) => ({
+              user_id: `r${i + 1}`, movement: '버피', is_custom: true, unit: 'reps' as const,
+              weight_lb: null, time_sec: null, reps: [52, 48, 45][i], minutes: 1, achieved_on: '2026-11-20',
+              nickname: ['박회원', '미리보기', '이지은'][i], gender: 'M' as const, avatar: a,
             }))}
           />
         </div>

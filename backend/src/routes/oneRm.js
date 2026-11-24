@@ -5,31 +5,41 @@ import { oneRmSchema, uuid } from '../schemas.js';
 export const oneRmRouter = Router();
 
 // DB의 numeric은 문자열로 오므로 숫자로 바꾼다
-const clean = (r) => ({ ...r, weight_lb: r.weight_lb == null ? null : Number(r.weight_lb), time_sec: r.time_sec ?? null });
+const clean = (r) => ({
+  ...r,
+  weight_lb: r.weight_lb == null ? null : Number(r.weight_lb),
+  time_sec: r.time_sec ?? null,
+  reps: r.reps ?? null,
+  minutes: r.minutes ?? null,
+});
+
+// 순위·기록 묶음 열쇠: Max Rep은 시간(분)마다 따로 (reps:1:버피)
+const groupKey = (r) =>
+  r.unit === 'reps' ? `reps:${r.minutes}:${r.movement}` : `${r.unit === 'time' ? 'time' : 'lb'}:${r.is_custom ? 'custom:' : ''}${r.movement}`;
 
 // 내 기록 이력 + 종목별 박스 순위(사람별 최고 기록 기준 상위 10명)
 oneRmRouter.get('/', async (req, res) => {
   const [mine, best] = await Promise.all([
     req.sb
       .from('one_rm_records')
-      .select('id, movement, is_custom, unit, weight_lb, time_sec, achieved_on, created_at')
+      .select('id, movement, is_custom, unit, weight_lb, time_sec, reps, minutes, achieved_on, created_at')
       .eq('user_id', req.userId)
       .order('achieved_on', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(300),
-    req.sb.from('one_rm_best').select('user_id, movement, is_custom, unit, weight_lb, time_sec, achieved_on, nickname, gender').limit(2000),
+    req.sb.from('one_rm_best').select('user_id, movement, is_custom, unit, weight_lb, time_sec, reps, minutes, achieved_on, nickname, gender').limit(2000),
   ]);
 
-  // 순위: 무게는 무거운 순, 시간은 빠른 순
+  // 순위: 무게는 무거운 순, 시간은 빠른 순, 횟수는 많은 순
   const rankings = {};
   for (const row of unwrap(best)) {
-    const key = `${row.unit === 'time' ? 'time' : 'lb'}:${row.is_custom ? 'custom:' : ''}${row.movement}`;
-    (rankings[key] ??= []).push(clean(row));
+    (rankings[groupKey(row)] ??= []).push(clean(row));
   }
   // 종목마다 전체 / 남자 / 여자 상위 10명
   for (const key of Object.keys(rankings)) {
     const time = key.startsWith('time:');
-    const sorted = rankings[key].sort((a, b) => (time ? a.time_sec - b.time_sec : b.weight_lb - a.weight_lb));
+    const reps = key.startsWith('reps:');
+    const sorted = rankings[key].sort((a, b) => (time ? a.time_sec - b.time_sec : reps ? b.reps - a.reps : b.weight_lb - a.weight_lb));
     rankings[key] = {
       all: sorted.slice(0, 10),
       M: sorted.filter((r) => r.gender === 'M').slice(0, 10),
@@ -58,7 +68,7 @@ oneRmRouter.get('/', async (req, res) => {
 oneRmRouter.post('/', async (req, res) => {
   const body = oneRmSchema.parse(req.body);
   const record = unwrap(
-    await req.sb.from('one_rm_records').insert(body).select('id, movement, is_custom, unit, weight_lb, time_sec, achieved_on').single(),
+    await req.sb.from('one_rm_records').insert(body).select('id, movement, is_custom, unit, weight_lb, time_sec, reps, minutes, achieved_on').single(),
   );
   // 트리거가 PR이면 명예의 벽에 기록했는지 확인해서 알려준다
   const { data: pr } = await req.sb

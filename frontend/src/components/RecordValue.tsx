@@ -1,18 +1,23 @@
 import { fmtLb, fmtTime, lbToKg } from '@/lib/format';
 import type { RecordUnit } from '@/lib/types';
 
-// 기록 값 표시: 무게는 "225 lb (102.1 kg)", 시간은 "4:05"
+// 기록 값 표시: 무게는 "225 lb (102.1 kg)", 시간은 "4:05", 횟수는 "50회"
 export function RecordValue({
   unit,
   weightLb,
   timeSec,
+  reps,
   size = 'md',
 }: {
   unit?: RecordUnit;
   weightLb?: number | null;
   timeSec?: number | null;
+  reps?: number | null;
   size?: 'md' | 'lg';
 }) {
+  if (unit === 'reps') {
+    return <span className="font-black tabular-nums">🔁 {reps ?? '-'}회</span>;
+  }
   if (unit === 'time') {
     return <span className="font-black tabular-nums">⏱ {timeSec ? fmtTime(timeSec) : '-'}</span>;
   }

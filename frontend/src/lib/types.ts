@@ -89,7 +89,7 @@ export type EventDetail = BoxEvent & {
   can_manage: boolean;
 };
 
-export type RecordUnit = 'lb' | 'time';
+export type RecordUnit = 'lb' | 'time' | 'reps';
 
 export type OneRmRecord = {
   id: string;
@@ -98,6 +98,8 @@ export type OneRmRecord = {
   unit: RecordUnit;
   weight_lb: number | null; // 파운드
   time_sec: number | null; // 초 (네임드 WOD)
+  reps?: number | null; // Max Rep 횟수
+  minutes?: number | null; // Max Rep 시간(분), 0 = 제한 없음
   achieved_on: string;
   created_at: string;
 };
@@ -109,6 +111,8 @@ export type RankRow = {
   unit: RecordUnit;
   weight_lb: number | null;
   time_sec: number | null;
+  reps?: number | null;
+  minutes?: number | null;
   achieved_on: string;
   nickname: string;
   gender: Gender | null;
@@ -126,6 +130,9 @@ export type FeedItem = {
     prev_lb?: number | null;
     time_sec?: number;
     prev_sec?: number | null;
+    reps?: number;
+    minutes?: number;
+    prev_reps?: number | null;
   };
   created_at: string;
   user_id: string;

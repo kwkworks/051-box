@@ -7,10 +7,10 @@ import { NaverCafeCard } from '@/components/NaverCafeCard';
 import { BoardShell } from '@/components/BoardShell';
 import { ErrorBox, Guard, Loading } from '@/components/Guard';
 import { api } from '@/lib/api';
-import { formatDateLabel, formatRelative, kstToday } from '@/lib/format';
+import { formatDateLabel, formatRelative, kstToday, repsLabel } from '@/lib/format';
 import { movementLabel } from '@/lib/constants';
 import { RecordValue } from '@/components/RecordValue';
-import type { Me, Profile, Role } from '@/lib/types';
+import type { Me, Profile, RecordUnit, Role } from '@/lib/types';
 import { useLoad } from '@/lib/useLoad';
 
 export default function AdminPage() {
@@ -287,7 +287,7 @@ function Usage() {
 }
 
 type MemberRecordsData = {
-  oneRm: { id: string; movement: string; is_custom: boolean; unit: 'lb' | 'time'; weight_lb: number | null; time_sec: number | null; achieved_on: string }[];
+  oneRm: { id: string; movement: string; is_custom: boolean; unit: RecordUnit; weight_lb: number | null; time_sec: number | null; reps?: number | null; minutes?: number | null; achieved_on: string }[];
   gatherings: { id: string; title: string; starts_at: string }[];
 };
 
@@ -356,7 +356,7 @@ function MemberRecords({ member }: { member: Profile }) {
               {data.oneRm.map((r) => (
                 <li key={r.id} className="flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate">
-                    {movementLabel(r.movement, r.is_custom)} <RecordValue unit={r.unit} weightLb={r.weight_lb} timeSec={r.time_sec} />{' '}
+                    {r.unit === 'reps' ? repsLabel(r.movement, r.minutes) : movementLabel(r.movement, r.is_custom)} <RecordValue unit={r.unit} weightLb={r.weight_lb} timeSec={r.time_sec} reps={r.reps} />{' '}
                     <span className="text-xs text-muted">{formatDateLabel(r.achieved_on)}</span>
                   </span>
                   <button

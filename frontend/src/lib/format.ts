@@ -81,3 +81,12 @@ export function fmtTime(sec: number): string {
   return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
 }
 
+// Max Rep 시간(분) 표시: 0 = 시간 제한 없음
+export function minutesLabel(m: number | null | undefined): string {
+  return !m ? '제한 없음' : `${m}분`;
+}
+
+// Max Rep 종목 이름: "1분 버피", "제한 없음 풀업"
+export function repsLabel(movement: string, minutes: number | null | undefined): string {
+  return `${minutesLabel(minutes)} ${movement}`;
+}

@@ -423,6 +423,16 @@ begin
   -- 0028: 대회 모집글에도 댓글
   insert into rls_results values
   (153, '회원이 대회 모집글에 댓글 작성', 'ok:1', pg_temp.run_as(a, format('insert into public.event_comments (event_id, body) values (%L, ''rls-test 대회 댓글'')', ev_closed)));
+
+  -- 0029: Max Rep 기록 (시간(분) + 직접 입력 종목 + 횟수). 임시 회원 m으로
+  insert into rls_results values
+  (154, '회원이 Max Rep 기록 (1분 버피 50회)', 'ok:1', pg_temp.run_as(m, 'insert into public.one_rm_records (movement, is_custom, unit, reps, minutes) values (''rls-test 버피'', true, ''reps'', 50, 1)')),
+  (155, 'Max Rep을 시간(분) 없이 기록', 'err', pg_temp.run_as(m, 'insert into public.one_rm_records (movement, is_custom, unit, reps) values (''rls-test 버피'', true, ''reps'', 50)')),
+  (156, 'Max Rep에 무게까지 함께 기록', 'err', pg_temp.run_as(m, 'insert into public.one_rm_records (movement, is_custom, unit, reps, minutes, weight_lb) values (''rls-test 버피'', true, ''reps'', 50, 1, 100)'));
+  insert into rls_results values
+  (157, 'Max Rep 첫 기록이 명예의 벽 PR로', 'ok:1',
+   'ok:' || (select count(*) from public.activities where user_id = m and kind = 'pr' and payload ->> 'unit' = 'reps' and payload ->> 'movement' = 'rls-test 버피')::text);
+  delete from public.one_rm_records where user_id = m and movement = 'rls-test 버피';
   delete from public.event_comments where body like 'rls-test%';
 
   -- 0028: Q&A 새 문의 알림 대상은 서버 비밀값으로만

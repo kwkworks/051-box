@@ -3,14 +3,16 @@
 import { AvatarView } from "./AvatarView";
 import { RecordValue } from "./RecordValue";
 import { movementLabel } from "@/lib/constants";
-import { fmtTime, formatRelative } from "@/lib/format";
+import { fmtTime, formatRelative, repsLabel } from "@/lib/format";
 import type { FeedItem } from "@/lib/types";
 
 // 이전 최고 기록 (없으면 그 종목 첫 기록)
 const prevOf = (item: FeedItem) =>
   (item.payload.unit === "time"
     ? item.payload.prev_sec
-    : item.payload.prev_lb) ?? null;
+    : item.payload.unit === "reps"
+      ? item.payload.prev_reps
+      : item.payload.prev_lb) ?? null;
 
 // PR 명예의 벽 카드 하나 (오른쪽에 축하해요 🎉 버튼). 페이지와 개발용 미리보기가 함께 쓴다
 export function WallCard({
@@ -30,7 +32,9 @@ export function WallCard({
       <div className="min-w-0 flex-1">
         <p className="font-bold">
           🎉 <span className="text-[var(--burgundy)]">{item.nickname}</span>님{" "}
-          {movementLabel(item.payload.movement, item.payload.is_custom)}{" "}
+          {item.payload.unit === "reps"
+            ? repsLabel(item.payload.movement, item.payload.minutes)
+            : movementLabel(item.payload.movement, item.payload.is_custom)}{" "}
           {prevOf(item) == null ? "첫 기록!" : "PR!"}
         </p>
         <p className="text-2xl">
@@ -38,13 +42,16 @@ export function WallCard({
             unit={item.payload.unit ?? "lb"}
             weightLb={item.payload.weight_lb}
             timeSec={item.payload.time_sec}
+            reps={item.payload.reps}
             size="lg"
           />
           {prevOf(item) != null && (
             <span className="ml-2 text-sm font-bold text-[var(--ok)]">
               {item.payload.unit === "time"
                 ? `${fmtTime(Number(item.payload.prev_sec) - Number(item.payload.time_sec))} 단축`
-                : `+${Math.round((Number(item.payload.weight_lb) - Number(item.payload.prev_lb)) * 10) / 10} lb`}
+                : item.payload.unit === "reps"
+                  ? `+${Number(item.payload.reps) - Number(item.payload.prev_reps)}회`
+                  : `+${Math.round((Number(item.payload.weight_lb) - Number(item.payload.prev_lb)) * 10) / 10} lb`}
             </span>
           )}
         </p>
