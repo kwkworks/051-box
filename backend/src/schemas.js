@@ -139,11 +139,14 @@ export const eventSchema = z
   .refine(...deadlineBeforeStart)
   .refine(...opensBeforeDeadline);
 // 수정: 종류(대회/이벤트/모임)는 바꿀 수 없고 나머지 내용만 고친다
-export const eventUpdateSchema = z.strictObject(eventFields).refine(...deadlineBeforeStart).refine(...opensBeforeDeadline);
+export const eventUpdateSchema = z
+  .strictObject({ ...eventFields, signup_opens_at: z.iso.datetime({ offset: true }).nullable().optional() })
+  .refine(...deadlineBeforeStart)
+  .refine(...opensBeforeDeadline);
 
 export const oneRmSchema = z
   .strictObject({
-    movement: z.string().trim().min(1).max(30),
+    movement: z.string().trim().min(1).max(30).transform((s) => s.replace(/\s+/g, ' ')),
     is_custom: z.boolean(),
     unit: z.enum(['lb', 'time', 'reps']).default('lb'),
     weight_lb: z.number().positive().max(1200).multipleOf(0.5).optional(), // 파운드

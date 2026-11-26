@@ -462,7 +462,7 @@ function Rankings({ me, rankings }: { me: Me; rankings: Record<string, RankGroup
   return (
     <section className="mb-6">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="text-lg font-black">🏆 박스 순위</h2>
+        <h2 className="shrink-0 whitespace-nowrap text-lg font-black">🏆 박스 순위</h2>
         <select className="input w-auto" value={rankKey} onChange={(e) => setRankKey(e.target.value)} aria-label="순위 종목">
           {keys.map((k) => (
             <option key={k} value={k}>

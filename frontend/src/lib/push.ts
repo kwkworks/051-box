@@ -24,7 +24,7 @@ async function registration() {
 
 // 휴대폰이 응답하지 않으면 영원히 기다리지 않게 단계마다 시간 제한을 둔다.
 // 멈춘 단계(1 알림 허용 · 2 알림 준비 · 3 푸시 등록)를 화면이 받아서 그 단계의 해결 방법을 보여준다
-export type PushStep = 1 | 2 | 3;
+export type PushStep = 1 | 2 | 3 | 4;
 export class PushStepError extends Error {
   constructor(public step: PushStep) {
     super(`push step ${step} timed out`);
@@ -94,7 +94,12 @@ export async function pushState(): Promise<PushState> {
   if (Notification.permission === 'denied') return 'denied';
   const reg = await navigator.serviceWorker.getRegistration('/');
   const sub = await reg?.pushManager.getSubscription();
-  return sub && Notification.permission === 'granted' ? 'on' : 'off';
+  if (sub && Notification.permission === 'granted') {
+    // 이 기기는 등록돼 있는데 서버 저장이 빠졌을 수 있다(등록이 늦게 끝난 경우 등) → 조용히 다시 저장 (서버는 같은 기기면 바꿔 씀)
+    api.post('/push/subscribe', sub.toJSON()).catch(() => {});
+    return 'on';
+  }
+  return 'off';
 }
 
 // 버튼을 눌렀을 때 호출 (알림 권한 요청은 사용자 동작 안에서만 가능)
@@ -115,7 +120,7 @@ export async function enablePush(): Promise<PushState> {
   let sub: PushSubscription | null = null;
   if (permission !== 'granted') {
     try {
-      permission = await withTimeout(Notification.requestPermission(), 12_000, 1);
+      permission = await withTimeout(Notification.requestPermission(), 30_000, 1); // 허용 창을 읽고 고를 시간
     } catch {
       if (Notification.permission === 'granted') {
         permission = 'granted'; // 그사이 설정에서 허용함
@@ -127,7 +132,11 @@ export async function enablePush(): Promise<PushState> {
           permission = 'granted';
         } catch (e) {
           if (e instanceof PushStepError && e.step === 2) throw e;
-          if (Notification.permission === 'denied') return 'denied';
+          // 허용은 됐는데 푸시 등록에서 실패한 것이면 3단계 안내
+          // (그사이 사용자가 허용·차단했을 수 있으니 지금 값을 다시 읽는다)
+          const now = Notification.permission as NotificationPermission;
+          if (now === 'granted') throw new PushStepError(3);
+          if (now === 'denied') return 'denied';
           throw new PushStepError(1);
         }
       }
@@ -139,7 +148,7 @@ export async function enablePush(): Promise<PushState> {
   // 3) 휴대폰 푸시 서비스에 등록 (이미 등록돼 있으면 그대로)
   if (!sub) sub = await withTimeout(subscribe(reg), 20_000, 3);
   // 4) 우리 서버에 저장 (서버가 잠들어 있으면 '깨우는 중' 안내가 따로 뜬다)
-  await api.post('/push/subscribe', sub.toJSON());
+  await withTimeout(api.post('/push/subscribe', sub.toJSON()), 75_000, 4);
   return 'on';
 }
 

@@ -104,6 +104,10 @@ body {
   background: #fff;
   font-size: 15px;
 }
+/* w-auto를 붙인 입력칸(정렬·종목 고르기 등)은 내용 폭만큼만. .input의 width: 100%가 w-auto를 덮어써서 옆 제목이 밀렸다 */
+.input.w-auto {
+  width: auto;
+}
 /* 아이폰은 16px보다 작은 입력칸을 누르면 화면을 확대하고, 홈 화면 앱에서는 확대가 풀리지 않아
    화면이 밀린 채로 남는다. 아이폰(iOS)에서만 입력칸 글자를 16px로 맞춘다. */
 @supports (-webkit-touch-callout: none) {
