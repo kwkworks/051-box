@@ -18,12 +18,49 @@ export const naverEnabled = () =>
   Boolean(config.naverClientId && config.naverClientSecret && config.naverSecret && config.pushSecret);
 
 // 카페 글 주소를 한 가지 모양으로 (https://cafe.naver.com/crossfit051/6118). 우리 카페 글이 아니면 null
+// 받는 모양: 짧은 주소(crossfit051/글번호), 새 카페 주소(cafes/31088296/articles/글번호), 모바일 주소,
+// PC 주소창 주소(iframe_url_utf8=... 안에 두 번 인코딩된 articleid), ArticleRead.nhn?articleid=
 export function normalizeCafeUrl(input) {
   const s = String(input ?? '').trim();
-  if (!/(cafe\.naver\.com)/i.test(s)) return null;
-  if (!/(crossfit051|31088296)/i.test(s)) return null;
-  const m = s.match(/articles\/(\d{1,12})/i) || s.match(/crossfit051\/(\d{1,12})(?:[/?#]|$)/i) || s.match(/articleid=(\d{1,12})/i);
+  let u;
+  try {
+    u = new URL(s);
+  } catch {
+    return null;
+  }
+  // 네이버 카페 주소만 (다른 사이트 주소 안에 카페 주소가 들어 있는 경우는 거절)
+  if (!/^https?:$/.test(u.protocol) || !/^(m\.)?cafe\.naver\.com$/i.test(u.hostname)) return null;
+  // 주소 안에 여러 번 인코딩된 부분(%253D 등)을 풀어서 찾는다
+  let text = s;
+  for (let i = 0; i < 3; i++) {
+    let next;
+    try {
+      next = decodeURIComponent(text);
+    } catch {
+      break;
+    }
+    if (next === text) break;
+    text = next;
+  }
+  if (!/(crossfit051|31088296)/i.test(text)) return null;
+  const m = text.match(/articles\/(\d{1,12})/i) || text.match(/crossfit051\/(\d{1,12})(?:[/?#&]|$)/i) || text.match(/articleid=(\d{1,12})/i);
   return m ? `${CAFE_URL_BASE}/${m[1]}` : null;
+}
+
+// 카페 앱의 '공유 → 링크 복사'로 받은 짧은 주소(https://naver.me/xxxx)는 네이버가 알려주는 원래 주소로 바꿔서 확인한다.
+// 글 내용은 읽지 않고, 넘겨주는 주소(Location)만 본다. 네이버 카페 주소가 아니면 거절
+export async function resolveCafeUrl(input) {
+  const direct = normalizeCafeUrl(input);
+  if (direct) return direct;
+  const s = String(input ?? '').trim();
+  if (!/^https:\/\/naver\.me\/[A-Za-z0-9]{3,20}$/.test(s)) return null;
+  try {
+    const res = await fetch(s, { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(5000) });
+    const loc = res.headers.get('location');
+    return loc ? normalizeCafeUrl(new URL(loc, s).toString()) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function authorizeUrl(state) {

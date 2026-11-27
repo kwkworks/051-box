@@ -3,18 +3,20 @@ import { sendPushLater } from '../push.js';
 import { requireAdmin } from '../auth.js';
 import { HttpError, unwrap } from '../errors.js';
 import { noticeCreateSchema, noticeUpdateSchema, uuid } from '../schemas.js';
-import { naverEnabled, normalizeCafeUrl, postToCafe, serialCafe } from '../naver.js';
+import { naverEnabled, postToCafe, resolveCafeUrl, serialCafe } from '../naver.js';
 
 export const noticesRouter = Router();
 
 const COLUMNS = 'id, title, body, pinned, cafe_url, created_at, updated_at';
 
 // 카페 주소를 우리 카페 글 주소 모양으로. 빈 값이면 null, 다른 주소면 오류
-function cafeUrlOrThrow(v) {
+async function cafeUrlOrThrow(v) {
   if (v === undefined) return undefined;
   if (v === null || v === '') return null;
-  const url = normalizeCafeUrl(v);
-  if (!url) throw new HttpError(400, '크로스핏051 네이버 카페 글 주소가 아니에요');
+  const url = await resolveCafeUrl(v);
+  if (!url) {
+    throw new HttpError(400, '크로스핏051 카페 글 주소를 읽지 못했어요. 카페에서 글을 열고 주소창의 주소(또는 공유 → 링크 복사)를 붙여 넣어 주세요');
+  }
   return url;
 }
 
@@ -32,7 +34,7 @@ noticesRouter.get('/', async (req, res) => {
 
 noticesRouter.post('/', requireAdmin, async (req, res) => {
   const { post_to_cafe, ...input } = noticeCreateSchema.parse(req.body);
-  const cafe_url = cafeUrlOrThrow(input.cafe_url);
+  const cafe_url = await cafeUrlOrThrow(input.cafe_url);
   const result = await req.sb.from('notices').insert({ ...input, cafe_url: cafe_url ?? null }).select(COLUMNS).single();
   if (result.error?.code === '23505') throw new HttpError(409, '이미 앱에 가져온 카페 글이에요');
   let notice = unwrap(result);
@@ -60,7 +62,7 @@ noticesRouter.patch('/:id', requireAdmin, async (req, res) => {
   const id = uuid.parse(req.params.id);
   const body = noticeUpdateSchema.parse(req.body);
   if (!Object.keys(body).length) throw new HttpError(400, '변경할 내용이 없습니다');
-  if ('cafe_url' in body) body.cafe_url = cafeUrlOrThrow(body.cafe_url);
+  if ('cafe_url' in body) body.cafe_url = await cafeUrlOrThrow(body.cafe_url);
   const result = await req.sb.from('notices').update(body).eq('id', id).select(COLUMNS).maybeSingle();
   if (result.error?.code === '23505') throw new HttpError(409, '이미 다른 공지에 연결된 카페 글이에요');
   const notice = unwrap(result);

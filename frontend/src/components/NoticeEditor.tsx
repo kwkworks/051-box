@@ -58,7 +58,10 @@ export function NoticeEditor({ notice, onDone }: { notice: Notice | null; onDone
       <div>
         <label className="label" htmlFor="n-cafe">카페 글 주소 (카페에서 가져온 글이면 붙여 넣기)</label>
         <input id="n-cafe" className="input" inputMode="url" maxLength={1000} value={cafeUrl} onChange={(e) => setCafeUrl(e.target.value)} placeholder="https://cafe.naver.com/crossfit051/6118" />
-        <p className="mt-1 text-xs text-muted">공지에 &quot;네이버 카페에서 보기&quot; 버튼이 생기고, 같은 카페 글은 두 번 가져올 수 없어요.</p>
+        <p className="mt-1 break-keep text-xs text-muted">
+          카페에서 글을 열고 주소창의 주소나 공유 → 링크 복사한 주소를 그대로 붙여 넣으면 돼요. 공지에 &quot;네이버 카페에서 보기&quot; 버튼이 생기고,
+          같은 카페 글은 두 번 가져올 수 없어요.
+        </p>
       </div>
       {!notice && !cafeUrl.trim() && (
         <div>
